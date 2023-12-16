@@ -98,6 +98,25 @@ def logs_vars(logger: logging.Logger, *ignore: str, start_message: str = None,
               end_message: str = None,
               end_message_level: Union[str, int] = logging.DEBUG,
               var_message_level: Union[str, int] = logging.DEBUG):
+    """
+    A decorator which will log the variables of a function at the given level
+    when the function is called. In the event that the wrapped function raises
+    an exception, this decorator will log an error in the provided logger, and
+    pass the exception up to the caller.
+
+    :param logger: The Logger to log with.
+    :param ignore: Any parameters that should not be logged.
+    :param start_message: A message that gets logged before the function even
+        starts executing
+    :param start_message_level: The level at which start_message should log.
+        This defaults to logging.DEBUG.
+    :param end_message: A message that gets logged after the function stops
+        executing (assuming no unexpected errors).
+    :param end_message_level: The level at which the end_message should log.
+        This defaults to logging.DEBUG.
+    :param var_message_level: The level at which the variables should log. This
+        defaults to logging.DEBUG.
+    """
     def wrap(func):
         sig = inspect.signature(func)
         parameters = sig.parameters
@@ -131,7 +150,15 @@ def logs_vars(logger: logging.Logger, *ignore: str, start_message: str = None,
         def wrapper(*args, **kwargs):
             start_log(start_message)
             _extract_and_log_values_message(var_log, sig, args, kwargs, names)
-            ans = func(*args, **kwargs)
+            try:
+                ans = func(*args, **kwargs)
+
+            except Exception as e:
+                logger.error('A variable-logged function failed to execute'
+                             ' completely.')
+                logger.error(e)
+                raise e
+
             end_log(end_message)
 
             return ans

@@ -11,6 +11,7 @@ LOGGER = getLogger('testy')
 ANSWER = 42
 LIFE = 'Bobbert'
 NAME = 'Stapler'
+BAD_NAME = 45
 AGE = 300
 
 
@@ -251,6 +252,19 @@ class TestFunctionStr:
 
         assert ans == f"Hi, I'm {NAME} and I'm {AGE} years old."
 
+    def test_logs_error(self, t_runs, caplog):
+        caplog.set_level(logging.DEBUG)
+
+        LOGGER.setLevel(logging.DEBUG)
+        try:
+            t_runs[0](BAD_NAME, AGE)
+
+        except Exception as e:
+            assert len(caplog.records) >= 2
+            assert caplog.records[-2].msg == 'A variable-logged function' \
+                                             ' failed to execute completely.'
+            assert caplog.records[-1].msg == e
+
 
 class TestFunctionInt:
     @pytest.fixture
@@ -304,3 +318,16 @@ class TestFunctionInt:
         ans = t_runs[0](NAME, AGE)
 
         assert ans == f"Hi, I'm {NAME} and I'm {AGE} years old."
+
+    def test_logs_error(self, t_runs, caplog):
+        caplog.set_level(logging.DEBUG)
+
+        LOGGER.setLevel(logging.DEBUG)
+        try:
+            t_runs[0](BAD_NAME, AGE)
+
+        except Exception as e:
+            assert len(caplog.records) >= 2
+            assert caplog.records[-2].msg == 'A variable-logged function' \
+                                             ' failed to execute completely.'
+            assert caplog.records[-1].msg == e
