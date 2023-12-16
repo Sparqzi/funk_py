@@ -1,7 +1,9 @@
+import inspect
 import logging
+from functools import wraps
 from os import getenv
 import sys
-from typing import Union
+from typing import Union, Callable
 
 
 def __make_log_at_level_func(level_value: int):
@@ -54,7 +56,7 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
     level = getenv(env_var, default_level)
     logger.setLevel(level if type(level) is int else level.upper())
 
-    format_str = '%(levelname)-' + max_length + 's: %(name)s - '
+    format_str = '%(levelname)-' + str(max_length) + 's: %(name)s - '
     if show_function:
         format_str += '%funcName)s - %(message)s'
         formatter = logging.Formatter(format_str)
@@ -73,3 +75,67 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
         logger.addHandler(file_handler)
 
     return logger
+
+
+def _get_log_level_func(logger: logging.Logger, log_level: Union[str, int]):
+    if type(log_level) is int:
+        return getattr(logger, logging.getLevelName(log_level).lower())
+
+    return getattr(logger, log_level.lower())
+
+
+def _extract_and_log_values_message(log_call: Callable, sig: inspect.Signature,
+                                    args, kwargs, names: list):
+    arg_result = sig.bind(*args, **kwargs)
+    log_call('Arguments:')
+    for name, value in arg_result.arguments.items():
+        if name in names:
+            log_call(name + ' = ' + repr(value))
+
+
+def logs_vars(logger: logging.Logger, *ignore: str, start_message: str = None,
+              start_message_level: Union[str, int] = logging.DEBUG,
+              end_message: str = None,
+              end_message_level: Union[str, int] = logging.DEBUG,
+              var_message_level: Union[str, int] = logging.DEBUG):
+    def wrap(func):
+        sig = inspect.signature(func)
+        parameters = sig.parameters
+
+        names = []
+        for name, parameter in parameters.items():
+            names.append(name)
+
+        if len(ignore):
+            for i in range(len(names) - 1, -1, -1):
+                if names[i] in ignore:
+                    del names[i]
+
+        if start_message is not None:
+            start_log = _get_log_level_func(logger, start_message_level)
+
+        else:
+            # Need function to do nothing if there's no start_message.
+            def start_log(msg: str): pass
+
+        if end_message is not None:
+            end_log = _get_log_level_func(logger, end_message_level)
+
+        else:
+            # Need function to do nothing if there's no end_message.
+            def end_log(msg: str): pass
+
+        var_log = _get_log_level_func(logger, var_message_level)
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start_log(start_message)
+            _extract_and_log_values_message(var_log, sig, args, kwargs, names)
+            ans = func(*args, **kwargs)
+            end_log(end_message)
+
+            return ans
+
+        return wrapper
+
+    return wrap
