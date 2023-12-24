@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 
 setup(
-    name='funk_py',
-    version='0.1.0',
+    name='funky_modifiers',
+    version='0.1.1',
     description='A package containing tiny bits and bobs to remove boilerplate or just make things simpler.',
     url='https://github.com/Sparqzi/funk_py',
     author='Sparqzi',
