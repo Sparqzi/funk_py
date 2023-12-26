@@ -1,4 +1,7 @@
-from init_modifiers import listable, dictable, class_init
+from typing import Callable
+
 from transforming_list import TransformingList
 
-__all__ = [init_modifiers, transforming_list]
+
+def transforming(transformer: Callable):
+    return TransformingList(transformer)
