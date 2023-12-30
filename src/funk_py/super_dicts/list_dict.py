@@ -2,7 +2,7 @@ from typing import Union, Callable, Any, Tuple, Iterable
 
 
 class ListDict(list):
-    def __init__(self, key_function: Callable, values: Iterable = None):
+    def __init__(self, key_function: Callable, values: Iterable = ...):
         """
         A list that sort of acts like a dictionary...
 
@@ -12,7 +12,7 @@ class ListDict(list):
         """
         list.__init__(self)
         self.__key_function = key_function
-        if values is not None:
+        if values is not ...:
             for item in values:
                 list.append(self, self.__process_item(item))
 

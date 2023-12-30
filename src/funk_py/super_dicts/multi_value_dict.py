@@ -2,22 +2,22 @@ from typing import Union, Optional, Tuple, Mapping, Hashable, Iterable
 
 
 class MultiValueDict(dict):
-    def __init__(self, __m: Mapping = None, **kwargs):
+    def __init__(self, map_: Mapping = ..., **kwargs):
         """
         A dictionary where each key can have multiple values. Values for this
         dictionary should be hashable.
 
-        :param __m: Initialize dictionary from mappings.
+        :param map_: Initialize dictionary from mappings.
 
         :param kwargs: Initialize dictionary from key-val pairs.
         """
-        if __m is None:
-            __m = {}
+        if map_ is ...:
+            map_ = {}
 
-        __m = dict(__m)
-        __m.update(kwargs)
+        map_ = dict(map_)
+        map_.update(kwargs)
 
-        dict.__init__(self, MultiValueDict.__convert_dict(__m))
+        dict.__init__(self, MultiValueDict.__convert_dict(map_))
 
     @staticmethod
     def __convert_dict(dictionary: dict,

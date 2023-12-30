@@ -101,7 +101,7 @@ class MultiKeyDict(dict):
 
             raise StopIteration
 
-    def __init__(self, map_: Mapping, **kwargs):
+    def __init__(self, map_: Mapping = ..., **kwargs):
         """
         Checks a mapping for keys using the same value and assigns them a
         reference to a holder for the value.
@@ -112,6 +112,9 @@ class MultiKeyDict(dict):
         """
         self._holder = self.__Holder()
         dict.__init__(self)
+        if map_ is ...:
+            map_ = {}
+
         temp_dict = dict(map_, **kwargs)
         for key, val in temp_dict.items():
             self._process_key_val_pair(key, val)
