@@ -20,6 +20,14 @@ LOG_NAME_LOOKUP = {'debug': logging.DEBUG, 'info': logging.INFO,
                    'critical': logging.CRITICAL}
 
 
+# Given this is testing a logging decorator, multiple thousands of tests are
+# run with slight differences, not just edge cases. If this breaks, it could
+# mean endless headaches. It may be worth it to later re-locate the logic for
+# determining log level out of the decorator so that it can be tested,
+# separately, but to prevent silly mistakes like accidentally hard-coding a log
+# level, it is best to keep these tests.
+
+
 @pytest.fixture(params=['debug', 'info', 'warning', 'error', 'critical'])
 def different_str_levels(request):
     return request.param
