@@ -6,10 +6,10 @@ from funk_py.modularity.logging import make_logger
 main_logger = make_logger('super_dicts', 'SUPER_DICT_LOGGER',
                           default_level='warning', TRACE=5)
 
-from super_dicts.drop_none_dict import DropNoneDict      # noqa
-from super_dicts.multi_key_dict import MultiKeyDict      # noqa
-from super_dicts.list_dict import ListDict               # noqa
-from super_dicts.multi_value_dict import MultiValueDict  # noqa
+from funk_py.super_dicts.drop_none_dict import DropNoneDict      # noqa
+from funk_py.super_dicts.multi_key_dict import MultiKeyDict      # noqa
+from funk_py.super_dicts.list_dict import ListDict               # noqa
+from funk_py.super_dicts.multi_value_dict import MultiValueDict  # noqa
 
 
 @wraps(DropNoneDict.__init__)

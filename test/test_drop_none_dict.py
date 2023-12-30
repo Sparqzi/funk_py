@@ -1,7 +1,7 @@
 from typing import Tuple, Any
 
 import pytest
-from super_dicts import DropNoneDict as DnD
+from funk_py.super_dicts.drop_none_dict import DropNoneDict as DnD
 
 
 NOT_CAUSE = 'Test failed to generate the expected start value. The issue is' \
