@@ -1,7 +1,7 @@
 from typing import Any, Union, Callable, Mapping
 
-from super_dicts import main_logger
-from modularity.logging import logs_vars
+from funk_py.super_dicts import main_logger
+from funk_py.modularity.logging import logs_vars
 
 
 class DropNoneDict(dict):
