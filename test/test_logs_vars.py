@@ -1,8 +1,8 @@
-import logging
-
 import pytest
 
-from modularity.logging import logs_vars
+import logging
+
+from funk_py.modularity.logging import logs_vars
 from logging import getLogger
 
 
