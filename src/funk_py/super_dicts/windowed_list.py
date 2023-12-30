@@ -1,4 +1,4 @@
-from typing import Any, Iterable
+from typing import Any, Dict, Collection
 
 
 class ListRefNode:
@@ -65,8 +65,8 @@ class ListRefNode:
 
 
 class WindowedList:
-    def __init__(self, values: Iterable):
-        self._lookup = {}
+    def __init__(self, values: Collection):
+        self._lookup: Dict[int, ListRefNode] = {}
         self._on = {}
         if len(values):
             self._lookup[0] = ListRefNode(values, 0)
