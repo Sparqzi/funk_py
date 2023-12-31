@@ -1,5 +1,4 @@
 from collections import namedtuple
-from enum import IntFlag
 from typing import Tuple, Any, Union
 
 import pytest
