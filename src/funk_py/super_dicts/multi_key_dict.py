@@ -1,90 +1,220 @@
-from typing import Any, Mapping, Iterable
+from typing import Callable, Iterable, Union, Any, Mapping
 
 
-class MultiKeyDict(dict):
-    class __Holder(list):
+def v_is(value):
+    return value is False or value is True or value is None or value is ...
+
+
+def _eq_list(list_: Union[list, tuple]):
+    def _eq(o_list: list):
+        if not isinstance(o_list, list) or len(list_) != len(o_list):
+            return False
+
+        for i in range(len(list_)):
+            v, o = list_[i], o_list[i]
+
+            if not _compare_values(v, o):
+                return False
+
+    return _eq
+
+
+def _eq_dict(dict_: dict):
+    def _eq(o_dict: dict):
+        if not isinstance(o_dict, dict) or len(dict_) != len(o_dict):
+            return False
+
+        for key, val in dict_.items():
+            if key in o_dict:
+                if not _compare_values(val, o_dict[key]):
+                    return False
+
+            else:
+                return False
+
+    return _eq
+
+
+def _eq_set(set_: set):
+    def _eq(o_set: set):
+        if not isinstance(o_set, set) or len(set_) != len(o_set):
+            return False
+
+        for val in set_:
+            if val not in o_set:
+                return False
+
+    return _eq
+
+
+SPECIAL_HANDLED_TYPES = (list, dict, tuple, set)
+SPECIAL_TYPE_HANDLERS = (_eq_list, _eq_dict, _eq_list, _eq_set)
+
+
+def _compare_values(v1, v2):
+    if (t1 := v_is(v1)) ^ (t2 := v_is(v2)):
+        return False
+
+    elif t1 and t2:
+        return v1 is v2
+
+    elif (t1 := callable(v1)) ^ (t2 := callable(v2)):
+        return False
+
+    # Ignore linter for below. It's trying its best, but the second set of
+    # walrus operators confuses it.
+    elif t1 and t2:  # noqa
+        return _eq_func(v1)(v2)
+
+    elif all(not isinstance(v1, t) for t in SPECIAL_HANDLED_TYPES):
+        return v1 == v2
+
+    return _check_for_thing(v1, v2, SPECIAL_HANDLED_TYPES,
+                            SPECIAL_TYPE_HANDLERS)
+
+
+def _check_for_thing(v1, v2, types, c_funcs):
+    _type = types[0]
+    if (t1 := isinstance(v1, _type)) ^ (t2 := isinstance(v2, _type)):
+        return False
+
+    elif t1 and t2:
+        return c_funcs[0](v1)(v2)
+
+    elif len(types) > 1:
+        return _check_for_thing(v1, v2, types[1:], c_funcs[1:])
+
+    return v1 == v2
+
+
+def _hash_func(func: Callable):
+    _code = func.__code__
+    _hash = hash(_code.co_code)
+    _hash += hash(_code.co_consts)
+    _hash += _code.co_nlocals
+    _hash += _code.co_argcount
+    _hash += _code.co_kwonlyargcount
+    return hash(_hash)
+
+
+def _eq_func(func: Callable):
+    _code = func.__code__
+    p1 = _code.co_code
+    p2 = _code.co_consts
+    p3 = _code.co_argcount
+    p4 = _code.co_nlocals
+    p5 = _code.co_kwonlyargcount
+    p6 = _code.co_posonlyargcount
+    p7 = _code.co_flags
+
+    def _eq(o_func: Callable):
+        if not callable(o_func):
+            return False
+
+        o_code = o_func.__code__
+        return (o_code.co_code == p1 and o_code.co_consts == p2
+                and o_code.co_argcount == p3  and o_code.co_nlocals == p4
+                and o_code.co_kwonlyargcount == p5
+                and o_code.co_posonlyargcount == p6 and o_code.co_flags == p7)
+
+    return _eq
+
+
+_HASH_LIST = hash('lIsT')
+_HASH_DICT = hash('dIcTiOnArY')
+_HASH_SET = hash('sEt')
+_HASH_UNKNOWN = hash('uNkNoWn')
+
+
+class MkD(dict):
+    class __Holder(set):
         """Holds and acts as a reference for values in the MultiKeyDict."""
-        class ValNode:
-            __slots__ = 'value', 'pos'
+        class ValNode(object):
+            def __init__(i_i_self, value):
+                i_i_self.value = value
+                # Handles the screwy ones...
+                if v_is(value):
+                    i_i_self._hash = hash(value)
+                    i_i_self._eq = lambda other: other.value is value
+                    return
 
-            def __hash__(self):
-                return self.pos
+                try:
+                    i_i_self._hash = hash(value)
+                    i_i_self._eq = lambda other: i_i_self.value == other.value
+                    return
+
+                except TypeError as e:
+                    if 'unhashable type:' in str(e):
+                        if callable(value):
+                            i_i_self._eq = _eq_func(value)
+                            i_i_self._hash = _hash_func(value)
+                            return
+
+                        elif isinstance(value, list) or type(value) is tuple:
+                            i_i_self._eq = _eq_list(value)
+                            i_i_self._hash = _HASH_LIST
+                            return
+
+                        elif isinstance(value, dict):
+                            i_i_self._eq = _eq_dict(value)
+                            i_i_self._hash = _HASH_DICT
+                            return
+
+                        elif isinstance(value, set):
+                            i_i_self._eq = _eq_set(value)
+                            i_i_self._hash = _HASH_SET
+                            return
+
+                        else:
+                            i_i_self._eq = \
+                                lambda other: _compare_values(value, other.value)
+                            i_i_self._hash = _HASH_UNKNOWN
+                            return
+
+                    raise e
+
+            def __eq__(i_i_self, other):
+                return i_i_self._eq(other)
+
+            def __hash__(i_i_self):
+                return i_i_self._hash
 
         def __init__(i_self):
-            list.__init__(i_self)
+            set.__init__(i_self)
 
-        def append(i_self, object_: Any) -> bool:
+        def add(i_self, object_: Any) -> bool:
             """Appends a value to the __Holder."""
-            c = type(object_)
-            for obj in i_self:
-                if (c is type(obj.value) and object_ == obj.value) or \
-                        (obj.value is None and object_ is None):
-                    return True
-
-            list.append(i_self, i_self.ValNode())
-            list.__getitem__(i_self, -1).value = object_
-            list.__getitem__(i_self, -1).pos = len(i_self) - 1
-            return False
-
-        def index(i_self, value: Any, start: int = ...,
-                  stop: int = ...) -> int:
-            if value is None:
-                for i in range(len(i_self)):
-                    if list.__getitem__(i_self, i).value is None:
-                        return i
-
-            else:
-                for i in range(len(i_self)):
-                    if list.__getitem__(i_self, i).value == value:
-                        return i
-
-            raise ValueError(f"'{value}' is not in __Holder")
+            temp = i_self.ValNode(object_)
+            set.add(i_self, temp)
+            return tuple(set.intersection(i_self, {temp}))[0]
 
         def __contains__(i_self, item):
-            if item is None:
-                for obj in list.__iter__(i_self):
-                    if obj.value is None:
-                        return True
+            temp = i_self.ValNode(item)
+            return set.__contains__(i_self, temp)
 
-            else:
-                for obj in list.__iter__(i_self):
-                    if obj.value == item:
-                        return True
-
-            return False
-
-        def __setitem__(i_self, index: int, value):
-            t = list.__getitem__(i_self, index)
-            t.value = value
-
-        def __getitem__(i_self, index: int):
-            return list.__getitem__(i_self, index)
-
-        def __delitem__(i_self, index: int):
-            for i in range(index + 1, len(i_self)):
-                list.__getitem__(i_self, i).pos -= 1
-
-            list.__delitem__(i_self, index)
+        def remove(i_self, __element):
+            temp = i_self.ValNode(__element)
+            set.remove(i_self, temp)
 
     class _ValuesView:
-        """An object used to view the values inside of a MultiKeyDict."""
+        """An object used to view the values inside a MultiKeyDict."""
         def __init__(i_self, parent: 'MultiKeyDict'):
             i_self.parent = parent
             i_self._index = 0
+            i_self._values = list(parent._holder)
 
         def __iter__(i_self):
             return i_self
 
         def __next__(i_self):
-            h = i_self.parent._holder
-            if i_self._index < len(h):
+            if i_self._index < len(i_self._values):
                 i_self._index += 1
-                return h[i_self._index - 1].value
+                return i_self._values[i_self._index - 1].value
 
             raise StopIteration
 
     class _ItemsView:
-        """An object used to view the items inside of a MultiKeyDict."""
+        """An object used to view the items inside a MultiKeyDict."""
         def __init__(i_self, parent: 'MultiKeyDict'):
             i_self.parent = parent
             i_self.keys = list(parent.keys())
@@ -132,9 +262,8 @@ class MultiKeyDict(dict):
         if not isinstance(keys, Iterable) or type(keys) is str:
             keys = [keys]
 
-        i = self._holder.index(value) if self._holder.append(value) else -1
         for key in keys:
-            dict.__setitem__(self, key, self._holder[i])
+            dict.__setitem__(self, key, self._holder.add(value))
 
     def __getitem__(self, key):
         """
@@ -193,7 +322,7 @@ class MultiKeyDict(dict):
         val_list = set(dict.values(self))
         for v in counter:
             if v not in val_list:
-                del self._holder[v.pos]
+                self._holder.remove(v)
 
     def values(self) -> _ValuesView:
         """
@@ -249,7 +378,7 @@ class MultiKeyDict(dict):
         val_list = set(dict.values(self))
         for v in output:
             if v not in val_list:
-                del self._holder[v.pos]
+                self._holder.remove(v)
 
         return output[0].value if len(output) == 1 \
             else tuple(v.value for v in output)
@@ -292,7 +421,7 @@ class MultiKeyDict(dict):
         val_list = set(dict.values(self))
         for v in counter:
             if v not in val_list:
-                del self._holder[v.pos]
+                self._holder.remove(v)
 
         return [v.value for v in counter]
 
@@ -358,7 +487,7 @@ class MultiKeyDict(dict):
         :param default: The default value used to fill in for keys that don't
             exist. If left empty, missing keys will not insert any value.
         :return: A tuple of the unique values corresponding to the keys if
-            multiple keys were sought. Otherwise the value corresponding to
+            multiple keys were sought. Otherwise, the value corresponding to
             the key sought.
         """
         counter = set()
@@ -372,13 +501,12 @@ class MultiKeyDict(dict):
         # do not need to test if there is a default
         else:
             for k in keys:
-                ans = dict.get(self, k, default)
-                if ans is default \
-                        or ans == default and type(default) == type(ans):
-                    default_in = True
+                if k in self:
+                    ans = dict.get(self, k, default)
+                    counter.add(ans)
 
                 else:
-                    counter.add(ans)
+                    default_in = True
 
         output = [v.value for v in counter]
         if default_in:
