@@ -447,7 +447,7 @@ def hash_function(func: FunctionType):
 
 
 def _get_kw_only_names(code_: code) -> set:
-    if (t := code_.kwonlyargcount) > 0:
+    if (t := code_.co_kwonlyargcount) > 0:
         return set(code_.co_names[-t:])
 
     return set()
