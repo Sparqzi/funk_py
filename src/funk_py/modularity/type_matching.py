@@ -1,4 +1,6 @@
+import code
 import inspect
+from types import FunctionType
 from typing import Union, Any, AnyStr, Callable, Mapping, MutableMapping, \
     get_args, get_origin, Sequence, Literal
 
@@ -433,3 +435,39 @@ class TransformerFilter:
         new = self.__from_existing(self.__rules, self.__outputs,
                                    self._raise_on_fail)
         return new
+
+
+def hash_function(func: FunctionType):
+    _code = func.__code__
+    _hash = _code.co_nlocals
+    _hash += _code.co_argcount
+    _hash += _code.co_kwonlyargcount
+    _hash += _code.co_posonlyargcount
+    return _hash
+
+
+def _get_kw_only_names(code_: code) -> set:
+    if (t := code_.kwonlyargcount) > 0:
+        return set(code_.co_names[-t:])
+
+    return set()
+
+
+def check_function_equality(func: FunctionType, o_func: FunctionType):
+    _code = func.__code__
+    p1 = _code.co_code
+    p2 = _code.co_consts
+    p3 = _code.co_argcount
+    p4 = _code.co_kwonlyargcount
+    p5 = _get_kw_only_names(_code)
+    p6 = _code.co_nlocals
+    p7 = _code.co_posonlyargcount
+    p8 = _code.co_flags
+    if not callable(o_func):
+        return False
+
+    o_code = o_func.__code__
+    return (o_code.co_code == p1 and o_code.co_consts == p2
+            and o_code.co_argcount == p3 and o_code.co_kwonlyargcount == p4
+            and _get_kw_only_names(o_code) == p5 and o_code.co_nlocals == p6
+            and o_code.co_posonlyargcount == p7 and o_code.co_flags == p8)

@@ -1,4 +1,9 @@
 from typing import Callable, Iterable, Union, Any, Mapping
+from types import FunctionType
+from typing import Iterable, Union, Any, Mapping
+
+from funk_py.modularity.type_matching import (check_function_equality,
+                                              hash_function)
 
 
 def v_is(value):
@@ -87,35 +92,9 @@ def _check_for_thing(v1, v2, types, c_funcs):
     return v1 == v2
 
 
-def _hash_func(func: Callable):
-    _code = func.__code__
-    _hash = hash(_code.co_code)
-    _hash += hash(_code.co_consts)
-    _hash += _code.co_nlocals
-    _hash += _code.co_argcount
-    _hash += _code.co_kwonlyargcount
-    return hash(_hash)
-
-
-def _eq_func(func: Callable):
-    _code = func.__code__
-    p1 = _code.co_code
-    p2 = _code.co_consts
-    p3 = _code.co_argcount
-    p4 = _code.co_nlocals
-    p5 = _code.co_kwonlyargcount
-    p6 = _code.co_posonlyargcount
-    p7 = _code.co_flags
-
-    def _eq(o_func: Callable):
-        if not callable(o_func):
-            return False
-
-        o_code = o_func.__code__
-        return (o_code.co_code == p1 and o_code.co_consts == p2
-                and o_code.co_argcount == p3  and o_code.co_nlocals == p4
-                and o_code.co_kwonlyargcount == p5
-                and o_code.co_posonlyargcount == p6 and o_code.co_flags == p7)
+def _eq_func(func: FunctionType):
+    def _eq(o_func: FunctionType):
+        check_function_equality(func, o_func)
 
     return _eq
 
@@ -145,9 +124,9 @@ class MkD(dict):
 
                 except TypeError as e:
                     if 'unhashable type:' in str(e):
-                        if callable(value):
+                        if isinstance(value, FunctionType):
                             i_i_self._eq = _eq_func(value)
-                            i_i_self._hash = _hash_func(value)
+                            i_i_self._hash = hash_function(value)
                             return
 
                         elif isinstance(value, list) or type(value) is tuple:
