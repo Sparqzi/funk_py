@@ -128,8 +128,8 @@ def parse_eq_dict(dict_: Dict[Any, list]) -> Dict[Any, list]:
                                " multiple equivalence lists during processing.")
 
     if user_is_monkey:
-        warn(f"You fool. You absolute buffoon. You think you're clever?"
-             f" I think you don't realize the magnitude of your mistake...\n"
+        warn(f"You fool. You absolute buffoon. You think you're clever? I think"
+             f" you don't realize the magnitude of your mistake...\n"
              f"The list you gave me has a value's equality defined after it was"
              f" already set equal to something else. In case you actually meant"
              f" to do this, I went back and applied the changes recursively to"
