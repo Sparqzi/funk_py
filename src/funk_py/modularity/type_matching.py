@@ -462,7 +462,6 @@ def check_function_equality(func: FunctionType, o_func: FunctionType):
     p5 = _get_kw_only_names(_code)
     p6 = _code.co_nlocals
     p7 = _code.co_posonlyargcount
-    p8 = _code.co_flags
     if not callable(o_func):
         return False
 
@@ -470,4 +469,4 @@ def check_function_equality(func: FunctionType, o_func: FunctionType):
     return (o_code.co_code == p1 and o_code.co_consts == p2
             and o_code.co_argcount == p3 and o_code.co_kwonlyargcount == p4
             and _get_kw_only_names(o_code) == p5 and o_code.co_nlocals == p6
-            and o_code.co_posonlyargcount == p7 and o_code.co_flags == p8)
+            and o_code.co_posonlyargcount == p7)
