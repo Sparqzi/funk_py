@@ -1,4 +1,3 @@
-from typing import Callable, Iterable, Union, Any, Mapping
 from types import FunctionType
 from typing import Iterable, Union, Any, Mapping
 
@@ -109,7 +108,7 @@ class MkD(dict):
     class __Holder(set):
         """Holds and acts as a reference for values in the MultiKeyDict."""
         class ValNode(object):
-            def __init__(i_i_self, value):
+            def __init__(i_i_self, value):  # noqa
                 i_i_self.value = value
                 # Handles the screwy ones...
                 if v_is(value):
@@ -152,40 +151,40 @@ class MkD(dict):
 
                     raise e
 
-            def __eq__(i_i_self, other):
+            def __eq__(i_i_self, other):  # noqa
                 return i_i_self._eq(other)
 
-            def __hash__(i_i_self):
+            def __hash__(i_i_self):  # noqa
                 return i_i_self._hash
 
-        def __init__(i_self):
+        def __init__(i_self):  # noqa
             set.__init__(i_self)
 
-        def add(i_self, object_: Any) -> bool:
+        def add(i_self, object_: Any) -> bool:  # noqa
             """Appends a value to the __Holder."""
             temp = i_self.ValNode(object_)
             set.add(i_self, temp)
             return tuple(set.intersection(i_self, {temp}))[0]
 
-        def __contains__(i_self, item):
+        def __contains__(i_self, item):  # noqa
             temp = i_self.ValNode(item)
             return set.__contains__(i_self, temp)
 
-        def remove(i_self, __element):
+        def remove(i_self, __element):  # noqa
             temp = i_self.ValNode(__element)
             set.remove(i_self, temp)
 
     class _ValuesView:
         """An object used to view the values inside a MultiKeyDict."""
-        def __init__(i_self, parent: 'MultiKeyDict'):
+        def __init__(i_self, parent: 'MultiKeyDict'):  # noqa
             i_self.parent = parent
             i_self._index = 0
             i_self._values = list(parent._holder)
 
-        def __iter__(i_self):
+        def __iter__(i_self):  # noqa
             return i_self
 
-        def __next__(i_self):
+        def __next__(i_self):  # noqa
             if i_self._index < len(i_self._values):
                 i_self._index += 1
                 return i_self._values[i_self._index - 1].value
@@ -194,15 +193,15 @@ class MkD(dict):
 
     class _ItemsView:
         """An object used to view the items inside a MultiKeyDict."""
-        def __init__(i_self, parent: 'MultiKeyDict'):
+        def __init__(i_self, parent: 'MultiKeyDict'):  # noqa
             i_self.parent = parent
             i_self.keys = list(parent.keys())
             i_self._index = 0
 
-        def __iter__(i_self):
+        def __iter__(i_self):  # noqa
             return i_self
 
-        def __next__(i_self):
+        def __next__(i_self):  # noqa
             if i_self._index < len(i_self.keys):
                 i_self._index += 1
                 key = i_self.keys[i_self._index - 1]
