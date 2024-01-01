@@ -114,10 +114,10 @@ def parse_eq_dict(dict_: Dict[Any, list]) -> Dict[Any, list]:
     return builder
 
 
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # Functions For Testing When Arguments Have Different Types
 # As Well As For Texting Different Types of Method Declarations
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # We want to minimize use of the constant pool in ID-ing functions, do not
 # define a function to get called by all the functions below.
 
@@ -305,9 +305,9 @@ def test_func_types_and_variants_equal(func_type1_eqs):
         assert not check_function_equality(func1, func2)
 
 
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # Functions For Testing When Arguments Have Defaults
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # We want to minimize use of the constant pool's impact in ID-ing functions, do
 # not define a function to get called by all the functions below.
 
@@ -389,6 +389,9 @@ def false_func_type2_9_2(*, arg1=D1B, arg2=D2G):
     return str(arg1 * arg2) + f'-{arg2}-{arg1}'
 
 
+# --------------------------------------------------------------------------------------------------
+# Test Fixtures
+# --------------------------------------------------------------------------------------------------
 POS_ONLY = 'pos-only'
 KW_ONLY = 'keyword-only'
 
@@ -499,10 +502,10 @@ def test_func_defaults_equal(func_type2_eqs):
         assert not check_function_equality(func1, func2)
 
 
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # Functions For Testing When Arguments Are Positional-Only, Kw-Only, And Positional
 # As Well As For Testing Whether Argument Names Matter
-# --------------------------------------------------------------------------------------------------
+# ==================================================================================================
 # We want to minimize use of the constant pool in ID-ing functions, do not
 # define a function to get called by all the functions below.
 
