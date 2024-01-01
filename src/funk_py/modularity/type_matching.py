@@ -502,13 +502,20 @@ def hash_function(func: FunctionType):
     This may or may not be used on decorated functions, depending on how the
     decorator works. lru_cache, for instance would break the hash, but something
     like @wraps will not necessarily break it.
-
-    :param func: The function to check.
     """
     return hash(sum(_get_simple_argument_data(func)))
 
 
 def check_function_equality(func1: FunctionType, func2: FunctionType):
+def check_function_equality(func1: FunctionType, func2: Any):
+    """
+    Checks for equality of two functions. This equality is not standard
+    equality, but is closer to how a human would interpret similarity of
+    functions. It is intended to be location-agnostic as far as is possible,
+    and is tested for functions nested within other functions, static methods in
+    classes, and decorated functions. Keep in mind if the decorator for a
+    function does not use *@wrapped*, it may not work as intended.
+    """
     p4, p5, p6, p7, p8, p9 = _get_argument_data(func1)
     o4, o5, o6, o7, o8, o9 = _get_argument_data(func2)
 
