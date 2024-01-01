@@ -459,7 +459,6 @@ def _get_simple_argument_data(func: FunctionType) \
     return arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg
 
 
-
 def _get_argument_data(func: FunctionType) \
         -> Tuple[int, int, int, bool, bool, List[str], list, dict]:
     signature = inspect.signature(func)
