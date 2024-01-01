@@ -589,16 +589,8 @@ def func_type3_3_4(arg1, arg2, lorem, /, arg4):
     return builder
 
 
-def func_type3_4_1(arg1, *, arg2, arg3, arg4):
+def func_type3_4(arg1, *, arg2, arg3, arg4):
     builder = [arg1]
-    builder *= arg2
-    builder.append(arg3)
-    builder *= arg4
-    return builder
-
-
-def func_type3_4_2(lorem, *, arg2, arg3, arg4):
-    builder = [lorem]
     builder *= arg2
     builder.append(arg3)
     builder *= arg4
@@ -695,3 +687,111 @@ def func_type4_4(arg1, /, arg2, arg3, lorem, *, arg5):
     builder *= lorem
     builder.append(arg5)
     return builder
+
+
+# --------------------------------------------------------------------------------------------------
+# Test Fixtures
+# --------------------------------------------------------------------------------------------------
+FIRST = 'first of the type'
+MIDDLE = 'middle of the type'
+END = 'end of the type'
+TYPE2 = ' preceded by positional-only'
+TYPE3 = ' proceeded by keyword-only'
+TYPE4 = TYPE2 + ' and' + TYPE3
+
+
+def construct_func_type3_desc(arg_type: str, different_name_pos: str = 'N/A'):
+    return (f'Arguments Type: {arg_type},'
+            f' Different Name Position: {different_name_pos}')
+
+
+FUNC_TYPE3_PAIRS = (
+    (func_type3_1_1, construct_func_type3_desc(REG)),
+    (func_type3_1_2, construct_func_type3_desc(REG, 'ALL')),
+    (func_type3_2_1, construct_func_type3_desc(REG + TYPE2)),
+    (func_type3_2_2, construct_func_type3_desc(REG + TYPE2, FIRST)),
+    (func_type3_2_3, construct_func_type3_desc(REG + TYPE2, MIDDLE)),
+    (func_type3_2_4, construct_func_type3_desc(REG + TYPE2, END)),
+    (func_type3_3_1, construct_func_type3_desc(POS_ONLY)),
+    (func_type3_3_2, construct_func_type3_desc(POS_ONLY, FIRST)),
+    (func_type3_3_3, construct_func_type3_desc(POS_ONLY, MIDDLE)),
+    (func_type3_3_4, construct_func_type3_desc(POS_ONLY, END)),
+    (func_type3_4, construct_func_type3_desc(KW_ONLY)),
+    (false_func_type3_4_1, construct_func_type3_desc(KW_ONLY, FIRST)),
+    (false_func_type3_4_2, construct_func_type3_desc(KW_ONLY, MIDDLE)),
+    (false_func_type3_4_3, construct_func_type3_desc(KW_ONLY, END)),
+    (func_type3_5_1, construct_func_type3_desc(REG + TYPE3)),
+    (func_type3_5_2, construct_func_type3_desc(REG + TYPE3, FIRST)),
+    (func_type3_5_3, construct_func_type3_desc(REG + TYPE3, MIDDLE)),
+    (func_type3_5_4, construct_func_type3_desc(REG + TYPE3, END)),
+    (func_type4_1, construct_func_type3_desc(REG + TYPE4)),
+    (func_type4_2, construct_func_type3_desc(REG + TYPE4, FIRST)),
+    (func_type4_3, construct_func_type3_desc(REG + TYPE4, MIDDLE)),
+    (func_type4_4, construct_func_type3_desc(REG + TYPE4, END))
+)
+
+FUNC_TYPE3_EQ_HASH = parse_eq_dict({
+    func_type3_1_1: [func_type3_1_2],
+    func_type3_2_1: [func_type3_2_2, func_type3_2_3, func_type3_2_4,
+                     func_type3_5_1, func_type3_5_2, func_type3_5_3,
+                     func_type3_5_4],
+    func_type3_3_1: [func_type3_3_2, func_type3_3_3, func_type3_3_4,
+                     func_type3_4, false_func_type3_4_1, false_func_type3_4_2,
+                     false_func_type3_4_3, func_type4_1, func_type4_2,
+                     func_type4_3, func_type4_4]
+})
+FUNC_TYPE3_EQ_EQ = parse_eq_dict({
+    func_type3_1_1: [func_type3_1_2],
+    func_type3_2_1: [func_type3_2_2, func_type3_2_3, func_type3_2_4],
+    func_type3_3_1: [func_type3_3_2, func_type3_3_3, func_type3_3_4],
+    func_type3_4: [func_type3_4],
+    false_func_type3_4_1: [false_func_type3_4_1],
+    false_func_type3_4_2: [false_func_type3_4_2],
+    false_func_type3_4_3: [false_func_type3_4_3],
+    func_type3_5_1: [func_type3_5_2, func_type3_5_3, func_type3_5_4],
+    func_type4_1: [func_type4_2, func_type4_3, func_type4_4]
+})
+
+
+@pytest.fixture(params=[p[0] for p in FUNC_TYPE3_PAIRS],
+                ids=[p[1] for p in FUNC_TYPE3_PAIRS])
+def func_type3_funcs1(request):
+    return request.param
+
+
+@pytest.fixture(params=[p[0] for p in FUNC_TYPE3_PAIRS],
+                ids=[' <--> ' + p[1] for p in FUNC_TYPE3_PAIRS])
+def func_type3_funcs2(request):
+    return request.param
+
+
+@pytest.fixture
+def func_type3_hashes(func_type3_funcs1, func_type3_funcs2):
+    return (func_type3_funcs1, func_type3_funcs2,
+            func_type3_funcs2 in FUNC_TYPE3_EQ_HASH[func_type3_funcs1])
+
+
+@pytest.fixture
+def func_type3_eqs(func_type3_funcs1, func_type3_funcs2):
+    return (func_type3_funcs1, func_type3_funcs2,
+            func_type3_funcs2 in FUNC_TYPE3_EQ_EQ[func_type3_funcs1])
+
+
+def test_func_names_hash(func_type3_hashes):
+    func1, func2, should_equal = func_type3_hashes
+    hash1 = hash_function(func1)
+    hash2 = hash_function(func2)
+    if should_equal:
+        assert hash1 == hash2
+
+    else:
+        assert hash1 != hash2
+
+
+def test_func_names_equal(func_type3_eqs):
+    func1, func2, should_equal = func_type3_eqs
+    if should_equal:
+        assert check_function_equality(func1, func2)
+
+    else:
+        assert not check_function_equality(func1, func2)
