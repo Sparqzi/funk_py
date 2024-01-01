@@ -461,20 +461,30 @@ def _get_simple_argument_data(func: FunctionType) \
 
 
 def _get_argument_data(func: FunctionType) \
-        -> Tuple[int, int, int, bool, bool, List[str]]:
+        -> Tuple[int, int, int, bool, bool, List[str], list, dict]:
     signature = inspect.signature(func)
     arg_count = len(signature.parameters)
     pos_only_count = kw_only_count = 0
+    pos_defaults = []
+    kw_defaults = {}
     var_arg = var_kwarg = False
     kw_names = []
 
     for name, parameter in signature.parameters.items():
         if parameter.kind is parameter.POSITIONAL_ONLY:
             pos_only_count += 1
+            if parameter.default is not parameter.empty:
+                pos_defaults.append(parameter.default)
+
+        elif (parameter.kind is parameter.POSITIONAL_OR_KEYWORD
+                and parameter.default is not parameter.empty):
+            pos_defaults.append(parameter.default)
 
         elif parameter.kind is parameter.KEYWORD_ONLY:
             kw_only_count += 1
             kw_names.append(name)
+            if parameter.default is not parameter.empty:
+                kw_defaults[name] = parameter.default
 
         elif parameter.kind is parameter.VAR_POSITIONAL:
             var_arg = True
@@ -483,7 +493,7 @@ def _get_argument_data(func: FunctionType) \
             var_kwarg = True
 
     return (arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg,
-            kw_names)
+            kw_names, pos_defaults, kw_defaults)
 
 
 def hash_function(func: FunctionType):
@@ -519,15 +529,15 @@ def check_function_equality(func1: FunctionType, func2: Any):
             not isinstance(func2, FunctionType)):
         return False
 
-    p4, p5, p6, p7, p8, p9 = _get_argument_data(func1)
-    o4, o5, o6, o7, o8, o9 = _get_argument_data(func2)
+    args1 = _get_argument_data(func1)
+    args2 = _get_argument_data(func2)
 
     _code = func1.__code__
     o_code = func2.__code__
     return (o_code.co_code == _code.co_code
             and o_code.co_consts == _code.co_consts
-            and o_code.co_nlocals == _code.co_nlocals and o4 == p4 and o5 == p5
-            and o6 == p6 and o7 == p7 and o8 == p8 and o9 == p9)
+            and o_code.co_nlocals == _code.co_nlocals
+            and all(args1[i] == args2[i] for i in range(8)))
 
 
 # def thoroughly_check_equality(val1: Any, val2: Any):
