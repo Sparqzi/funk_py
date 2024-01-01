@@ -515,6 +515,10 @@ def check_function_equality(func1: FunctionType, func2: Any):
     classes, and decorated functions. Keep in mind if the decorator for a
     function does not use *@wrapped*, it may not work as intended.
     """
+    if (not isinstance(func1, FunctionType) or
+            not isinstance(func2, FunctionType)):
+        return False
+
     p4, p5, p6, p7, p8, p9 = _get_argument_data(func1)
     o4, o5, o6, o7, o8, o9 = _get_argument_data(func2)
 
