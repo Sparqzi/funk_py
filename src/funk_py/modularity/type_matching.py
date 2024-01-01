@@ -523,7 +523,8 @@ def check_function_equality(func1: FunctionType, func2: Any):
     functions. It is intended to be location-agnostic as far as is possible,
     and is tested for functions nested within other functions, static methods in
     classes, and decorated functions. Keep in mind if the decorator for a
-    function does not use *@wrapped*, it may not work as intended.
+    function does not use *@wrapped*, it may not work as intended. **BEWARE:
+    This does not care about the names of positional arguments at all.**
     """
     if (not isinstance(func1, FunctionType) or
             not isinstance(func2, FunctionType)):
