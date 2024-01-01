@@ -1,8 +1,7 @@
-import code
 import inspect
 from types import FunctionType
 from typing import Union, Any, AnyStr, Callable, Mapping, MutableMapping, \
-    get_args, get_origin, Sequence, Literal
+    get_args, get_origin, Sequence, Literal, Tuple, List
 
 from collections.abc import Iterable
 
@@ -437,36 +436,88 @@ class TransformerFilter:
         return new
 
 
+def _get_simple_argument_data(func: FunctionType) \
+        -> Tuple[int, int, int, bool, bool]:
+    signature = inspect.signature(func)
+    arg_count = len(signature.parameters)
+    pos_only_count = kw_only_count = 0
+    var_arg = var_kwarg = False
+
+    for name, parameter in signature.parameters.items():
+        if parameter.kind is parameter.POSITIONAL_ONLY:
+            pos_only_count += 1
+
+        elif parameter.kind is parameter.KEYWORD_ONLY:
+            kw_only_count += 1
+
+        elif parameter.kind is parameter.VAR_POSITIONAL:
+            var_arg = True
+
+        elif parameter.kind is parameter.VAR_KEYWORD:
+            var_kwarg = True
+
+    return arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg
+
+
+
+def _get_argument_data(func: FunctionType) \
+        -> Tuple[int, int, int, bool, bool, List[str]]:
+    signature = inspect.signature(func)
+    arg_count = len(signature.parameters)
+    pos_only_count = kw_only_count = 0
+    var_arg = var_kwarg = False
+    kw_names = []
+
+    for name, parameter in signature.parameters.items():
+        if parameter.kind is parameter.POSITIONAL_ONLY:
+            pos_only_count += 1
+
+        elif parameter.kind is parameter.KEYWORD_ONLY:
+            kw_only_count += 1
+            kw_names.append(name)
+
+        elif parameter.kind is parameter.VAR_POSITIONAL:
+            var_arg = True
+
+        elif parameter.kind is parameter.VAR_KEYWORD:
+            var_kwarg = True
+
+    return (arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg,
+            kw_names)
+
+
 def hash_function(func: FunctionType):
-    _code = func.__code__
-    _hash = _code.co_nlocals
-    _hash += _code.co_argcount
-    _hash += _code.co_kwonlyargcount
-    _hash += _code.co_posonlyargcount
-    return _hash
+    """
+    This can *hash* a function insofar as its static image at the time of
+    hashing. Since functions are technically mutable, it is heavily advised
+    that use of this is avoided unless a function is truly going to be treated
+    as immutable. This means:
+        1 - **No attributes may be set on a function** after hashing.
+
+        2 - The function **should not use *global* variables** that are
+        **changed after hashing**.
+
+        3 - The function should have **no internal constants which change**.
+
+    This may or may not be used on decorated functions, depending on how the
+    decorator works. lru_cache, for instance would break the hash, but something
+    like @wraps will not necessarily break it.
+
+    :param func: The function to check.
+    """
+    return hash(sum(_get_simple_argument_data(func)))
 
 
-def _get_kw_only_names(code_: code) -> set:
-    if (t := code_.co_kwonlyargcount) > 0:
-        return set(code_.co_names[-t:])
+def check_function_equality(func1: FunctionType, func2: FunctionType):
+    p4, p5, p6, p7, p8, p9 = _get_argument_data(func1)
+    o4, o5, o6, o7, o8, o9 = _get_argument_data(func2)
 
-    return set()
+    _code = func1.__code__
+    o_code = func2.__code__
+    return (o_code.co_code == _code.co_code
+            and o_code.co_consts == _code.co_consts
+            and o_code.co_nlocals == _code.co_nlocals and o4 == p4 and o5 == p5
+            and o6 == p6 and o7 == p7 and o8 == p8 and o9 == p9)
 
 
-def check_function_equality(func: FunctionType, o_func: FunctionType):
-    _code = func.__code__
-    p1 = _code.co_code
-    p2 = _code.co_consts
-    p3 = _code.co_argcount
-    p4 = _code.co_kwonlyargcount
-    p5 = _get_kw_only_names(_code)
-    p6 = _code.co_nlocals
-    p7 = _code.co_posonlyargcount
-    if not callable(o_func):
-        return False
-
-    o_code = o_func.__code__
-    return (o_code.co_code == p1 and o_code.co_consts == p2
-            and o_code.co_argcount == p3 and o_code.co_kwonlyargcount == p4
-            and _get_kw_only_names(o_code) == p5 and o_code.co_nlocals == p6
-            and o_code.co_posonlyargcount == p7)
+# def thoroughly_check_equality(val1: Any, val2: Any):
