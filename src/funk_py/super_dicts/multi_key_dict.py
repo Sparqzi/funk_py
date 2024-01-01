@@ -374,7 +374,7 @@ class MkD(dict):
         :param default: The default value used to fill in for keys that don't
             exist.
         :return: A tuple of the unique values corresponding to the keys if
-            multiple keys were sought. Otherwise the value corresponding
+            multiple keys were sought. Otherwise, the value corresponding
             to the key sought.
         """
         if type(key) is not tuple:
@@ -416,7 +416,7 @@ class MkD(dict):
         :param default: The default value used to fill in for keys that don't
             exist.
         :return: A tuple of the values corresponding to the keys if multiple
-            keys were sought. Otherwise the value corresponding to the key
+            keys were sought. Otherwise, the value corresponding to the key
             sought.
         """
         output = []
