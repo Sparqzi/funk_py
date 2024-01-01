@@ -212,42 +212,42 @@ STATIC_CLASS = 'static class method'
 CLASS_LAMBDA = 'lambda defined in class'
 
 
-def construct_func_desc(type_: type, variant: Any, func_type: str):
+def construct_func_type1_desc(type_: type, variant: Any, func_type: str):
     return (f'Param Type: {type_}, Code Variant: {variant},'
             f' Function Type: {func_type}')
 
 
 FUNC_TYPE1_PAIRS = (
-    (func_type1_1_1, construct_func_desc(str, 1, REG), 1),
-    (func_type1_1_2, construct_func_desc(int, 1, REG), 1),
-    (func_type1_1_3, construct_func_desc(Any, 1, REG_LAMBDA), 1),
+    (func_type1_1_1, construct_func_type1_desc(str, 1, REG), 1),
+    (func_type1_1_2, construct_func_type1_desc(int, 1, REG), 1),
+    (func_type1_1_3, construct_func_type1_desc(Any, 1, REG_LAMBDA), 1),
     (FuncType1ClassVersions.func_type1_1_1,
-     construct_func_desc(str, 1, STATIC_CLASS), 1),
+     construct_func_type1_desc(str, 1, STATIC_CLASS), 1),
     (FuncType1ClassVersions.func_type1_1_2,
-     construct_func_desc(int, 1, STATIC_CLASS), 1),
+     construct_func_type1_desc(int, 1, STATIC_CLASS), 1),
     (FuncType1ClassVersions.func_type1_1_3,
-     construct_func_desc(Any, 1, CLASS_LAMBDA), 1),
+     construct_func_type1_desc(Any, 1, CLASS_LAMBDA), 1),
     (func_type1_local_version(FUNC_TYPE1_1_1),
-     construct_func_desc(str, 1, LOCAL), 1),
+     construct_func_type1_desc(str, 1, LOCAL), 1),
     (func_type1_local_version(FUNC_TYPE1_1_2),
-     construct_func_desc(int, 1, LOCAL), 1),
+     construct_func_type1_desc(int, 1, LOCAL), 1),
     (func_type1_local_version(FUNC_TYPE1_1_3),
-     construct_func_desc(Any, 1, LOCAL_LAMBDA), 1),
-    (func_type1_2_1, construct_func_desc(str, 2, REG), 2),
-    (func_type1_2_2, construct_func_desc(int, 2, REG), 2),
-    (func_type1_2_3, construct_func_desc(Any, 2, REG_LAMBDA), 2),
+     construct_func_type1_desc(Any, 1, LOCAL_LAMBDA), 1),
+    (func_type1_2_1, construct_func_type1_desc(str, 2, REG), 2),
+    (func_type1_2_2, construct_func_type1_desc(int, 2, REG), 2),
+    (func_type1_2_3, construct_func_type1_desc(Any, 2, REG_LAMBDA), 2),
     (FuncType1ClassVersions.func_type1_2_1,
-     construct_func_desc(str, 2, STATIC_CLASS), 2),
+     construct_func_type1_desc(str, 2, STATIC_CLASS), 2),
     (FuncType1ClassVersions.func_type1_2_2,
-     construct_func_desc(int, 2, STATIC_CLASS), 2),
+     construct_func_type1_desc(int, 2, STATIC_CLASS), 2),
     (FuncType1ClassVersions.func_type1_2_3,
-     construct_func_desc(Any, 2, CLASS_LAMBDA), 2),
+     construct_func_type1_desc(Any, 2, CLASS_LAMBDA), 2),
     (func_type1_local_version(FUNC_TYPE1_2_1),
-     construct_func_desc(str, 2, LOCAL), 2),
+     construct_func_type1_desc(str, 2, LOCAL), 2),
     (func_type1_local_version(FUNC_TYPE1_2_2),
-     construct_func_desc(int, 2, LOCAL), 2),
+     construct_func_type1_desc(int, 2, LOCAL), 2),
     (func_type1_local_version(FUNC_TYPE1_2_3),
-     construct_func_desc(Any, 2, LOCAL_LAMBDA), 2)
+     construct_func_type1_desc(Any, 2, LOCAL_LAMBDA), 2)
 )
 
 # As of the time of this comment, the expected behavior of hashing these
@@ -308,8 +308,8 @@ def test_func_types_and_variants_equal(func_type1_eqs):
 # --------------------------------------------------------------------------------------------------
 # Functions For Testing When Arguments Have Defaults
 # --------------------------------------------------------------------------------------------------
-# We want to minimize use of the constant pool in ID-ing functions, do not
-# define a function to get called by all the functions below.
+# We want to minimize use of the constant pool's impact in ID-ing functions, do
+# not define a function to get called by all the functions below.
 
 D1G = 15
 D2G = 12
@@ -387,6 +387,116 @@ def false_func_type2_9_1(*, arg1=D1G, arg2=D2B):
 
 def false_func_type2_9_2(*, arg1=D1B, arg2=D2G):
     return str(arg1 * arg2) + f'-{arg2}-{arg1}'
+
+
+POS_ONLY = 'pos-only'
+KW_ONLY = 'keyword-only'
+
+
+# default1 and default2 are reversed because of restrictions on default
+# arguments which prevent arg1 from ever having a default if arg2 doesn't
+def construct_func_type2_desc(arg_type: str, default2: int = 'N/A',
+                              default1: int = 'N/A'):
+    return (f'Arguments Type: {arg_type}, arg1 Default: {default1},'
+            f' arg2 Default: {default2}')
+
+
+FUNC_TYPE2_PAIRS = (
+    (func_type2_1, construct_func_type2_desc(REG)),
+    (func_type2_2, construct_func_type2_desc(REG, D2G)),
+    (false_func_type2_2, construct_func_type2_desc(REG, D2B)),
+    (func_type2_3, construct_func_type2_desc(REG, D2G, D1G)),
+    (false_func_type2_3_1, construct_func_type2_desc(REG, D2B, D1G)),
+    (false_func_type2_3_2, construct_func_type2_desc(REG, D2G, D1B)),
+    (func_type2_4, construct_func_type2_desc(POS_ONLY)),
+    (func_type2_5, construct_func_type2_desc(POS_ONLY, D2G)),
+    (false_func_type2_5, construct_func_type2_desc(POS_ONLY, D2B)),
+    (func_type2_6, construct_func_type2_desc(POS_ONLY, D2G)),
+    (false_func_type2_6_1, construct_func_type2_desc(POS_ONLY, D2B, D1G)),
+    (false_func_type2_6_2, construct_func_type2_desc(POS_ONLY, D2G, D1B)),
+    (func_type2_7, construct_func_type2_desc(KW_ONLY)),
+    (func_type2_8, construct_func_type2_desc(KW_ONLY, D2G)),
+    (false_func_type2_8, construct_func_type2_desc(KW_ONLY, D2B)),
+    (func_type2_9, construct_func_type2_desc(KW_ONLY, D2G, D1G)),
+    (false_func_type2_9_1, construct_func_type2_desc(KW_ONLY, D2B, D1G)),
+    (false_func_type2_9_2, construct_func_type2_desc(KW_ONLY, D2G, D1B))
+)
+
+FUNC_TYPE2_EQ_HASH = parse_eq_dict({
+    func_type2_1: [func_type2_2, false_func_type2_2, func_type2_3,
+                   false_func_type2_3_1, false_func_type2_3_2],
+    func_type2_4: [func_type2_5, false_func_type2_5, func_type2_6,
+                   false_func_type2_6_1, false_func_type2_6_2, func_type2_7,
+                   func_type2_8, false_func_type2_8, func_type2_9,
+                   false_func_type2_9_1, false_func_type2_9_2]
+})
+# As of the time of this comment, the expected behavior of comparing these
+# functions with check_function_equality is that none of them are the same as
+# each other.
+FUNC_TYPE2_EQ_EQ = parse_eq_dict({
+    func_type2_1: [func_type2_1],
+    func_type2_2: [func_type2_2],
+    false_func_type2_2: [false_func_type2_2],
+    func_type2_3: [func_type2_3],
+    false_func_type2_3_1: [false_func_type2_3_1],
+    false_func_type2_3_2: [false_func_type2_3_2],
+    func_type2_4: [func_type2_4],
+    func_type2_5: [func_type2_5],
+    false_func_type2_5: [false_func_type2_5],
+    func_type2_6: [func_type2_6],
+    false_func_type2_6_1: [false_func_type2_6_1],
+    false_func_type2_6_2: [false_func_type2_6_2],
+    func_type2_7: [func_type2_7],
+    func_type2_8: [func_type2_8],
+    false_func_type2_8: [false_func_type2_8],
+    func_type2_9: [func_type2_9],
+    false_func_type2_9_1: [false_func_type2_9_1],
+    false_func_type2_9_2: [false_func_type2_9_2]
+})
+
+
+@pytest.fixture(params=[p[0] for p in FUNC_TYPE2_PAIRS],
+                ids=[p[1] for p in FUNC_TYPE2_PAIRS])
+def func_type2_funcs1(request):
+    return request.param
+
+
+@pytest.fixture(params=[p[0] for p in FUNC_TYPE2_PAIRS],
+                ids=[' <--> ' + p[1] for p in FUNC_TYPE2_PAIRS])
+def func_type2_funcs2(request):
+    return request.param
+
+
+@pytest.fixture
+def func_type2_hashes(func_type2_funcs1, func_type2_funcs2):
+    return (func_type2_funcs1, func_type2_funcs2,
+            func_type2_funcs2 in FUNC_TYPE2_EQ_HASH[func_type2_funcs1])
+
+
+@pytest.fixture
+def func_type2_eqs(func_type2_funcs1, func_type2_funcs2):
+    return (func_type2_funcs1, func_type2_funcs2,
+            func_type2_funcs2 in FUNC_TYPE2_EQ_EQ[func_type2_funcs1])
+
+
+def test_func_defaults_hash(func_type2_hashes):
+    func1, func2, should_equal = func_type2_hashes
+    hash1 = hash_function(func1)
+    hash2 = hash_function(func2)
+    if should_equal:
+        assert hash1 == hash2
+
+    else:
+        assert hash1 != hash2
+
+
+def test_func_defaults_equal(func_type2_eqs):
+    func1, func2, should_equal = func_type2_eqs
+    if should_equal:
+        assert check_function_equality(func1, func2)
+
+    else:
+        assert not check_function_equality(func1, func2)
 
 
 # --------------------------------------------------------------------------------------------------
