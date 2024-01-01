@@ -250,9 +250,6 @@ def construct_func_desc(type_: type, variant: Any, func_type: str):
             f' Function Type: {func_type}')
 
 
-FUNC_TYPE1_1_1_DESC = construct_func_desc(str, 1, REG)
-
-
 FUNC_TYPE1_PAIRS = (
     (func_type1_1_1, construct_func_desc(str, 1, REG), 1),
     (func_type1_1_2, construct_func_desc(int, 1, REG), 1),
