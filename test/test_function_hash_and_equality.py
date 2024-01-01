@@ -7,39 +7,6 @@ from funk_py.modularity.type_matching import (check_function_equality,
 
 import pytest
 
-NOT_CAUSE = 'Test failed to generate the expected start value. The issue is' \
-            ' probably elsewhere.'
-
-ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
-
-K = [char for char in ALPHABET] + ['a' + char for char in ALPHABET]
-
-CV = [1, True, '1',
-      0, False, '0', '', {}, [], (), set(), range(0),
-      None, ...]
-V = ['lorem', 25, b'ipsum', 57.56]
-AV = ['dolor', 90, b'sit', 900.5]
-
-CONTROL = 'control'
-
-# 1 is normally confused with True by sets (for values) and dicts (for keys).
-# '1' is a sanity check to make sure python isn't suddenly acting like
-# javascript.
-TRUE_CONFUSED = (1, True, '1')
-
-# 0 is normally confused with False by sets (for values) and dicts (for keys).
-# '0' is a sanity check to make sure python isn't suddenly acting like
-# javascript. The other values are falsy, but shouldn't generally be confused
-# in sets or dicts, they are sanity checks as well, since it would be bad for
-# errors to sneak up on us.
-FALSE_CONFUSED = (0, False, '', {}, [], (), set(), range(0), '0')
-
-# None is falsy, but the hash check should cause immediate fail to match (as it
-# should with most falsy values). The following two tests are not really for
-# values that get confused with others, but are instead related to values that
-# must be compared using 'is'.
-NONE_ETC = (None, ...)
-
 
 # If this appears to be broken, please step through, reading the comments
 # carefully. At the time this is written, this can only be replaced if EVERY
