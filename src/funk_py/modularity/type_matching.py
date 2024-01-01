@@ -506,7 +506,6 @@ def hash_function(func: FunctionType):
     return hash(sum(_get_simple_argument_data(func)))
 
 
-def check_function_equality(func1: FunctionType, func2: FunctionType):
 def check_function_equality(func1: FunctionType, func2: Any):
     """
     Checks for equality of two functions. This equality is not standard
