@@ -24,7 +24,7 @@ def _eq(obj1, check):
     return check_it
 
 
-class MkD(dict):
+class MultiKeyDict(dict):
     class __Holder(set):
         """Holds and acts as a reference for values in the MultiKeyDict."""
         class ValNode(object):
