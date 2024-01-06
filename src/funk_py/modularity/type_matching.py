@@ -595,10 +595,8 @@ def check_function_equality(func1: FunctionType, func2: Any):
     Checks for equality of two functions. This equality is not standard
     equality, but is closer to how a human would interpret similarity of
     functions. It is intended to be location-agnostic as far as is possible,
-    and is tested for functions nested within other functions, static methods in
-    classes, and decorated functions. Keep in mind if the decorator for a
-    function does not use *@wrapped*, it may not work as intended. **BEWARE:
-    This does not care about the names of positional arguments at all.**
+    and is tested for functions nested within other functions and static methods
+    in classes. Decorated functions will generally fail to compare equal.**
     """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
