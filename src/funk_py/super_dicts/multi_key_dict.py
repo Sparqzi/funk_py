@@ -1,107 +1,27 @@
 from types import FunctionType
 from typing import Iterable, Union, Any, Mapping
 
-from funk_py.modularity.type_matching import (check_function_equality,
-                                              hash_function)
+from funk_py.modularity.type_matching import (hash_function,
+                                              check_function_equality,
+                                              check_list_equality,
+                                              check_dict_equality,
+                                              thoroughly_check_equality)
 
 
-def v_is(value):
-    return value is False or value is True or value is None or value is ...
-
-
-def _eq_list(list_: Union[list, tuple]):
-    def _eq(o_list: list):
-        if not isinstance(o_list, list) or len(list_) != len(o_list):
-            return False
-
-        for i in range(len(list_)):
-            v, o = list_[i], o_list[i]
-
-            if not _compare_values(v, o):
-                return False
-
-    return _eq
-
-
-def _eq_dict(dict_: dict):
-    def _eq(o_dict: dict):
-        if not isinstance(o_dict, dict) or len(dict_) != len(o_dict):
-            return False
-
-        for key, val in dict_.items():
-            if key in o_dict:
-                if not _compare_values(val, o_dict[key]):
-                    return False
-
-            else:
-                return False
-
-    return _eq
-
-
-def _eq_set(set_: set):
-    def _eq(o_set: set):
-        if not isinstance(o_set, set) or len(set_) != len(o_set):
-            return False
-
-        for val in set_:
-            if val not in o_set:
-                return False
-
-    return _eq
-
-
-SPECIAL_HANDLED_TYPES = (list, dict, tuple, set)
-SPECIAL_TYPE_HANDLERS = (_eq_list, _eq_dict, _eq_list, _eq_set)
-
-
-def _compare_values(v1, v2):
-    if (t1 := v_is(v1)) ^ (t2 := v_is(v2)):
-        return False
-
-    elif t1 and t2:
-        return v1 is v2
-
-    elif (t1 := callable(v1)) ^ (t2 := callable(v2)):
-        return False
-
-    # Ignore linter for below. It's trying its best, but the second set of
-    # walrus operators confuses it.
-    elif t1 and t2:  # noqa
-        return _eq_func(v1)(v2)
-
-    elif all(not isinstance(v1, t) for t in SPECIAL_HANDLED_TYPES):
-        return v1 == v2
-
-    return _check_for_thing(v1, v2, SPECIAL_HANDLED_TYPES,
-                            SPECIAL_TYPE_HANDLERS)
-
-
-def _check_for_thing(v1, v2, types, c_funcs):
-    _type = types[0]
-    if (t1 := isinstance(v1, _type)) ^ (t2 := isinstance(v2, _type)):
-        return False
-
-    elif t1 and t2:
-        return c_funcs[0](v1)(v2)
-
-    elif len(types) > 1:
-        return _check_for_thing(v1, v2, types[1:], c_funcs[1:])
-
-    return v1 == v2
-
-
-def _eq_func(func: FunctionType):
-    def _eq(o_func: FunctionType):
-        check_function_equality(func, o_func)
-
-    return _eq
-
-
+# These types don't really have hashes, but we want to be able to store them in
+# a set. Assign each type a different constant hash.
 _HASH_LIST = hash('lIsT')
+_HASH_TUPLE = hash('tUpLe')
 _HASH_DICT = hash('dIcTiOnArY')
 _HASH_SET = hash('sEt')
 _HASH_UNKNOWN = hash('uNkNoWn')
+
+
+def _eq(obj1, check):
+    def check_it(obj2):
+        return check(obj1, obj2)
+
+    return check_it
 
 
 class MkD(dict):
@@ -111,41 +31,44 @@ class MkD(dict):
             def __init__(i_i_self, value):  # noqa
                 i_i_self.value = value
                 # Handles the screwy ones...
-                if v_is(value):
+                if (value is False or value is True or value is None
+                        or value is ...):
                     i_i_self._hash = hash(value)
                     i_i_self._eq = lambda other: other.value is value
                     return
 
                 try:
                     i_i_self._hash = hash(value)
-                    i_i_self._eq = lambda other: i_i_self.value == other.value
+                    i_i_self._eq = lambda other: other.value == value
                     return
 
                 except TypeError as e:
                     if 'unhashable type:' in str(e):
                         if isinstance(value, FunctionType):
-                            i_i_self._eq = _eq_func(value)
+                            i_i_self._eq = _eq(value, check_function_equality)
                             i_i_self._hash = hash_function(value)
                             return
 
                         elif isinstance(value, list) or type(value) is tuple:
-                            i_i_self._eq = _eq_list(value)
+                            i_i_self._eq = _eq(value, check_list_equality)
                             i_i_self._hash = _HASH_LIST
                             return
 
                         elif isinstance(value, dict):
-                            i_i_self._eq = _eq_dict(value)
+                            i_i_self._eq = _eq(value, check_dict_equality)
                             i_i_self._hash = _HASH_DICT
                             return
 
                         elif isinstance(value, set):
-                            i_i_self._eq = _eq_set(value)
+                            i_i_self._eq = \
+                                lambda other: other.value == other.value
                             i_i_self._hash = _HASH_SET
                             return
 
                         else:
                             i_i_self._eq = \
-                                lambda other: _compare_values(value, other.value)
+                                lambda other: _eq(value,
+                                                  thoroughly_check_equality)
                             i_i_self._hash = _HASH_UNKNOWN
                             return
 
@@ -161,7 +84,6 @@ class MkD(dict):
             set.__init__(i_self)
 
         def add(i_self, object_: Any) -> bool:  # noqa
-            """Appends a value to the __Holder."""
             temp = i_self.ValNode(object_)
             set.add(i_self, temp)
             return tuple(set.intersection(i_self, {temp}))[0]
