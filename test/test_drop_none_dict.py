@@ -358,6 +358,3 @@ def test_none_if_later_works_in_dict_plug_out(plug_out_none_if_args,
 
     testy = DnD(tests[2][0])
     assert testy == tests[2][1], VF3
-
-
-
