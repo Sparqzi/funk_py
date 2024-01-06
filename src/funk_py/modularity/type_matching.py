@@ -5,8 +5,14 @@ from typing import Union, Any, AnyStr, Callable, Mapping, MutableMapping, \
 
 from collections.abc import Iterable
 
+from funk_py.modularity.basic_structures import simple_trinomial
+
 
 IterableNonString = type('IterableNonString', (Iterable,), {'a': '1'})
+_double_list_check = simple_trinomial(lambda x: isinstance(x, list))  # noqa
+_double_dict_check = simple_trinomial(lambda x: isinstance(x, dict))  # noqa
+_double_tuple_check = simple_trinomial(lambda x: isinstance(x, tuple))  # noqa
+_double_func_check = simple_trinomial(lambda x: isinstance(x, FunctionType))  # noqa
 
 
 def check_iterable_not_string(value: Any) -> bool:
@@ -436,6 +442,75 @@ class TransformerFilter:
         return new
 
 
+DOUBLE_FAILED_RECURSION_MSG = \
+    ('During the process of checking whether two {%s}s were equal, the'
+     ' recursion limit was exceeded. An attempt was made to compare the {%s}s'
+     ' in a different way, since it was assumed the {%s} or something inside'
+     ' was self-containing. Unfortunately, it seems there were just too many'
+     ' nested objects.')
+UNKNOWN_RECURSION_MSG = ('Encountered a value which exhibits recursion, but is'
+                         ' not a known recursive type. Failed to handle'
+                         ' recursion.')
+
+
+def rec_lists_checker(recursion_points1, recursion_points2):
+    _rec_tester = simple_trinomial(lambda x, y: recursion_points1[y] is x,
+                                   lambda x, y: recursion_points2[y] is x)
+
+    # If you're not familiar with walrus operators, I advise you read up on
+    # them...
+    def rec_lists_check(v1, v2, func_if_missing):
+        found = False
+        for ji in range(len(recursion_points1)):
+            if ti := _rec_tester(v1, v2, ji):
+                found = True
+                break
+
+            elif ti is False:
+                return False
+
+        if not found:
+            recursion_points1.append(v1)
+            recursion_points2.append(v2)
+            return func_if_missing
+
+    def point_check(v1, v2):
+        # ... is the "continue to next" result of functions here.
+        t1 = _double_tuple_check(v1, v2) \
+            if (t := _double_list_check(v1, v2)) is ... \
+            else t
+
+        if t1:
+            t2 = rec_lists_check(v1, v2, _recursive_check_list_equality)
+
+        elif t1 is ... and (t1 := _double_dict_check(v1, v2)):
+            t2 = rec_lists_check(v1, v2, _recursive_check_dict_equality)
+
+        elif t1 is ... and (t1 := _double_func_check(v1, v2)):
+            t2 = rec_lists_check(v1, v2, _recursive_check_function_equality)
+
+        elif t1 is False:
+            return False
+
+        else:
+            return ...
+
+        return t2
+
+    return point_check
+
+
+def _check_is_equality(obj1: Any, obj2: Any):
+    if obj1 is None or obj2 is None or obj1 is ... or obj2 is ...:
+        return obj1 is obj2
+
+    t1, t2 = type(obj1), type(obj2)
+    if t1 is bool or t2 is bool:
+        return obj1 is obj2
+
+    return ...
+
+
 def _get_simple_argument_data(func: FunctionType) \
         -> Tuple[int, int, int, bool, bool]:
     signature = inspect.signature(func)
@@ -525,19 +600,151 @@ def check_function_equality(func1: FunctionType, func2: Any):
     function does not use *@wrapped*, it may not work as intended. **BEWARE:
     This does not care about the names of positional arguments at all.**
     """
-    if (not isinstance(func1, FunctionType) or
-            not isinstance(func2, FunctionType)):
-        return False
+    args1 = _get_argument_data(func1)
+    args2 = _get_argument_data(func2)
 
+    _code = func1.__code__
+    o_code = func2.__code__
+
+    return (o_code.co_code == _code.co_code
+            and check_list_equality(o_code.co_consts, _code.co_consts)
+            and o_code.co_nlocals == _code.co_nlocals
+            and all(args1[i] == args2[i] for i in range(6))
+            and check_list_equality(args1[6], args2[6])
+            and check_dict_equality(args1[7], args2[7]))
+
+
+def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
+                                       recursion_points1: list,
+                                       recursion_points2: list):
+    """
+    *check_function_equality*, but for use when a likely self-containing object
+    is contained within the constant pool or is a default value.
+    """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
 
     _code = func1.__code__
     o_code = func2.__code__
     return (o_code.co_code == _code.co_code
-            and o_code.co_consts == _code.co_consts
+            and check_list_equality(o_code.co_consts, _code.co_consts)
             and o_code.co_nlocals == _code.co_nlocals
-            and all(args1[i] == args2[i] for i in range(8)))
+            and all(args1[i] == args2[i] for i in range(6))
+            and _recursive_check_list_equality(args1[6], args2[6],
+                                               recursion_points1,
+                                               recursion_points2)
+            and _recursive_check_dict_equality(args1[7], args2[7],
+                                               recursion_points1,
+                                               recursion_points2))
 
 
-# def thoroughly_check_equality(val1: Any, val2: Any):
+def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
+    try:
+        return list1 == list2
+
+    except RecursionError:
+        try:
+            return _recursive_check_list_equality(list1, list2, [], [])
+
+        except RecursionError as e:
+            fill = 'list' if type(list1) is list else 'tuple'
+            raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format(fill), e)
+
+
+def _recursive_check_list_equality(list1: Union[list, tuple],
+                                   list2: Union[list, tuple],
+                                   recursion_points1: list,
+                                   recursion_points2: list,
+                                   rec_lists_check: Callable = None):
+    if rec_lists_check is None:
+        rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
+
+    # If we get here, we shouldn't need to check list lengths or tuple.
+    for i in range(len(list1)):
+        val1 = list1[i]
+        val2 = list2[i]
+        try:
+            if not (_check_is_equality(val1, val2)) or val1 != val2:
+                return False
+
+        except RecursionError as e:
+            t1 = rec_lists_check(val1, val2)
+            if ((t1 and not t1(val1, val2, recursion_points1,
+                               recursion_points2, rec_lists_check))
+                    or t1 is False):
+                return False
+
+            else:
+                raise RecursionError(UNKNOWN_RECURSION_MSG, e)
+
+    return True
+
+
+def check_dict_equality(dict1: dict, dict2: dict):
+    try:
+        return dict1 == dict2
+
+    except RecursionError:
+        try:
+            return _recursive_check_dict_equality(dict1, dict2, [], [])
+
+        except RecursionError as e:
+            raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format('dict'), e)
+
+
+def _recursive_check_dict_equality(dict1: dict, dict2: dict,
+                                   recursion_points1: list,
+                                   recursion_points2: list,
+                                   rec_lists_check: Callable = None):
+    if rec_lists_check is None:
+        rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
+
+    keys1 = list(dict1.keys())
+
+    # If we get here, we shouldn't need to check dict lengths.
+    for key in keys1:
+        if key not in dict2:
+            return False
+
+        val1 = dict1[key]
+        val2 = dict2[key]
+
+        try:
+            if not (_check_is_equality(val1, val2)) or val1 != val2:
+                return False
+
+        except RecursionError as e:
+            t1 = rec_lists_check(val1, val2)
+            if ((t1 and not t1(val1, val2, recursion_points1,
+                               recursion_points2, rec_lists_check))
+                    or t1 is False):
+                return False
+
+            else:
+                raise RecursionError(UNKNOWN_RECURSION_MSG, e)
+
+    return True
+
+
+def thoroughly_check_equality(val1: Any, val2: Any):
+    if t1 := _check_is_equality(val1, val2):
+        return True
+
+    elif t1 is ... and (t1 := _double_list_check):
+        return check_list_equality(val1, val2)
+
+    elif t1 is ... and (t1 := _double_tuple_check):
+        return check_list_equality(val1, val2)
+
+    elif t1 is ... and (t1 := _double_dict_check):
+        return check_dict_equality(val1, val2)
+
+    elif t1 is ... and (t1 := _double_func_check):
+        return check_list_equality(val1, val2)
+
+    elif t1 is False:
+        return False
+
+    return val1 == val2
+
+
