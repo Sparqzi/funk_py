@@ -1,6 +1,5 @@
-from collections import namedtuple
 from warnings import warn
-from typing import Tuple, Any, Union, Dict
+from typing import Any, Dict
 
 from funk_py.modularity.type_matching import (check_function_equality,
                                               hash_function)
