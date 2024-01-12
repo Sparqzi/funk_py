@@ -659,6 +659,9 @@ def _recursive_check_list_equality(list1: Union[list, tuple],
     if rec_lists_check is None:
         rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
 
+    recursion_points1.append(list1)
+    recursion_points2.append(list2)
+
     # If we get here, we shouldn't need to check list lengths or tuple.
     for i in range(len(list1)):
         val1 = list1[i]
