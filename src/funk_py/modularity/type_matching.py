@@ -474,6 +474,8 @@ def rec_lists_checker(recursion_points1, recursion_points2):
             recursion_points2.append(v2)
             return func_if_missing
 
+        return True
+
     def point_check(v1, v2):
         # ... is the "continue to next" result of functions here.
         t1 = _double_tuple_check(v1, v2) \
@@ -667,12 +669,14 @@ def _recursive_check_list_equality(list1: Union[list, tuple],
 
         except RecursionError as e:
             t1 = rec_lists_check(val1, val2)
-            if ((t1 and not t1(val1, val2, recursion_points1,
-                               recursion_points2, rec_lists_check))
+            if ((t1 is not True
+                 and t1
+                 and not t1(val1, val2, recursion_points1,
+                            recursion_points2, rec_lists_check))
                     or t1 is False):
                 return False
 
-            else:
+            elif t1 is ...:
                 raise RecursionError(UNKNOWN_RECURSION_MSG, e)
 
     return True
@@ -713,12 +717,14 @@ def _recursive_check_dict_equality(dict1: dict, dict2: dict,
 
         except RecursionError as e:
             t1 = rec_lists_check(val1, val2)
-            if ((t1 and not t1(val1, val2, recursion_points1,
-                               recursion_points2, rec_lists_check))
+            if ((t1 is not True
+                 and t1
+                 and not t1(val1, val2, recursion_points1,
+                            recursion_points2, rec_lists_check))
                     or t1 is False):
                 return False
 
-            else:
+            elif t1 is ...:
                 raise RecursionError(UNKNOWN_RECURSION_MSG, e)
 
     return True
