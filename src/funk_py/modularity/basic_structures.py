@@ -1,4 +1,7 @@
-from typing import Any
+from typing import Any, Callable, Optional, ParamSpec
+
+
+Args = ParamSpec("Args")
 
 
 class Singleton:
@@ -31,3 +34,30 @@ class Shareable:
 
 def pass_(x: Any) -> Any:
     return x
+
+
+def simple_trinomial(check_func: Callable[[Any, Args], bool],
+                     check_func2: Callable[[Any, Args], bool] = None) \
+        -> Callable[[Any, Any, Args], Optional[bool]]:
+    if check_func2 is None:
+        def check_it(val1, val2, *args) -> Optional[bool]:
+            if check_func(val1, *args):
+                return check_func(val2, *args)
+
+            if check_func(val2, *args):
+                return False
+
+            return ...
+
+        return check_it
+
+    def check_it(val1, val2, *args) -> Optional[bool]:
+        if check_func(val1, *args):
+            return check_func2(val2, *args)
+
+        if check_func2(val2, *args):
+            return False
+
+        return ...
+
+    return check_it
