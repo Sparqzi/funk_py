@@ -449,6 +449,15 @@ SIMPLE_RECURSIVE_LIST = (
          instruction1=dict(base=1)),
     'L1->(*,L1,*)'
 )
+COPIED_RECURSIVE_LIST = (
+    dict(base=GEN_SET,
+         point1=INSERT_POINT1_1,
+         instruction1=dict(base=GEN_SET,
+                           callback=1,
+                           point1=INSERT_POINT1_1,
+                           instruction1=dict(base=1))),
+    'L1_1->(*,L1_2->(*,L1_2,*),*)'
+)
 
 DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
     dict(base=GEN_SET,
@@ -458,6 +467,20 @@ DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
          point2=INSERT_POINT1_2,
          instruction2=dict(base=1)),
     'L1->(*,L1,*,L1,*)'
+)
+COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
+    dict(base=GEN_SET,
+         callback=1,
+         point1=INSERT_POINT1_1,
+         instruction1=dict(base=1),
+         point2=INSERT_POINT1_2,
+         instruction2=dict(base=GEN_SET,
+                           callback=2,
+                           point1=INSERT_POINT1_1,
+                           instruction1=dict(base=2),
+                           point2=INSERT_POINT2_2,
+                           instruction2=dict(base=2))),
+    'L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)'
 )
 
 LOWER_LEVEL_RECURSIVE_LIST = (
@@ -496,23 +519,24 @@ DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST = (
     'L1->(*,L2->(*,L1,*,L2),*)'
 )
 
-COPIED_RECURSIVE_LIST = (
-    dict(base=GEN_SET,
-         point1=INSERT_POINT1_1,
-         instruction1=dict(base=GEN_SET,
-                           callback=1,
-                           point1=INSERT_POINT1_1,
-                           instruction1=dict(base=1))),
-    'L1_1->(*,L1_2->(*,L1_2,*),*)'
-)
-
 RECURSIVE_LISTS = (
     SIMPLE_RECURSIVE_LIST,
     DOUBLE_TOP_LEVEL_RECURSIVE_LIST,
     LOWER_LEVEL_RECURSIVE_LIST,
     DOUBLE_RECURSIVE_DIFF_LEVELS_LIST,
     DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST,
-    COPIED_RECURSIVE_LIST
+    COPIED_RECURSIVE_LIST,
+    COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST
+)
+
+DIFF_SIMPLE_RECURSIVE_LIST_SET = (
+    (SIMPLE_RECURSIVE_LIST[0], COPIED_RECURSIVE_LIST[0]),
+    'L1->(*,L1,*)!=L1_1->(*,L1_2->(*,L1_2,*),*)'
+)
+DIFF_DOUBLE_RECURSIVE_LIST_SET = (
+    (DOUBLE_TOP_LEVEL_RECURSIVE_LIST[0],
+     COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST[0]),
+    'L1->(*,L1,*,L1,*)!=L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)'
 )
 
 
@@ -524,11 +548,17 @@ def recursive_equal_lists(request, types):
     return l1, l2
 
 
-def test_recursive_equality(recursive_equal_lists):
-    assert check_list_equality(*recursive_equal_lists)
+@pytest.fixture(
+    params=(DIFF_DOUBLE_RECURSIVE_LIST_SET[0],
+            DIFF_SIMPLE_RECURSIVE_LIST_SET[0]),
+    ids=(DIFF_DOUBLE_RECURSIVE_LIST_SET[1], DIFF_SIMPLE_RECURSIVE_LIST_SET[1]))
+def recursive_unequal_lists(request, types):
+    l1 = build_nested_sequence(types, **request.param[0])
+    l2 = build_nested_sequence(types, **request.param[1])
+    return l1, l2
 
 
-# If for some reason Python makes it so that testing recursive lists does not
+# If for some reason Python makes it so that comparing recursive lists does not
 # raise exceptions, then the function being tested here is useless.
 def test_still_has_purpose(recursive_equal_lists):
     l1, l2 = recursive_equal_lists
@@ -543,4 +573,9 @@ def test_still_has_purpose(recursive_equal_lists):
          ' implemented recursion safety in list comparison.')
 
 
+def test_recursive_equality(recursive_equal_lists):
+    assert check_list_equality(*recursive_equal_lists)
 
+
+def test_recursive_inequality(recursive_unequal_lists):
+    assert not check_list_equality(*recursive_unequal_lists)
