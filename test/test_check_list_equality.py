@@ -41,6 +41,7 @@ B_INT_SET2 = (G_INT1, G_INT2)
 FLT_SET = (G_FLT1, G_FLT2, G_FLT3)
 B_FLT_SET1 = (G_FLT1, G_FLT2, B_FLT1)
 B_FLT_SET2 = (G_FLT1, G_FLT2)
+
 BOOL_SET = (False, True)
 GEN_SET = (G_STR1, G_INT1, G_FLT1, True,
            G_STR2, G_INT2, G_FLT2, False,
