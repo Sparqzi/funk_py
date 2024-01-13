@@ -100,6 +100,59 @@ def test_un_nested_list_inequality(regular_unequal_lists):
     assert not check_list_equality(*regular_unequal_lists)
 
 
+def build_nested_sequence(type_: type,
+                          callbacks: Dict[int, Union[tuple, list]] = None,
+                          inner_callbacks: Set[int] = None,
+                          *, base: Union[tuple, int],
+                          callback: int = None,
+                          point1: int = None,
+                          instruction1: dict = None,
+                          point2: int = None,
+                          instruction2: dict = None):
+    if callbacks is None:
+        callbacks = {}
+        inner_callbacks = set()
+
+    if type(base) is int:
+        inner_callbacks.add(base)
+        return callbacks[base]
+
+    if point1:
+        builder = list(base[:point1])
+        if callback is not None:
+            callbacks[callback] = builder
+
+        builder.append(
+            build_nested_sequence(type_, callbacks, inner_callbacks,
+                                  **instruction1))
+        if point2:
+            if point2 == -1:
+                builder.extend(base[point1:])
+                builder.append(
+                    build_nested_sequence(type_, callbacks, inner_callbacks,
+                                          **instruction2))
+
+            else:
+                builder.extend(base[point1:point2])
+                builder.append(
+                    build_nested_sequence(type_, callbacks, inner_callbacks,
+                                          **instruction2))
+                builder.extend(base[point2:])
+
+        else:
+            builder.extend(base[point1:])
+
+        if callback is not None and callback in inner_callbacks:
+            return builder
+
+        return type_(builder)
+
+    if callback is not None:
+        callbacks[callback] = type_(base)
+
+    return type_(base)
+
+
 # -1 Means Append
 # Indexes in GEN_SET:
 INSERT_POINT1_1 = 5
@@ -307,59 +360,6 @@ BAD_DOUBLE_NESTED_LISTS = (
 
 NON_RECURSIVE_NESTED_LISTS = TOP_NESTED_LISTS + DOUBLE_NESTED_LISTS
 BAD_NON_RECURSIVE_NESTED_LISTS = BAD_TOP_NESTED_LISTS + BAD_DOUBLE_NESTED_LISTS
-
-
-def build_nested_sequence(type_: type,
-                          callbacks: Dict[int, Union[tuple, list]] = None,
-                          inner_callbacks: Set[int] = None,
-                          *, base: Union[tuple, int],
-                          callback: int = None,
-                          point1: int = None,
-                          instruction1: dict = None,
-                          point2: int = None,
-                          instruction2: dict = None):
-    if callbacks is None:
-        callbacks = {}
-        inner_callbacks = set()
-
-    if type(base) is int:
-        inner_callbacks.add(base)
-        return callbacks[base]
-
-    if point1:
-        builder = list(base[:point1])
-        if callback is not None:
-            callbacks[callback] = builder
-
-        builder.append(
-            build_nested_sequence(type_, callbacks, inner_callbacks,
-                                  **instruction1))
-        if point2:
-            if point2 == -1:
-                builder.extend(base[point1:])
-                builder.append(
-                    build_nested_sequence(type_, callbacks, inner_callbacks,
-                                          **instruction2))
-
-            else:
-                builder.extend(base[point1:point2])
-                builder.append(
-                    build_nested_sequence(type_, callbacks, inner_callbacks,
-                                          **instruction2))
-                builder.extend(base[point2:])
-
-        else:
-            builder.extend(base[point1:])
-
-        if callback is not None and callback in inner_callbacks:
-            return builder
-
-        return type_(builder)
-
-    if callback is not None:
-        callbacks[callback] = type_(base)
-
-    return type_(base)
 
 
 @pytest.fixture(params=(tuple, list))
