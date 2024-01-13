@@ -1,8 +1,19 @@
+from timeit import timeit
 from typing import Union, Dict, List, Set
 
 import pytest
 
 from funk_py.modularity.type_matching import check_list_equality
+
+
+def too_slow(number: int, max_duration: float, l1, l2):
+    duration = timeit(lambda: check_list_equality(l1, l2), number=number)
+    assert duration < max_duration, ('check_list_equality worked for two lists,'
+                                     ' but did not perform adequately with'
+                                     ' regards to speed. Lists compared'
+                                     ' were:\n' + repr(l1) + '\n' + repr(l2)
+                                     + '\n' + str(number) + ' iterations were'
+                                     ' performed.')
 
 
 G_STR1 = 'a'
@@ -121,10 +132,12 @@ def regular_unequal_lists(request):
 
 def test_un_nested_list_equality(regular_equal_lists):
     assert check_list_equality(*regular_equal_lists)
+    too_slow(1000000, 0.2, *regular_equal_lists)
 
 
 def test_un_nested_list_inequality(regular_unequal_lists):
     assert not check_list_equality(*regular_unequal_lists)
+    too_slow(1000000, 0.2, *regular_unequal_lists)
 
 
 def build_nested_sequence(type_: type,
@@ -403,11 +416,13 @@ def nested_non_recursive_unequal_lists(request, types):
 
 def test_nested_non_recursive_list_equality(nested_non_recursive_equal_lists):
     assert check_list_equality(*nested_non_recursive_equal_lists)
+    too_slow(1000000, 0.2, *nested_non_recursive_equal_lists)
 
 
 def test_nested_non_recursive_list_inequality(
         nested_non_recursive_unequal_lists):
     assert not check_list_equality(*nested_non_recursive_unequal_lists)
+    too_slow(1000000, 0.2, *nested_non_recursive_unequal_lists)
 
 
 SHARING_LISTS = (
@@ -453,10 +468,12 @@ def nested_with_shared_unequal_lists(request, types):
 
 def test_sharing_works(nested_with_shared_equal_lists):
     assert check_list_equality(*nested_with_shared_equal_lists)
+    too_slow(1000000, 0.2, *nested_with_shared_equal_lists)
 
 
 def test_no_false_pass_sharing(nested_with_shared_unequal_lists):
     assert not check_list_equality(*nested_with_shared_unequal_lists)
+    too_slow(1000000, 0.2, *nested_with_shared_unequal_lists)
 
 
 NASTY_RECURSIVE_LIST = (
@@ -613,10 +630,12 @@ def test_still_has_purpose(recursive_equal_lists):
 
 def test_recursive_equality(recursive_equal_lists):
     assert check_list_equality(*recursive_equal_lists)
+    too_slow(10000, 0.5, *recursive_equal_lists)
 
 
 def test_recursive_inequality(recursive_unequal_lists):
     assert not check_list_equality(*recursive_unequal_lists)
+    too_slow(10000, 0.5, *recursive_unequal_lists)
 
 
 @pytest.fixture(params=(1, 2), ids=('base as outer', 'base as inner'))
@@ -659,3 +678,4 @@ def confused_unequal_recursive_lists(request, types,
 # logic regarding True and False works as intended.
 def test_confused_recursive_inequality(confused_unequal_recursive_lists):
     assert not check_list_equality(*confused_unequal_recursive_lists)
+    too_slow(1000000, 0.2, *confused_unequal_recursive_lists)
