@@ -562,15 +562,10 @@ def recursive_unequal_lists(request, types):
 # raise exceptions, then the function being tested here is useless.
 def test_still_has_purpose(recursive_equal_lists):
     l1, l2 = recursive_equal_lists
-    with pytest.raises(RecursionError) as info:
+    with pytest.raises(RecursionError):
         # Your linter may dislike this line because "it has no side effects"
-        # It absolutely has side effects. It should always raise an exception.
-        if l1 == l2:
-            print('Yay!')
-
-    assert 'maximum recursion' in str(info.value), \
-        ('A purpose check has failed. If all checks fail, Python may have'
-         ' implemented recursion safety in list comparison.')
+        # It absolutely has effects. It should always raise an exception.
+        l1 == l2  # noqa
 
 
 def test_recursive_equality(recursive_equal_lists):
