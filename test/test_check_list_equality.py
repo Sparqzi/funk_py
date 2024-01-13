@@ -76,6 +76,32 @@ BAD_LISTS = (
 )
 
 
+# -1 Means Append
+# Indexes in GEN_SET:
+INSERT_POINT1_1 = 5
+INSERT_POINT1_2 = 7
+
+# Indexes in INT_SET:
+INSERT_POINT2_1 = 2
+INSERT_POINT2_2 = -1
+
+# Indexes in CONFUSED_SETs:
+INSERT_POINT3_1 = 7
+INSERT_POINT3_2 = 11
+
+
+READ_IT = 'Did you read the comments above this test? You should have.'
+
+
+def test_user_listened_to_comments():
+    assert len(GEN_SET) > INSERT_POINT1_1 >= -1, READ_IT
+    assert len(GEN_SET) > INSERT_POINT1_2 >= -1, READ_IT
+    assert len(INT_SET) > INSERT_POINT2_1 >= -1, READ_IT
+    assert len(INT_SET) > INSERT_POINT2_2 >= -1, READ_IT
+    assert len(CONFUSED_SET1) > INSERT_POINT3_1 >= -1, READ_IT
+    assert len(CONFUSED_SET1) > INSERT_POINT3_2 >= -1, READ_IT
+
+
 @pytest.fixture(params=[v[0] for v in GOOD_LISTS],
                 ids=[v[1] for v in GOOD_LISTS])
 def regular_equal_lists(request):
@@ -152,16 +178,6 @@ def build_nested_sequence(type_: type,
         callbacks[callback] = type_(base)
 
     return type_(base)
-
-
-# -1 Means Append
-# Indexes in GEN_SET:
-INSERT_POINT1_1 = 5
-INSERT_POINT1_2 = 7
-
-# Indexes in INT_SET:
-INSERT_POINT2_1 = 2
-INSERT_POINT2_2 = -1
 
 
 TOP_NESTED_LISTS = (
