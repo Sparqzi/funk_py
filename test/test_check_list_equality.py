@@ -459,6 +459,23 @@ def test_no_false_pass_sharing(nested_with_shared_unequal_lists):
     assert not check_list_equality(*nested_with_shared_unequal_lists)
 
 
+NASTY_RECURSIVE_LIST = (
+    dict(base=CONFUSED_SET1,
+         callback=1,
+         point1=INSERT_POINT3_1,
+         instruction1=dict(base=1)),
+    'L1->(*,L1,*)-nasty'
+)
+COPIED_NASTY_RECURSIVE_LIST = (
+    dict(base=CONFUSED_SET1,
+         point1=INSERT_POINT3_1,
+         instruction1=dict(base=CONFUSED_SET1,
+                           callback=1,
+                           point1=INSERT_POINT3_1,
+                           instruction1=dict(base=1))),
+    'L1_1->(*,L1_2->(*,L1_2,*),*)-nasty'
+)
+
 SIMPLE_RECURSIVE_LIST = (
     dict(base=GEN_SET,
          callback=1,
@@ -543,7 +560,9 @@ RECURSIVE_LISTS = (
     DOUBLE_RECURSIVE_DIFF_LEVELS_LIST,
     DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST,
     COPIED_RECURSIVE_LIST,
-    COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST
+    COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST,
+    NASTY_RECURSIVE_LIST,
+    COPIED_NASTY_RECURSIVE_LIST
 )
 
 DIFF_SIMPLE_RECURSIVE_LIST_SET = (
@@ -554,6 +573,10 @@ DIFF_DOUBLE_RECURSIVE_LIST_SET = (
     (DOUBLE_TOP_LEVEL_RECURSIVE_LIST[0],
      COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST[0]),
     'L1->(*,L1,*,L1,*)!=L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)'
+)
+DIFF_NASTY_RECURSIVE_LIST_SET = (
+    (NASTY_RECURSIVE_LIST[0], COPIED_NASTY_RECURSIVE_LIST[0]),
+    'L1->(*,L1,*)!=L1_1->(*,L1_2->(*,L1_2,*),*)-nasty'
 )
 
 
@@ -567,8 +590,11 @@ def recursive_equal_lists(request, types):
 
 @pytest.fixture(
     params=(DIFF_DOUBLE_RECURSIVE_LIST_SET[0],
-            DIFF_SIMPLE_RECURSIVE_LIST_SET[0]),
-    ids=(DIFF_DOUBLE_RECURSIVE_LIST_SET[1], DIFF_SIMPLE_RECURSIVE_LIST_SET[1]))
+            DIFF_SIMPLE_RECURSIVE_LIST_SET[0],
+            DIFF_NASTY_RECURSIVE_LIST_SET[0]),
+    ids=(DIFF_DOUBLE_RECURSIVE_LIST_SET[1],
+         DIFF_SIMPLE_RECURSIVE_LIST_SET[1],
+         DIFF_NASTY_RECURSIVE_LIST_SET[1]))
 def recursive_unequal_lists(request, types):
     l1 = build_nested_sequence(types, **request.param[0])
     l2 = build_nested_sequence(types, **request.param[1])
@@ -591,3 +617,45 @@ def test_recursive_equality(recursive_equal_lists):
 
 def test_recursive_inequality(recursive_unequal_lists):
     assert not check_list_equality(*recursive_unequal_lists)
+
+
+@pytest.fixture(params=(1, 2), ids=('base as outer', 'base as inner'))
+def confused_recursive_list_positions(request):
+    return request.param
+
+
+@pytest.fixture(params=(CONFUSED_SET2, CONFUSED_SET3),
+                ids=('falsy made false', 'truey made true'))
+def confused_unequal_recursive_lists(request, types,
+                                     confused_recursive_list_positions):
+    s = request.param
+
+    l1 = build_nested_sequence(types, base=CONFUSED_SET1,
+                               point1=INSERT_POINT3_1,
+                               instruction1=dict(base=CONFUSED_SET1,
+                                                 callback=1,
+                                                 point1=INSERT_POINT3_1,
+                                                 instruction1=dict(base=1)))
+    if confused_recursive_list_positions == 1:
+        l2 = build_nested_sequence(types, base=CONFUSED_SET1,
+                                   point1=INSERT_POINT3_1,
+                                   instruction1=dict(base=s,
+                                                     callback=1,
+                                                     point1=INSERT_POINT3_1,
+                                                     instruction1=dict(base=1)))
+
+    else:
+        l2 = build_nested_sequence(types, base=s,
+                                   point1=INSERT_POINT3_1,
+                                   instruction1=dict(base=CONFUSED_SET1,
+                                                     callback=1,
+                                                     point1=INSERT_POINT3_1,
+                                                     instruction1=dict(base=1)))
+
+    return l1, l2
+
+
+# This test should be very quick. Its primary purpose is to ensure internal
+# logic regarding True and False works as intended.
+def test_confused_recursive_inequality(confused_unequal_recursive_lists):
+    assert not check_list_equality(*confused_unequal_recursive_lists)
