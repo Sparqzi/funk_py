@@ -462,7 +462,7 @@ def rec_lists_checker(recursion_points1, recursion_points2):
     def rec_lists_check(v1, v2, func_if_missing):
         found = False
         for ji in range(len(recursion_points1)):
-            if ti := _rec_tester(v1, v2, ji):
+            if (ti := _rec_tester(v1, v2, ji)) is True:
                 found = True
                 break
 

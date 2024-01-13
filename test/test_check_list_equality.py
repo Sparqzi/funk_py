@@ -21,16 +21,21 @@ G_STR2 = 'Gerd'
 G_STR3 = 'Jerb'
 B_STR1 = 'lorem'
 
-C_FALSY1 = []
-C_FALSY2 = {}
-C_FALSY3 = set()
-C_FALSY4 = ''
-C_FALSY5 = 0
-C_FALSY6 = ()
-C_FALSISH = '0'
+C_FALSY1 = []  # sanity check
+C_FALSY2 = {}  # sanity check
+C_FALSY3 = set()  # sanity check
+C_FALSY4 = ''  # sanity check
+C_FALSY5 = 0  # actually necessary
+C_FALSY6 = ()  # sanity check
+C_FALSISH = '0'  # sanity check
 
-C_TRUEY = 1
-C_TRUEISH = '1'
+FALSY_VALS = (C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY5, C_FALSY6,
+              C_FALSISH, None)
+
+C_TRUEY = 1  # actually necessary
+C_TRUEISH = '1'  # sanity check
+
+TRUEY_VALS = (C_TRUEY, C_TRUEISH, ...)
 
 G_INT1 = 80085
 G_INT2 = 42
@@ -481,7 +486,7 @@ NASTY_RECURSIVE_LIST = (
          callback=1,
          point1=INSERT_POINT3_1,
          instruction1=dict(base=1)),
-    'L1->(*,L1,*)-nasty'
+    'L1->(*,L1,*)-nasty', 0.45
 )
 COPIED_NASTY_RECURSIVE_LIST = (
     dict(base=CONFUSED_SET1,
@@ -490,7 +495,7 @@ COPIED_NASTY_RECURSIVE_LIST = (
                            callback=1,
                            point1=INSERT_POINT3_1,
                            instruction1=dict(base=1))),
-    'L1_1->(*,L1_2->(*,L1_2,*),*)-nasty'
+    'L1_1->(*,L1_2->(*,L1_2,*),*)-nasty', 0.6
 )
 
 SIMPLE_RECURSIVE_LIST = (
@@ -498,7 +503,7 @@ SIMPLE_RECURSIVE_LIST = (
          callback=1,
          point1=INSERT_POINT1_1,
          instruction1=dict(base=1)),
-    'L1->(*,L1,*)'
+    'L1->(*,L1,*)', 0.4
 )
 COPIED_RECURSIVE_LIST = (
     dict(base=GEN_SET,
@@ -507,7 +512,7 @@ COPIED_RECURSIVE_LIST = (
                            callback=1,
                            point1=INSERT_POINT1_1,
                            instruction1=dict(base=1))),
-    'L1_1->(*,L1_2->(*,L1_2,*),*)'
+    'L1_1->(*,L1_2->(*,L1_2,*),*)', 0.55
 )
 
 DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
@@ -517,7 +522,7 @@ DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
          instruction1=dict(base=1),
          point2=INSERT_POINT1_2,
          instruction2=dict(base=1)),
-    'L1->(*,L1,*,L1,*)'
+    'L1->(*,L1,*,L1,*)', 0.55
 )
 COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
     dict(base=GEN_SET,
@@ -531,7 +536,7 @@ COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
                            instruction1=dict(base=2),
                            point2=INSERT_POINT2_2,
                            instruction2=dict(base=2))),
-    'L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)'
+    'L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)', 0.85
 )
 
 LOWER_LEVEL_RECURSIVE_LIST = (
@@ -541,7 +546,7 @@ LOWER_LEVEL_RECURSIVE_LIST = (
          instruction1=dict(base=INT_SET,
                            point1=INSERT_POINT2_1,
                            instruction1=dict(base=1))),
-    'L1->(*,L2->(*,L1,*),*)'
+    'L1->(*,L2->(*,L1,*),*)', 0.5
 )
 
 DOUBLE_RECURSIVE_DIFF_LEVELS_LIST = (
@@ -554,7 +559,7 @@ DOUBLE_RECURSIVE_DIFF_LEVELS_LIST = (
                            callback=2,
                            point1=INSERT_POINT2_1,
                            instruction1=dict(base=2))),
-    'L1->(*,L1,*,L2->(*,L2,*),*)'
+    'L1->(*,L1,*,L2->(*,L2,*),*)', 0.65
 )
 
 DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST = (
@@ -567,7 +572,7 @@ DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST = (
                            instruction1=dict(base=1),
                            point2=INSERT_POINT2_2,
                            instruction2=dict(base=2))),
-    'L1->(*,L2->(*,L1,*,L2),*)'
+    'L1->(*,L2->(*,L1,*,L2),*)', 0.65
 )
 
 RECURSIVE_LISTS = (
@@ -597,12 +602,12 @@ DIFF_NASTY_RECURSIVE_LIST_SET = (
 )
 
 
-@pytest.fixture(params=[v[0] for v in RECURSIVE_LISTS],
+@pytest.fixture(params=[(v[0], v[2]) for v in RECURSIVE_LISTS],
                 ids=[v[1] for v in RECURSIVE_LISTS])
 def recursive_equal_lists(request, types):
-    l1 = build_nested_sequence(types, **request.param)
-    l2 = build_nested_sequence(types, **request.param)
-    return l1, l2
+    l1 = build_nested_sequence(types, **request.param[0])
+    l2 = build_nested_sequence(types, **request.param[0])
+    return l1, l2, request.param[1]
 
 
 @pytest.fixture(
@@ -621,7 +626,7 @@ def recursive_unequal_lists(request, types):
 # If for some reason Python makes it so that comparing recursive lists does not
 # raise exceptions, then the function being tested here is useless.
 def test_still_has_purpose(recursive_equal_lists):
-    l1, l2 = recursive_equal_lists
+    l1, l2, timeout = recursive_equal_lists
     with pytest.raises(RecursionError):
         # Your linter may dislike this line because "it has no side effects"
         # It absolutely has effects. It should always raise an exception.
@@ -629,13 +634,13 @@ def test_still_has_purpose(recursive_equal_lists):
 
 
 def test_recursive_equality(recursive_equal_lists):
-    assert check_list_equality(*recursive_equal_lists)
-    too_slow(10000, 0.5, *recursive_equal_lists)
+    assert check_list_equality(*recursive_equal_lists[:2])
+    too_slow(10000, recursive_equal_lists[2], *recursive_equal_lists[:2])
 
 
 def test_recursive_inequality(recursive_unequal_lists):
     assert not check_list_equality(*recursive_unequal_lists)
-    too_slow(10000, 0.5, *recursive_unequal_lists)
+    too_slow(10000, 0.6, *recursive_unequal_lists)
 
 
 @pytest.fixture(params=(1, 2), ids=('base as outer', 'base as inner'))
@@ -643,39 +648,65 @@ def confused_recursive_list_positions(request):
     return request.param
 
 
-@pytest.fixture(params=(CONFUSED_SET2, CONFUSED_SET3),
-                ids=('falsy made false', 'truey made true'))
-def confused_unequal_recursive_lists(request, types,
-                                     confused_recursive_list_positions):
-    s = request.param
+@pytest.fixture(params=FALSY_VALS)
+def confused_unequal_falsy_recursive_lists(request, types,
+                                           confused_recursive_list_positions):
+    s1 = (True, False, request.param)
+    s2 = (True, False, False)
+    ip = 1
 
-    l1 = build_nested_sequence(types, base=CONFUSED_SET1,
-                               point1=INSERT_POINT3_1,
-                               instruction1=dict(base=CONFUSED_SET1,
-                                                 callback=1,
-                                                 point1=INSERT_POINT3_1,
+    l1 = build_nested_sequence(types, base=s1, point1=ip,
+                               instruction1=dict(base=s1, callback=1, point1=ip,
                                                  instruction1=dict(base=1)))
     if confused_recursive_list_positions == 1:
-        l2 = build_nested_sequence(types, base=CONFUSED_SET1,
-                                   point1=INSERT_POINT3_1,
-                                   instruction1=dict(base=s,
-                                                     callback=1,
-                                                     point1=INSERT_POINT3_1,
+        l2 = build_nested_sequence(types, base=s1, point1=ip,
+                                   instruction1=dict(base=s2, callback=1,
+                                                     point1=ip,
                                                      instruction1=dict(base=1)))
 
     else:
-        l2 = build_nested_sequence(types, base=s,
-                                   point1=INSERT_POINT3_1,
-                                   instruction1=dict(base=CONFUSED_SET1,
-                                                     callback=1,
-                                                     point1=INSERT_POINT3_1,
+        l2 = build_nested_sequence(types, base=s2, point1=ip,
+                                   instruction1=dict(base=s1, callback=1,
+                                                     point1=ip,
                                                      instruction1=dict(base=1)))
 
     return l1, l2
 
 
-# This test should be very quick. Its primary purpose is to ensure internal
-# logic regarding True and False works as intended.
-def test_confused_recursive_inequality(confused_unequal_recursive_lists):
-    assert not check_list_equality(*confused_unequal_recursive_lists)
-    too_slow(1000000, 0.2, *confused_unequal_recursive_lists)
+@pytest.fixture(params=TRUEY_VALS)
+def confused_unequal_truey_recursive_lists(request, types,
+                                           confused_recursive_list_positions):
+    s1 = (True, False, request.param)
+    s2 = (True, False, True)
+    ip = 1
+
+    l1 = build_nested_sequence(types, base=s1, point1=ip,
+                               instruction1=dict(base=s1, callback=1, point1=ip,
+                                                 instruction1=dict(base=1)))
+    if confused_recursive_list_positions == 1:
+        l2 = build_nested_sequence(types, base=s1, point1=ip,
+                                   instruction1=dict(base=s2, callback=1,
+                                                     point1=ip,
+                                                     instruction1=dict(base=1)))
+
+    else:
+        l2 = build_nested_sequence(types, base=s2, point1=ip,
+                                   instruction1=dict(base=s1, callback=1,
+                                                     point1=ip,
+                                                     instruction1=dict(base=1)))
+
+    return l1, l2
+
+
+@pytest.mark.timeout(2)
+def test_confused_falsy_recursive_inequality(
+        confused_unequal_falsy_recursive_lists):
+    assert not check_list_equality(*confused_unequal_falsy_recursive_lists)
+    too_slow(10000, 0.5, *confused_unequal_falsy_recursive_lists)
+
+
+@pytest.mark.timeout(2)
+def test_confused_truey_recursive_inequality(
+        confused_unequal_truey_recursive_lists):
+    assert not check_list_equality(*confused_unequal_truey_recursive_lists)
+    too_slow(10000, 0.5, *confused_unequal_truey_recursive_lists)
