@@ -8,6 +8,8 @@ from collections.abc import Iterable
 from funk_py.modularity.basic_structures import simple_trinomial
 
 
+_WEIRDOS = (None, ..., True, False)
+
 IterableNonString = type('IterableNonString', (Iterable,), {'a': '1'})
 _double_list_check = simple_trinomial(lambda x: isinstance(x, list))  # noqa
 _double_dict_check = simple_trinomial(lambda x: isinstance(x, dict))  # noqa
@@ -36,7 +38,7 @@ class TypeMatcher:
     # This might trigger a warning for python:S1144, that is because some
     # linters do not check the __new__ method properly. This does not violate
     # python:S1144.
-    def __true_init(self, type_: Union[type, tuple, None]): # noqa
+    def __true_init(self, type_: Union[type, tuple, None]):  # noqa
         # This serves as a hidden init so that instances are never
         # re-initialized. This is important to prevent eating up too much
         # memory. It can also decrease other resource usage.
