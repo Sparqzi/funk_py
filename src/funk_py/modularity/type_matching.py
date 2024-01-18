@@ -503,13 +503,27 @@ def rec_lists_checker(recursion_points1, recursion_points2):
 
 
 def _check_is_equality(obj1: Any, obj2: Any):
-    if obj1 is None or obj2 is None or obj1 is ... or obj2 is ...:
+    """
+    This checks whether two objects are **definitely**, **definitely not**, or
+    **possibly** the same.
+
+    :return: ``False`` if the objects are **definitely not** the same.
+             ``True`` if the objects are **definitely** the same.
+             ``...`` if the objects are **possibly** the same.
+    """
+    # In the case that either object is None, Ellipsis, or a boolean, we can
+    # determine pass or fail immediately. There is no chance of returning an
+    # inconclusive result in this scenario.
+    if obj1 in _WEIRDOS or obj2 in _WEIRDOS:
         return obj1 is obj2
 
-    t1, t2 = type(obj1), type(obj2)
-    if t1 is bool or t2 is bool:
-        return obj1 is obj2
+    # We do not necessarily want to return the result of obj1 is obj2, since if
+    # it is False, they may still be lists which are equal.
+    if obj1 is obj2:
+        return True
 
+    # Ellipsis is used here to represent that the test was inconclusive. We did
+    # not prove they were equal, but we also didn't prove they were unequal.
     return ...
 
 
@@ -553,7 +567,7 @@ def _get_argument_data(func: FunctionType) \
                 pos_defaults.append(parameter.default)
 
         elif (parameter.kind is parameter.POSITIONAL_OR_KEYWORD
-                and parameter.default is not parameter.empty):
+              and parameter.default is not parameter.empty):
             pos_defaults.append(parameter.default)
 
         elif parameter.kind is parameter.KEYWORD_ONLY:
@@ -638,6 +652,63 @@ def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
                                                recursion_points2))
 
 
+def _strict_has_no_issues(obj1, obj2):
+    # We should always have two same type objects when this is called, do not
+    # worry about making sure they are the same type. Only check the type of one
+    # object.
+    if isinstance(obj1, dict):
+        for k1, v1 in obj1.items():
+            if k1 == 0 or k1 == 1:
+                if v1 == 0 or v1 == 1:
+                    for k2, v2 in obj2.items():
+                        if k2 == k1:
+                            if v2 is not v1:
+                                return False
+
+                            break
+
+                else:
+                    for k2 in obj2.keys():
+                        if k2 == k1:
+                            if k2 is not k1:
+                                return False
+
+                            break
+
+            elif v1 == 0 or v1 == 1:
+                for k2, v2 in obj2.items():
+                    if k2 == k1:
+                        if v2 is not v1:
+                            return False
+
+                        break
+
+            if (isinstance(v1, list) or isinstance(v1, dict)
+                    or isinstance(v1, tuple)):
+                for k2, v2 in obj2.items():
+                    if k2 == k1:
+                        if not _strict_has_no_issues(v1, v2):
+                            return False
+
+                        break
+
+    elif isinstance(obj1, list) or isinstance(obj1, tuple):
+        for i in range(len(obj1)):
+            v1, v2 = obj1[i], obj2[i]
+            if (v1 == 0 or v1 == 1) and v1 is not v2:
+                return False
+
+            if ((isinstance(v1, list) or isinstance(v1, dict)
+                    or isinstance(v1, tuple))
+                    and not _strict_has_no_issues(v1, v2)):
+                return False
+
+    elif type(obj1) is bool or type(obj2) is bool:
+        return obj1 is obj2
+
+    return True
+
+
 def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
     try:
         return list1 == list2
@@ -651,31 +722,62 @@ def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
             raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format(fill), e)
 
 
+def strict_check_list_equality(list1: Union[list, tuple],
+                               list2: Union[list, tuple]):
+    try:
+        ans = list1 == list2
+        if not ans:
+            # Fail as fast as possible. If they aren't equal, they aren't equal.
+            return False
+
+        # At this point, we know the lists should at least be similar, but
+        # since this is a strict check, we want to make sure that dicts
+        # containing False or True as a key or value don't get compared to dicts
+        # with 0 or 1 as a key or value, respectively. As well, we should
+        # confirm that lists which contain False or True do not get compared to
+        # lists that contain 0 or 1 respectively.
+        return _strict_has_no_issues(list1, list2)
+
+    except RecursionError:
+        try:
+            return _recursive_check_list_equality(list1, list2, [], [],
+                                                  strict=True)
+
+        except RecursionError as e:
+            fill = 'list' if type(list1) is list else 'tuple'
+            raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format(fill), e)
+
+
 def _recursive_check_list_equality(list1: Union[list, tuple],
                                    list2: Union[list, tuple],
                                    recursion_points1: list,
                                    recursion_points2: list,
-                                   rec_lists_check: Callable = None):
+                                   rec_lists_check: Callable = None,
+                                   strict: bool = False):
     if rec_lists_check is None:
         rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
 
     recursion_points1.append(list1)
     recursion_points2.append(list2)
 
-    # If we get here, we shouldn't need to check list lengths or tuple.
+    # If we get here, we shouldn't need to check list lengths or tuple lengths.
     for i in range(len(list1)):
         val1 = list1[i]
         val2 = list2[i]
         try:
-            if not (_check_is_equality(val1, val2)) or val1 != val2:
+            if strict:
+                if val1 != val2 or not _strict_has_no_issues(val1, val2):
+                    return False
+
+            elif val1 is not val2 and val1 != val2:
                 return False
 
         except RecursionError as e:
             t1 = rec_lists_check(val1, val2)
             if ((t1 is not True
                  and t1
-                 and not t1(val1, val2, recursion_points1,
-                            recursion_points2, rec_lists_check))
+                 and not t1(val1, val2, recursion_points1, recursion_points2,
+                            rec_lists_check, strict=strict))
                     or t1 is False):
                 return False
 
@@ -697,10 +799,35 @@ def check_dict_equality(dict1: dict, dict2: dict):
             raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format('dict'), e)
 
 
+def strict_check_dict_equality(dict1: dict, dict2: dict):
+    try:
+        ans = dict1 == dict2
+        if not ans:
+            # Fail as fast as possible. If they aren't equal, they aren't equal.
+            return False
+
+        # At this point, we know the dicts should at least be similar, but
+        # since this is a strict check, we want to make sure that dicts
+        # containing False or True as a key or value don't get compared to dicts
+        # with 0 or 1 as a key or value, respectively. As well, we should
+        # confirm that lists which contain False or True do not get compared to
+        # lists that contain 0 or 1 respectively.
+        return _strict_has_no_issues(dict1, dict2)
+
+    except RecursionError:
+        try:
+            return _recursive_check_dict_equality(dict1, dict2, [], [],
+                                                  strict=True)
+
+        except RecursionError as e:
+            raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format('dict'), e)
+
+
 def _recursive_check_dict_equality(dict1: dict, dict2: dict,
                                    recursion_points1: list,
                                    recursion_points2: list,
-                                   rec_lists_check: Callable = None):
+                                   rec_lists_check: Callable = None,
+                                   strict: bool = False):
     if rec_lists_check is None:
         rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
 
@@ -715,15 +842,19 @@ def _recursive_check_dict_equality(dict1: dict, dict2: dict,
         val2 = dict2[key]
 
         try:
-            if not (_check_is_equality(val1, val2)) or val1 != val2:
+            if strict:
+                if val1 != val2 or not _strict_has_no_issues(val1, val2):
+                    return False
+
+            elif val1 is not val2 and val1 != val2:
                 return False
 
         except RecursionError as e:
             t1 = rec_lists_check(val1, val2)
             if ((t1 is not True
                  and t1
-                 and not t1(val1, val2, recursion_points1,
-                            recursion_points2, rec_lists_check))
+                 and not t1(val1, val2, recursion_points1, recursion_points2,
+                            rec_lists_check, strict=strict))
                     or t1 is False):
                 return False
 
@@ -753,5 +884,3 @@ def thoroughly_check_equality(val1: Any, val2: Any):
         return False
 
     return val1 == val2
-
-
