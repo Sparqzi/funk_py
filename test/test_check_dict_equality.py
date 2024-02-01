@@ -1,13 +1,14 @@
 from timeit import timeit
-from typing import Union, Dict, List, Set, Tuple, Any
+from typing import Union, Dict, Set, Tuple, Any
 
 import pytest
 
-from funk_py.modularity.type_matching import check_dict_equality
+from funk_py.modularity.type_matching import (check_dict_equality,
+                                              strict_check_dict_equality)
 
 
-def too_slow(number: int, max_duration: float, l1, l2):
-    duration = timeit(lambda: check_dict_equality(l1, l2), number=number)
+def too_slow(number: int, max_duration: float, l1, l2, func):
+    duration = timeit(lambda: func(l1, l2), number=number)
     assert duration < max_duration, ('check_list_equality worked for two lists,'
                                      ' but did not perform adequately with'
                                      ' regards to speed. Lists compared'
@@ -100,15 +101,25 @@ def same_but_diff_dicts(request, same_but_diff_pair_keys):
 
 def test_normal_equal_dicts(normal_dicts):
     assert check_dict_equality(*normal_dicts)
+    too_slow(1000000, 0.3, *normal_dicts, check_dict_equality)
+
+    assert strict_check_dict_equality(*normal_dicts)
+    too_slow(10000, 0.15, *normal_dicts, strict_check_dict_equality)
 
 
 def test_normal_diff_order_equal_dicts(same_but_diff_dicts):
     assert check_dict_equality(*same_but_diff_dicts)
-    keys1, keys2 = (d.keys() for d in same_but_diff_dicts)
+    too_slow(1000000, 0.3, *same_but_diff_dicts, check_dict_equality)
+
+    assert strict_check_dict_equality(*same_but_diff_dicts)
+    too_slow(10000, 0.15, *same_but_diff_dicts, strict_check_dict_equality)
+
+    keys1, keys2 = (tuple(d.keys()) for d in same_but_diff_dicts)
 
     # The following is meant to ensure that the dicts actually have different
     # orders of keys. If keys are in the same order, then the test is pointless.
     d_pos = False
+
     for i in range(len(keys1)):
         if keys1[i] != keys2[i]:
             d_pos = True
@@ -135,19 +146,49 @@ def weird_aligned_dicts(request):
     return request.param[0], dict(request.param[1]), request.param[2]
 
 
+USELESS_TRUE_FALSE_TEST = ('Useless test detected, both keys are the same items'
+                           ' in both dicts.')
+
+
 def test_dict_equality_still_hates_true_and_false(weird_aligned_dicts):
     assert weird_aligned_dicts[0] == weird_aligned_dicts[1]
     if weird_aligned_dicts[2]:
         v1 = list(weird_aligned_dicts[0].values())
         v2 = list(weird_aligned_dicts[1].values())
-        assert v1[0] is not v2[0] or v1[1] is not v2[1], \
-            'Useless test detected, both keys are the same items in both dicts.'
+        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
 
     else:
         k1 = list(weird_aligned_dicts[0].keys())
         k2 = list(weird_aligned_dicts[1].keys())
-        assert k1[0] is not k2[0] or k1[1] is not k2[1], \
-            'Useless test detected, both keys are the same items in both dicts.'
+        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
+
+
+def test_dict_equality_true_false_behavior_for_check_dict_equality(
+        weird_aligned_dicts):
+    assert check_dict_equality(*weird_aligned_dicts[:2])
+    if weird_aligned_dicts[2]:
+        v1 = list(weird_aligned_dicts[0].values())
+        v2 = list(weird_aligned_dicts[1].values())
+        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
+
+    else:
+        k1 = list(weird_aligned_dicts[0].keys())
+        k2 = list(weird_aligned_dicts[1].keys())
+        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
+
+
+def test_dict_inequality_true_false_behavior_for_strict_check_dict_equality(
+        weird_aligned_dicts):
+    assert not strict_check_dict_equality(*weird_aligned_dicts[:2])
+    if weird_aligned_dicts[2]:
+        v1 = list(weird_aligned_dicts[0].values())
+        v2 = list(weird_aligned_dicts[1].values())
+        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
+
+    else:
+        k1 = list(weird_aligned_dicts[0].keys())
+        k2 = list(weird_aligned_dicts[1].keys())
+        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
 
 
 def build_nested_dict(callbacks: Dict[int, dict] = None,
@@ -178,9 +219,255 @@ def build_nested_dict(callbacks: Dict[int, dict] = None,
         builder[key2] = build_nested_dict(callbacks, inner_callbacks,
                                           **instruction2)
 
-    return base
+    return builder
 
 
+SET1 = tuple(zip(S_SET1, I_SET1))
+B_SET1 = tuple(zip(B_S_SET1, B_I_SET1))
+SET2 = tuple(zip(S_SET2, I_SET2))
+B_SET2 = tuple(zip(B_S_SET2, B_I_SET2))
+SET3 = tuple(zip(F_SET1, S_SET1))
+B_SET3 = tuple(zip(B_F_SET1, B_S_SET1))
 
 
+TOP_NESTED_DICTS = (
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2)),
+     'D1->(*,D2)', 100000, 0.5),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2),
+          key2=IKI1,
+          instruction2=dict(base=SET3)),
+     'D1->(*,D2,D3)', 10000, 0.1),
+    (dict(base=SET1,
+          key1=IKF1,
+          instruction1=dict(base=SET1)),
+     'D1_1->(*,D1_2)', 10000, 0.3),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET1),
+          key2=IKF1,
+          instruction2=dict(base=SET1)),
+     'D1_1->(*,D1_2,D1_3)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKI1,
+          instruction1=dict(base=SET1),
+          key2=IKI2,
+          instruction2=dict(base=SET2)),
+     'D1_1->(*,D1_2,D2)', 10000, 0.35)
+)
+BAD_TOP_NESTED_DICTS = (
+    ((dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1)),
+      dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=B_SET1))),
+     'D1->(*,D2_1)!=D1->(*,D2_2)'),
+    ((dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1)),
+      dict(base=B_SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1))),
+     'D1_1->(*,D2,*)!=D1_2->(*,D2,*)'),
+    ((dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1),
+           key2=IKI1,
+           instruction2=dict(base=SET1)),
+      dict(base=B_SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1),
+           key2=IKI1,
+           instruction2=dict(base=SET1))),
+     'D1_1->(*,D2,D3)!=D1_2->(*,D2,D3)'),
+    ((dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1),
+           key2=IKI1,
+           instruction2=dict(base=SET1)),
+      dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1),
+           key2=IKI1,
+           instruction2=dict(base=B_SET1))),
+     'D1->(*,D2,D3_1)!=L1->(*,D2,D3_2)'),
+    ((dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=SET1),
+           key2=IKI1,
+           instruction2=dict(base=SET1)),
+      dict(base=SET1,
+           key1=IKS1,
+           instruction1=dict(base=B_SET1),
+           key2=IKI1,
+           instruction2=dict(base=SET1))),
+     'D1->(*,D2_1,D3)!=D1->(*,D2_2,D3)')
+)
 
+DOUBLE_NESTED_DICTS = (
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET3))),
+     'D1->(*,D2->(*,D3))', 10000, 0.1),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI2,
+                            instruction1=dict(base=SET3))),
+     'D1->(*,D2->(*,D3))', 10000, 0.1),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET2))),
+     'D1->(*,D2_1->(*,D2_2))', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET1))),
+     'D1_1->(*,D2->(*,D1_2))', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET1,
+                            key1=IKS1,
+                            instruction1=dict(base=SET3))),
+     'D1_1->(*,D1_2->(*,D3))', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET1,
+                            key1=IKS1,
+                            instruction1=dict(base=SET1))),
+     'D1_1->(*,D1_2->(*,D1_3))', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET3)),
+          key2=IKI2,
+          instruction2=dict(base=SET3)),
+     'D1->(*,D2->(*,D3_1),D3_2)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI2,
+                            instruction1=dict(base=SET3)),
+          key2=IKI2,
+          instruction2=dict(base=SET3)),
+     'D1->(*,D2->(*,D3_1),D3_2)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET2)),
+          key2=IKI2,
+          instruction2=dict(base=SET3)),
+     'D1->(*,D2_1->(*,D2_2),D3)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET3)),
+          key2=IKI2,
+          instruction2=dict(base=SET2)),
+     'D1->(*,D2_1->(*,D3),D2_2)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI2,
+                            instruction1=dict(base=SET3)),
+          key2=IKI2,
+          instruction2=dict(base=SET2)),
+     'D1->(*,D2_1->(*,D3),D2_2)', 10000, 0.15),
+    (dict(base=SET1,
+          key1=IKS1,
+          instruction1=dict(base=SET2,
+                            key1=IKI1,
+                            instruction1=dict(base=SET2)),
+          key2=IKI2,
+          instruction2=dict(base=SET2)),
+     'D1->(*,D2_1->(*,D2_2),D2_3)', 10000, 0.15)
+)
+BAD_DOUBLE_NESTED_DICTS = (
+    ((dict(base=SET1,
+           key1=IKI1,
+           instruction1=dict(base=SET2,
+                             key1=IKI1,
+                             instruction1=dict(base=SET1))),
+      dict(base=SET1,
+           key1=IKI1,
+           instruction1=dict(base=SET1,
+                             key1=IKI1,
+                             instruction1=dict(base=B_SET1)))),
+     'D1->(*,D2->(*,D3_1))!=D1->(*,D2->(*,D3_2))'),
+    ((dict(base=SET1,
+           key1=IKI1,
+           instruction1=dict(base=SET1,
+                             key1=IKI1,
+                             instruction1=dict(base=SET1))),
+      dict(base=SET1,
+           key1=IKI1,
+           instruction1=dict(base=B_SET1,
+                             key1=IKI1,
+                             instruction1=dict(base=SET1)))),
+     'D1->(*,D2_1->(*,D3))!=D1->(*,D2_2->(*,D3))'),
+    ((dict(base=SET1,
+           key1=IKI1,
+           instruction1=dict(base=SET1,
+                             key1=IKI1,
+                             instruction1=dict(base=SET1))),
+      dict(base=B_SET1,
+           key1=IKI1,
+           instruction1=dict(base=SET1,
+                             key1=IKI1,
+                             instruction1=dict(base=SET1)))),
+     'D1_1->(*,D2->(*,D3))!=D1_2->(*,D2->(*,D3))')
+)
+
+
+NON_RECURSIVE_NESTED_DICTS = TOP_NESTED_DICTS + DOUBLE_NESTED_DICTS
+BAD_NON_RECURSIVE_NESTED_DICTS = BAD_TOP_NESTED_DICTS + BAD_DOUBLE_NESTED_DICTS
+
+
+@pytest.fixture(params=[(v[0], *v[2:]) for v in NON_RECURSIVE_NESTED_DICTS],
+                ids=[v[1] for v in NON_RECURSIVE_NESTED_DICTS])
+def nested_non_recursive_equal_dicts(request):
+    # It is important that the lists returned are not the same exact list
+    # despite having same values.
+    return (build_nested_dict(**request.param[0]),
+            build_nested_dict(**request.param[0]),
+            *request.param[1:])
+
+
+@pytest.fixture(params=[v[0] for v in BAD_NON_RECURSIVE_NESTED_DICTS],
+                ids=[v[1] for v in BAD_NON_RECURSIVE_NESTED_DICTS])
+def nested_non_recursive_unequal_dicts(request):
+    d1, d2 = request.param
+    return (build_nested_dict(**d1),
+            build_nested_dict(**d2))
+
+
+def test_nested_non_recursive_dict_equality(nested_non_recursive_equal_dicts):
+    assert check_dict_equality(*nested_non_recursive_equal_dicts[:2])
+    too_slow(1000000, 0.6, *nested_non_recursive_equal_dicts[:2],
+             check_dict_equality)
+    assert strict_check_dict_equality(*nested_non_recursive_equal_dicts[:2])
+    too_slow(*nested_non_recursive_equal_dicts[2:],
+             *nested_non_recursive_equal_dicts[:2],
+             strict_check_dict_equality)
+
+
+def test_nested_non_recursive_dict_inequality(
+        nested_non_recursive_unequal_dicts):
+    assert not check_dict_equality(*nested_non_recursive_unequal_dicts)
+    too_slow(1000000, 0.4, *nested_non_recursive_unequal_dicts,
+             check_dict_equality)
+    assert not strict_check_dict_equality(*nested_non_recursive_unequal_dicts)
+    too_slow(1000000, 0.4, *nested_non_recursive_unequal_dicts,
+             strict_check_dict_equality)
