@@ -537,8 +537,6 @@ def test_no_false_pass_sharing(nested_with_shared_unequal_lists):
              strict_check_list_equality)
 
 
-
-
 NASTY_RECURSIVE_LIST = (
     dict(base=CONFUSED_SET1,
          callback=1,
