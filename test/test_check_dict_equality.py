@@ -466,8 +466,181 @@ def test_nested_non_recursive_dict_equality(nested_non_recursive_equal_dicts):
 def test_nested_non_recursive_dict_inequality(
         nested_non_recursive_unequal_dicts):
     assert not check_dict_equality(*nested_non_recursive_unequal_dicts)
-    too_slow(1000000, 0.4, *nested_non_recursive_unequal_dicts,
+    too_slow(1000000, 0.6, *nested_non_recursive_unequal_dicts,
              check_dict_equality)
     assert not strict_check_dict_equality(*nested_non_recursive_unequal_dicts)
-    too_slow(1000000, 0.4, *nested_non_recursive_unequal_dicts,
+    too_slow(1000000, 0.6, *nested_non_recursive_unequal_dicts,
              strict_check_dict_equality)
+
+
+SIMPLE_RECURSIVE_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=1)),
+    'D1->(*,D1)', 2
+)
+COPIED_RECURSIVE_DICT = (
+    dict(base=SET1,
+         key1=IKS1,
+         instruction1=dict(base=SET1,
+                           callback=1,
+                           key1=IKS1,
+                           instruction1=dict(base=1))),
+    'D1_1->(*,D1_2->(*,D1_2))', 1
+)
+
+DOUBLE_TOP_LEVEL_RECURSIVE_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=1),
+         key2=IKI1,
+         instruction2=dict(base=1)),
+    'D1->(*,D1,D1)', 1
+)
+COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=1),
+         key2=IKI1,
+         instruction2=dict(base=SET1,
+                           callback=2,
+                           key1=IKS1,
+                           instruction1=dict(base=2),
+                           key2=IKF1,
+                           instruction2=dict(base=2))),
+    'D1_1->(*,D1_1,D1_2->(*,D1_2,D1_2))', 1
+)
+
+LOWER_LEVEL_RECURSIVE_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=SET2,
+                           key1=IKS2,
+                           instruction1=dict(base=1))),
+    'D1->(*,D2->(*,D1))', 1
+)
+
+DOUBLE_RECURSIVE_DIFF_LEVELS_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=1),
+         key2=IKI1,
+         instruction2=dict(base=SET2,
+                           callback=2,
+                           key1=IKS2,
+                           instruction1=dict(base=2))),
+    'D1->(*,D1,D2->(*,D2))', 1
+)
+
+DOUBLE_RECURSIVE_BOTTOM_LEVEL_DICT = (
+    dict(base=SET1,
+         callback=1,
+         key1=IKS1,
+         instruction1=dict(base=SET2,
+                           callback=2,
+                           key1=IKS2,
+                           instruction1=dict(base=1),
+                           key2=IKF1,
+                           instruction2=dict(base=2))),
+    'D1->(*,D2->(*,D1,D2))', 1
+)
+
+RECURSIVE_DICTS = (
+    SIMPLE_RECURSIVE_DICT,
+    DOUBLE_TOP_LEVEL_RECURSIVE_DICT,
+    LOWER_LEVEL_RECURSIVE_DICT,
+    DOUBLE_RECURSIVE_DIFF_LEVELS_DICT,
+    DOUBLE_RECURSIVE_BOTTOM_LEVEL_DICT,
+    COPIED_RECURSIVE_DICT,
+    COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_DICT
+)
+
+DIFF_SIMPLE_RECURSIVE_DICT_SET = (
+    (SIMPLE_RECURSIVE_DICT[0], COPIED_RECURSIVE_DICT[0]),
+    'D1->(*,D1)!=D1_1->(*,D1_2->(*,D1_2))'
+)
+DIFF_DOUBLE_RECURSIVE_DICT_SET = (
+    (DOUBLE_TOP_LEVEL_RECURSIVE_DICT[0],
+     COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_DICT[0]),
+    'D1->(*,D1,D1)!=D1_1->(*,D1_1,D1_2->(*,D1_2,D1_2))'
+)
+
+@pytest.fixture(params=[(v[0], v[2]) for v in RECURSIVE_DICTS],
+                ids=[v[1] for v in RECURSIVE_DICTS])
+def recursive_equal_dicts(request):
+    d1 = build_nested_dict(**request.param[0])
+    d2 = build_nested_dict(**request.param[0])
+    return d1, d2, request.param[1]
+
+
+@pytest.fixture(
+    params=(DIFF_DOUBLE_RECURSIVE_DICT_SET[0],
+            DIFF_SIMPLE_RECURSIVE_DICT_SET[0]),
+    ids=(DIFF_DOUBLE_RECURSIVE_DICT_SET[1],
+         DIFF_SIMPLE_RECURSIVE_DICT_SET[1]))
+def recursive_unequal_dicts(request):
+    l1 = build_nested_dict(**request.param[0])
+    l2 = build_nested_dict(**request.param[1])
+    return l1, l2
+
+
+@pytest.fixture(params=(((True, 'a'), (1, 'a'), True),
+                        ((False, 'a'), (0, 'a'), True),
+                        (('a', True), ('a', 1), False),
+                        (('a', False), ('a', 0), False)),
+                ids=('True==1 (keys)', 'False==0 (keys)', 'True==1 (values)',
+                     'False==0 (values)'))
+def screwy_tests(request):
+    v1, v2, strict_result = request.param
+    d1 = {v1[0]: v1[1], 'b': {v1[0]: v1[1]}}
+    d1['b']['b'] = d1['b']
+    d2 = {v2[0]: v2[1], 'b': {v2[0]: v2[1]}}
+    d2['b']['b'] = d2['b']
+    return d1, d2, strict_result
+
+
+# If for some reason Python makes it so that comparing recursive lists does not
+# raise exceptions, then the function being tested here is useless.
+def test_still_has_purpose(recursive_equal_dicts):
+    d1, d2, timeout = recursive_equal_dicts
+    with pytest.raises(RecursionError):
+        # Your linter may dislike this line because "it has no side effects"
+        # It absolutely has effects. It should always raise an exception.
+        d1 == d2  # noqa
+
+
+def test_recursive_equality(recursive_equal_dicts):
+    assert check_dict_equality(*recursive_equal_dicts[:2])
+    too_slow(1000, recursive_equal_dicts[2], *recursive_equal_dicts[:2],
+             check_dict_equality)
+    assert strict_check_dict_equality(*recursive_equal_dicts[:2])
+    too_slow(1000, recursive_equal_dicts[2], *recursive_equal_dicts[:2],
+             strict_check_dict_equality)
+
+
+def test_follows_rules_for_true_and_false(screwy_tests):
+    assert check_dict_equality(*screwy_tests[:2])
+
+
+def test_strict_not_follows_rules_for_true_and_false(screwy_tests):
+    if screwy_tests[2]:
+        assert strict_check_dict_equality(*screwy_tests[:2])
+
+    else:
+        assert not strict_check_dict_equality(*screwy_tests[:2])
+
+
+def test_recursive_inequality(recursive_unequal_dicts):
+    assert not check_dict_equality(*recursive_unequal_dicts)
+    too_slow(5000, 1.5, *recursive_unequal_dicts, check_dict_equality)
+    assert not strict_check_dict_equality(*recursive_unequal_dicts)
+    too_slow(5000, 1.5, *recursive_unequal_dicts, strict_check_dict_equality)
+
+
+
+

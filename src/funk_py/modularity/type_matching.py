@@ -484,7 +484,7 @@ def rec_lists_checker(recursion_points1, recursion_points2):
             if (t := _double_list_check(v1, v2)) is ... \
             else t
 
-        if t1:
+        if t1 is True:
             t2 = rec_lists_check(v1, v2, _recursive_check_list_equality)
 
         elif t1 is ... and (t1 := _double_dict_check(v1, v2)):
