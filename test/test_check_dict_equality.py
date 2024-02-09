@@ -478,7 +478,7 @@ SIMPLE_RECURSIVE_DICT = (
          callback=1,
          key1=IKS1,
          instruction1=dict(base=1)),
-    'D1->(*,D1)', 2
+    'D1->(*,D1)', 1
 )
 COPIED_RECURSIVE_DICT = (
     dict(base=SET1,
@@ -509,7 +509,7 @@ COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_DICT = (
                            callback=2,
                            key1=IKS1,
                            instruction1=dict(base=2),
-                           key2=IKF1,
+                           key2=IKI1,
                            instruction2=dict(base=2))),
     'D1_1->(*,D1_1,D1_2->(*,D1_2,D1_2))', 1
 )
