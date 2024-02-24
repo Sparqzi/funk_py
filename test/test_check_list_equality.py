@@ -1,6 +1,6 @@
 import pytest
 
-from t_support import build_nested_sequence, too_slow_func
+from t_support import build_nest, too_slow_func
 from funk_py.modularity.type_matching import (check_list_equality,
                                               strict_check_list_equality)
 
@@ -381,8 +381,8 @@ def types(request):
 def nested_non_recursive_equal_lists(request, types):
     # It is important that the lists returned are not the same exact list
     # despite having same values.
-    return (build_nested_sequence(types, **request.param[0]),
-            build_nested_sequence(types, **request.param[0]),
+    return (build_nest(types, **request.param[0]),
+            build_nest(types, **request.param[0]),
             *request.param[1:])
 
 
@@ -390,8 +390,8 @@ def nested_non_recursive_equal_lists(request, types):
                 ids=[v[1] for v in BAD_NON_RECURSIVE_NESTED_LISTS])
 def nested_non_recursive_unequal_lists(request, types):
     d1, d2 = request.param
-    return (build_nested_sequence(types, **d1),
-            build_nested_sequence(types, **d2))
+    return (build_nest(types, **d1),
+            build_nest(types, **d2))
 
 
 def test_nested_non_recursive_list_equality(nested_non_recursive_equal_lists):
@@ -599,8 +599,8 @@ DIFF_NASTY_RECURSIVE_LIST_SET = (
 @pytest.fixture(params=[(v[0], v[2]) for v in RECURSIVE_LISTS],
                 ids=[v[1] for v in RECURSIVE_LISTS])
 def recursive_equal_lists(request, types):
-    l1 = build_nested_sequence(types, **request.param[0])
-    l2 = build_nested_sequence(types, **request.param[0])
+    l1 = build_nest(types, **request.param[0])
+    l2 = build_nest(types, **request.param[0])
     return l1, l2, request.param[1]
 
 
@@ -612,8 +612,8 @@ def recursive_equal_lists(request, types):
          DIFF_SIMPLE_RECURSIVE_LIST_SET[1],
          DIFF_NASTY_RECURSIVE_LIST_SET[1]))
 def recursive_unequal_lists(request, types):
-    l1 = build_nested_sequence(types, **request.param[0])
-    l2 = build_nested_sequence(types, **request.param[1])
+    l1 = build_nest(types, **request.param[0])
+    l2 = build_nest(types, **request.param[1])
     return l1, l2
 
 
@@ -673,20 +673,30 @@ def confused_unequal_falsy_recursive_lists(request, types,
     s2 = (True, False, False)
     ip = 1
 
-    l1 = build_nested_sequence(types, base=s1, point1=ip,
-                               instruction1=dict(base=s1, callback=1, point1=ip,
-                                                 instruction1=dict(base=1)))
+    l1 = build_nest(types,
+                    base=s1,
+                    point1=ip,
+                    instruction1=dict(base=s1,
+                                      callback=1,
+                                      point1=ip,
+                                      instruction1=dict(base=1)))
     if confused_recursive_list_positions == 1:
-        l2 = build_nested_sequence(types, base=s1, point1=ip,
-                                   instruction1=dict(base=s2, callback=1,
-                                                     point1=ip,
-                                                     instruction1=dict(base=1)))
+        l2 = build_nest(types,
+                        base=s1,
+                        point1=ip,
+                        instruction1=dict(base=s2,
+                                          callback=1,
+                                          point1=ip,
+                                          instruction1=dict(base=1)))
 
     else:
-        l2 = build_nested_sequence(types, base=s2, point1=ip,
-                                   instruction1=dict(base=s1, callback=1,
-                                                     point1=ip,
-                                                     instruction1=dict(base=1)))
+        l2 = build_nest(types,
+                        base=s2,
+                        point1=ip,
+                        instruction1=dict(base=s1,
+                                          callback=1,
+                                          point1=ip,
+                                          instruction1=dict(base=1)))
 
     return l1, l2
 
@@ -698,20 +708,30 @@ def confused_unequal_truthy_recursive_lists(request, types,
     s2 = (True, False, True)
     ip = 1
 
-    l1 = build_nested_sequence(types, base=s1, point1=ip,
-                               instruction1=dict(base=s1, callback=1, point1=ip,
-                                                 instruction1=dict(base=1)))
+    l1 = build_nest(types,
+                    base=s1,
+                    point1=ip,
+                    instruction1=dict(base=s1,
+                                      callback=1,
+                                      point1=ip,
+                                      instruction1=dict(base=1)))
     if confused_recursive_list_positions == 1:
-        l2 = build_nested_sequence(types, base=s1, point1=ip,
-                                   instruction1=dict(base=s2, callback=1,
-                                                     point1=ip,
-                                                     instruction1=dict(base=1)))
+        l2 = build_nest(types,
+                        base=s1,
+                        point1=ip,
+                        instruction1=dict(base=s2,
+                                          callback=1,
+                                          point1=ip,
+                                          instruction1=dict(base=1)))
 
     else:
-        l2 = build_nested_sequence(types, base=s2, point1=ip,
-                                   instruction1=dict(base=s1, callback=1,
-                                                     point1=ip,
-                                                     instruction1=dict(base=1)))
+        l2 = build_nest(types,
+                        base=s2,
+                        point1=ip,
+                        instruction1=dict(base=s1,
+                                          callback=1,
+                                          point1=ip,
+                                          instruction1=dict(base=1)))
 
     return l1, l2
 
@@ -738,4 +758,3 @@ def test_confused_truthy_recursive_inequality(
         *confused_unequal_truthy_recursive_lists)
     too_slow(10000, 0.6, *confused_unequal_truthy_recursive_lists,
              strict_check_list_equality)
-

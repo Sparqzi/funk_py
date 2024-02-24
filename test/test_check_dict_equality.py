@@ -1,6 +1,6 @@
 import pytest
 
-from t_support import build_nested_dict, too_slow_func
+from t_support import build_nest, too_slow_func
 from funk_py.modularity.type_matching import (check_dict_equality,
                                               strict_check_dict_equality)
 
@@ -400,8 +400,8 @@ BAD_NON_RECURSIVE_NESTED_DICTS = BAD_TOP_NESTED_DICTS + BAD_DOUBLE_NESTED_DICTS
 def nested_non_recursive_equal_dicts(request):
     # It is important that the lists returned are not the same exact list
     # despite having same values.
-    return (build_nested_dict(**request.param[0]),
-            build_nested_dict(**request.param[0]),
+    return (build_nest(dict, **request.param[0]),
+            build_nest(dict, **request.param[0]),
             *request.param[1:])
 
 
@@ -409,8 +409,7 @@ def nested_non_recursive_equal_dicts(request):
                 ids=[v[1] for v in BAD_NON_RECURSIVE_NESTED_DICTS])
 def nested_non_recursive_unequal_dicts(request):
     d1, d2 = request.param
-    return (build_nested_dict(**d1),
-            build_nested_dict(**d2))
+    return build_nest(dict, **d1), build_nest(dict, **d2)
 
 
 def test_nested_non_recursive_dict_equality(nested_non_recursive_equal_dicts):
@@ -533,8 +532,8 @@ DIFF_DOUBLE_RECURSIVE_DICT_SET = (
 @pytest.fixture(params=[(v[0], v[2]) for v in RECURSIVE_DICTS],
                 ids=[v[1] for v in RECURSIVE_DICTS])
 def recursive_equal_dicts(request):
-    d1 = build_nested_dict(**request.param[0])
-    d2 = build_nested_dict(**request.param[0])
+    d1 = build_nest(dict, **request.param[0])
+    d2 = build_nest(dict, **request.param[0])
     return d1, d2, request.param[1]
 
 
@@ -544,8 +543,8 @@ def recursive_equal_dicts(request):
     ids=(DIFF_DOUBLE_RECURSIVE_DICT_SET[1],
          DIFF_SIMPLE_RECURSIVE_DICT_SET[1]))
 def recursive_unequal_dicts(request):
-    l1 = build_nested_dict(**request.param[0])
-    l2 = build_nested_dict(**request.param[1])
+    l1 = build_nest(dict, **request.param[0])
+    l2 = build_nest(dict, **request.param[1])
     return l1, l2
 
 
@@ -600,7 +599,3 @@ def test_recursive_inequality(recursive_unequal_dicts):
     too_slow(5000, 1.5, *recursive_unequal_dicts, check_dict_equality)
     assert not strict_check_dict_equality(*recursive_unequal_dicts)
     too_slow(5000, 1.5, *recursive_unequal_dicts, strict_check_dict_equality)
-
-
-
-
