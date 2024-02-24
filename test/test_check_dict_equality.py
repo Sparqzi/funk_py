@@ -1,20 +1,11 @@
-from timeit import timeit
-from typing import Union, Dict, Set, Tuple, Any
-
 import pytest
 
+from t_support import build_nested_dict, too_slow_func
 from funk_py.modularity.type_matching import (check_dict_equality,
                                               strict_check_dict_equality)
 
 
-def too_slow(number: int, max_duration: float, l1, l2, func):
-    duration = timeit(lambda: func(l1, l2), number=number)
-    assert duration < max_duration, ('check_list_equality worked for two lists,'
-                                     ' but did not perform adequately with'
-                                     ' regards to speed. Lists compared'
-                                     ' were:\n' + repr(l1) + '\n' + repr(l2)
-                                     + '\n' + str(number) + ' iterations were'
-                                     ' performed.')
+too_slow = too_slow_func('dict')
 
 
 G_STR1 = 'a'
@@ -189,37 +180,6 @@ def test_dict_inequality_true_false_behavior_for_strict_check_dict_equality(
         k1 = list(weird_aligned_dicts[0].keys())
         k2 = list(weird_aligned_dicts[1].keys())
         assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
-
-
-def build_nested_dict(callbacks: Dict[int, dict] = None,
-                      inner_callbacks: Set[int] = None,
-                      *, base: Union[Tuple[tuple, ...], int],
-                      callback: int = None,
-                      key1: Any = None,
-                      instruction1: dict = None,
-                      key2: Any = None,
-                      instruction2: dict = None):
-    if callbacks is None:
-        callbacks = {}
-        inner_callbacks = set()
-
-    if type(base) is int:
-        inner_callbacks.add(base)
-        return callbacks[base]
-
-    builder = dict(base)
-    if callback is not None:
-        callbacks[callback] = builder
-
-    if key1:
-        builder[key1] = build_nested_dict(callbacks, inner_callbacks,
-                                          **instruction1)
-
-    if key2:
-        builder[key2] = build_nested_dict(callbacks, inner_callbacks,
-                                          **instruction2)
-
-    return builder
 
 
 SET1 = tuple(zip(S_SET1, I_SET1))

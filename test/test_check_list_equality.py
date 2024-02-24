@@ -1,20 +1,11 @@
-from collections import namedtuple
-from timeit import timeit
-from typing import Union, Dict, Set
-
 import pytest
 
+from t_support import build_nested_sequence, too_slow_func
 from funk_py.modularity.type_matching import (check_list_equality,
                                               strict_check_list_equality)
 
 
-def too_slow(number: int, max_duration: float, l1, l2, func):
-    duration = timeit(lambda: func(l1, l2), number=number)
-    assert duration < max_duration, \
-        f'check_list_equality worked for two lists, but did not perform' \
-        f' adequately with regards to speed. Lists compared were:\n{repr(l1)}' \
-        f'\n{repr(l2)}\n{str(number)} iterations were performed. Expected' \
-        f' rate was {str(number / max_duration)} executions per second.'
+too_slow = too_slow_func('list')
 
 
 G_STR1 = 'a'
@@ -174,59 +165,6 @@ def test_un_nested_list_inequality(regular_unequal_lists):
     assert not strict_check_list_equality(*regular_unequal_lists)
     too_slow(1000000, 1.5, *regular_unequal_lists,
              strict_check_list_equality)
-
-
-def build_nested_sequence(type_: type,
-                          callbacks: Dict[int, Union[tuple, list]] = None,
-                          inner_callbacks: Set[int] = None,
-                          *, base: Union[tuple, int],
-                          callback: int = None,
-                          point1: int = None,
-                          instruction1: dict = None,
-                          point2: int = None,
-                          instruction2: dict = None):
-    if callbacks is None:
-        callbacks = {}
-        inner_callbacks = set()
-
-    if type(base) is int:
-        inner_callbacks.add(base)
-        return callbacks[base]
-
-    if point1:
-        builder = list(base[:point1])
-        if callback is not None:
-            callbacks[callback] = builder
-
-        builder.append(
-            build_nested_sequence(type_, callbacks, inner_callbacks,
-                                  **instruction1))
-        if point2:
-            if point2 == -1:
-                builder.extend(base[point1:])
-                builder.append(
-                    build_nested_sequence(type_, callbacks, inner_callbacks,
-                                          **instruction2))
-
-            else:
-                builder.extend(base[point1:point2])
-                builder.append(
-                    build_nested_sequence(type_, callbacks, inner_callbacks,
-                                          **instruction2))
-                builder.extend(base[point2:])
-
-        else:
-            builder.extend(base[point1:])
-
-        if callback is not None and callback in inner_callbacks:
-            return builder
-
-        return type_(builder)
-
-    if callback is not None:
-        callbacks[callback] = type_(base)
-
-    return type_(base)
 
 
 TOP_NESTED_LISTS = (
