@@ -2,7 +2,25 @@ from collections import namedtuple
 from typing import Tuple, Any, Union
 
 import pytest
+
+from t_support import cov, cov_counter
 from funk_py.super_dicts.drop_none_dict import DropNoneDict as DnD
+
+
+@pytest.fixture(scope='session', autouse=True)
+def c():
+    if not cov_counter.value:
+        cov.start()
+        cov_counter.value += 1
+
+    yield cov
+
+    cov_counter.value -= 1
+    if not cov_counter.value:
+        cov.stop()
+        cov.save()
+        cov.report()
+
 
 NOT_CAUSE = 'Test failed to generate the expected start value. The issue is' \
             ' probably elsewhere.'

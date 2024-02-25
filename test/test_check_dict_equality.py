@@ -1,8 +1,23 @@
 import pytest
 
-from t_support import build_nest, too_slow_func
+from t_support import build_nest, too_slow_func, cov, cov_counter
 from funk_py.modularity.type_matching import (check_dict_equality,
                                               strict_check_dict_equality)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def c():
+    if not cov_counter.value:
+        cov.start()
+        cov_counter.value += 1
+
+    yield cov
+
+    cov_counter.value -= 1
+    if not cov_counter.value:
+        cov.stop()
+        cov.save()
+        cov.report()
 
 
 too_slow = too_slow_func('dict')

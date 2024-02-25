@@ -1,10 +1,26 @@
 from timeit import timeit
 from typing import Dict, Set, Union, Tuple, Any, Iterable
 
+import coverage
+from coverage import Coverage
+
+
+cov = coverage.Coverage()
+
+
+class Object(object):
+    pass
+
+
+cov_counter = Object()
+cov_counter.value = 0
+
 
 def too_slow_func(desc: str):
     def too_slow(number: int, max_duration: float, t1, t2, func: callable):
+        cov.stop()
         duration = timeit(lambda: func(t1, t2), number=number)
+        cov.start()
         assert duration < max_duration, \
             (f'{func.__name__} worked for two {desc}, but did not perform'
              f' adequately with regards to speed. {desc.title()} compared'

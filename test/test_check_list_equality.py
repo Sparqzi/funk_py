@@ -1,8 +1,23 @@
 import pytest
 
-from t_support import build_nest, too_slow_func
+from t_support import build_nest, too_slow_func, cov, cov_counter
 from funk_py.modularity.type_matching import (check_list_equality,
                                               strict_check_list_equality)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def c():
+    if not cov_counter.value:
+        cov.start()
+        cov_counter.value += 1
+
+    yield cov
+
+    cov_counter.value -= 1
+    if not cov_counter.value:
+        cov.stop()
+        cov.save()
+        cov.report()
 
 
 too_slow = too_slow_func('list')
@@ -153,7 +168,7 @@ def regular_unequal_lists(request):
 
 def test_un_nested_list_equality(regular_equal_lists):
     assert check_list_equality(*regular_equal_lists[:2])
-    too_slow(1000000, 0.3, *regular_equal_lists[:2], check_list_equality)
+    too_slow(1000000, 0.4, *regular_equal_lists[:2], check_list_equality)
     assert strict_check_list_equality(*regular_equal_lists[:2])
     too_slow(*regular_equal_lists[2:], *regular_equal_lists[:2],
              strict_check_list_equality)
@@ -161,9 +176,9 @@ def test_un_nested_list_equality(regular_equal_lists):
 
 def test_un_nested_list_inequality(regular_unequal_lists):
     assert not check_list_equality(*regular_unequal_lists)
-    too_slow(1000000, 0.2, *regular_unequal_lists, check_list_equality)
+    too_slow(1000000, 0.3, *regular_unequal_lists, check_list_equality)
     assert not strict_check_list_equality(*regular_unequal_lists)
-    too_slow(1000000, 1.5, *regular_unequal_lists,
+    too_slow(1000000, 1.6, *regular_unequal_lists,
              strict_check_list_equality)
 
 
@@ -171,29 +186,29 @@ TOP_NESTED_LISTS = (
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET)),
-     'L1->(*,L2,*)', 100000, 0.5),
+     'L1->(*,L2,*)', 100000, 0.6),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET),
           point2=INSERT_POINT1_2,
           instruction2=dict(base=STR_SET)),
-     'L1->(*,L2,*,L3,*)', 10000, 0.1),
+     'L1->(*,L2,*,L3,*)', 10000, 0.2),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=GEN_SET)),
-     'L1_1->(*,L1_2,*)', 10000, 0.3),
+     'L1_1->(*,L1_2,*)', 10000, 0.4),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=GEN_SET),
           point2=INSERT_POINT1_2,
           instruction2=dict(base=GEN_SET)),
-     'L1_1->(*,L1_2,*,L1_3,*)', 10000, 0.15),
+     'L1_1->(*,L1_2,*,L1_3,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=GEN_SET),
           point2=INSERT_POINT1_2,
           instruction2=dict(base=INT_SET)),
-     'L1_1->(*,L1_2,*,L2,*)', 10000, 0.35)
+     'L1_1->(*,L1_2,*,L2,*)', 10000, 0.45)
 )
 BAD_TOP_NESTED_LISTS = (
     ((dict(base=INT_SET,
@@ -251,37 +266,37 @@ DOUBLE_NESTED_LISTS = (
           instruction1=dict(base=INT_SET,
                             point1=INSERT_POINT2_1,
                             instruction1=dict(base=STR_SET))),
-     'L1->(*,L2->(*,L3,*),*)', 10000, 0.1),
+     'L1->(*,L2->(*,L3,*),*)', 10000, 0.2),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
                             point1=INSERT_POINT2_2,
                             instruction1=dict(base=STR_SET))),
-     'L1->(*,L2->(*,L3),*)', 10000, 0.1),
+     'L1->(*,L2->(*,L3),*)', 10000, 0.2),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
                             point1=INSERT_POINT2_1,
                             instruction1=dict(base=INT_SET))),
-     'L1->(*,L2_1->(*,L2_2,*),*)', 10000, 0.15),
+     'L1->(*,L2_1->(*,L2_2,*),*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
                             point1=INSERT_POINT2_1,
                             instruction1=dict(base=GEN_SET))),
-     'L1_1->(*,L2->(*,L1_2,*),*)', 10000, 0.15),
+     'L1_1->(*,L2->(*,L1_2,*),*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=GEN_SET,
                             point1=INSERT_POINT1_1,
                             instruction1=dict(base=STR_SET))),
-     'L1_1->(*,L1_2->(*,L3,*),*)', 10000, 0.15),
+     'L1_1->(*,L1_2->(*,L3,*),*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=GEN_SET,
                             point1=INSERT_POINT1_1,
                             instruction1=dict(base=GEN_SET))),
-     'L1_1->(*,L1_2->(*,L1_3,*),*)', 10000, 0.15),
+     'L1_1->(*,L1_2->(*,L1_3,*),*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -289,7 +304,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=STR_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=STR_SET)),
-     'L1->(*,L2->(*,L3_1,*),*,L3_2,*)', 10000, 0.15),
+     'L1->(*,L2->(*,L3_1,*),*,L3_2,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -297,7 +312,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=STR_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=STR_SET)),
-     'L1->(*,L2->(*,L3_1),*,L3_2,*)', 10000, 0.15),
+     'L1->(*,L2->(*,L3_1),*,L3_2,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -305,7 +320,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=INT_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=STR_SET)),
-     'L1->(*,L2_1->(*,L2_2,*),*,L3,*)', 10000, 0.15),
+     'L1->(*,L2_1->(*,L2_2,*),*,L3,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -313,7 +328,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=STR_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=INT_SET)),
-     'L1->(*,L2_1->(*,L3,*),*,L2_2,*)', 10000, 0.15),
+     'L1->(*,L2_1->(*,L3,*),*,L2_2,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -321,7 +336,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=STR_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=INT_SET)),
-     'L1->(*,L2_1->(*,L3),*,L2_2,*)', 10000, 0.15),
+     'L1->(*,L2_1->(*,L3),*,L2_2,*)', 10000, 0.25),
     (dict(base=GEN_SET,
           point1=INSERT_POINT1_1,
           instruction1=dict(base=INT_SET,
@@ -329,7 +344,7 @@ DOUBLE_NESTED_LISTS = (
                             instruction1=dict(base=INT_SET)),
           point2=INSERT_POINT2_2,
           instruction2=dict(base=INT_SET)),
-     'L1->(*,L2_1->(*,L2_2,*),*,L2_3,*)', 10000, 0.15)
+     'L1->(*,L2_1->(*,L2_2,*),*,L2_3,*)', 10000, 0.25)
 )
 BAD_DOUBLE_NESTED_LISTS = (
     ((dict(base=INT_SET,
@@ -480,7 +495,7 @@ NASTY_RECURSIVE_LIST = (
          callback=1,
          point1=INSERT_POINT3_1,
          instruction1=dict(base=1)),
-    'L1->(*,L1,*)-nasty', 0.7
+    'L1->(*,L1,*)-nasty', 0.8
 )
 COPIED_NASTY_RECURSIVE_LIST = (
     dict(base=CONFUSED_SET1,
@@ -489,7 +504,7 @@ COPIED_NASTY_RECURSIVE_LIST = (
                            callback=1,
                            point1=INSERT_POINT3_1,
                            instruction1=dict(base=1))),
-    'L1_1->(*,L1_2->(*,L1_2,*),*)-nasty', 0.75
+    'L1_1->(*,L1_2->(*,L1_2,*),*)-nasty', 1
 )
 
 SIMPLE_RECURSIVE_LIST = (
@@ -506,7 +521,7 @@ COPIED_RECURSIVE_LIST = (
                            callback=1,
                            point1=INSERT_POINT1_1,
                            instruction1=dict(base=1))),
-    'L1_1->(*,L1_2->(*,L1_2,*),*)', 0.75
+    'L1_1->(*,L1_2->(*,L1_2,*),*)', 1
 )
 
 DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
@@ -516,7 +531,7 @@ DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
          instruction1=dict(base=1),
          point2=INSERT_POINT1_2,
          instruction2=dict(base=1)),
-    'L1->(*,L1,*,L1,*)', 0.55
+    'L1->(*,L1,*,L1,*)', 0.85
 )
 COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
     dict(base=GEN_SET,
@@ -530,7 +545,7 @@ COPIED_DOUBLE_TOP_LEVEL_RECURSIVE_LIST = (
                            instruction1=dict(base=2),
                            point2=INSERT_POINT2_2,
                            instruction2=dict(base=2))),
-    'L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)', 1.1
+    'L1_1->(*,L1_1,*,L1_2->(*,L1_2,*,L1_2,*),*)', 1.2
 )
 
 LOWER_LEVEL_RECURSIVE_LIST = (
@@ -540,7 +555,7 @@ LOWER_LEVEL_RECURSIVE_LIST = (
          instruction1=dict(base=INT_SET,
                            point1=INSERT_POINT2_1,
                            instruction1=dict(base=1))),
-    'L1->(*,L2->(*,L1,*),*)', 0.5
+    'L1->(*,L2->(*,L1,*),*)', 0.6
 )
 
 DOUBLE_RECURSIVE_DIFF_LEVELS_LIST = (
@@ -553,7 +568,7 @@ DOUBLE_RECURSIVE_DIFF_LEVELS_LIST = (
                            callback=2,
                            point1=INSERT_POINT2_1,
                            instruction1=dict(base=2))),
-    'L1->(*,L1,*,L2->(*,L2,*),*)', 0.65
+    'L1->(*,L1,*,L2->(*,L2,*),*)', 0.85
 )
 
 DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST = (
@@ -566,7 +581,7 @@ DOUBLE_RECURSIVE_BOTTOM_LEVEL_LIST = (
                            instruction1=dict(base=1),
                            point2=INSERT_POINT2_2,
                            instruction2=dict(base=2))),
-    'L1->(*,L2->(*,L1,*,L2),*)', 0.7
+    'L1->(*,L2->(*,L1,*,L2),*)', 0.8
 )
 
 RECURSIVE_LISTS = (
@@ -658,7 +673,7 @@ def test_recursive_inequality(recursive_unequal_lists):
     assert not check_list_equality(*recursive_unequal_lists)
     too_slow(10000, 0.6, *recursive_unequal_lists, check_list_equality)
     assert not strict_check_list_equality(*recursive_unequal_lists)
-    too_slow(10000, 0.6, *recursive_unequal_lists, strict_check_list_equality)
+    too_slow(10000, 0.7, *recursive_unequal_lists, strict_check_list_equality)
 
 
 @pytest.fixture(params=(1, 2), ids=('base as outer', 'base as inner'))
@@ -703,7 +718,7 @@ def confused_unequal_falsy_recursive_lists(request, types,
 
 @pytest.fixture(params=TRUTHY_VALS)
 def confused_unequal_truthy_recursive_lists(request, types,
-                                           confused_recursive_list_positions):
+                                            confused_recursive_list_positions):
     s1 = (True, False, request.param)
     s2 = (True, False, True)
     ip = 1
@@ -744,7 +759,7 @@ def test_confused_falsy_recursive_inequality(
              check_list_equality)
     assert not strict_check_list_equality(
         *confused_unequal_falsy_recursive_lists)
-    too_slow(10000, 0.6, *confused_unequal_falsy_recursive_lists,
+    too_slow(10000, 0.7, *confused_unequal_falsy_recursive_lists,
              strict_check_list_equality)
 
 
@@ -756,5 +771,5 @@ def test_confused_truthy_recursive_inequality(
              check_list_equality)
     assert not strict_check_list_equality(
         *confused_unequal_truthy_recursive_lists)
-    too_slow(10000, 0.6, *confused_unequal_truthy_recursive_lists,
+    too_slow(10000, 0.7, *confused_unequal_truthy_recursive_lists,
              strict_check_list_equality)

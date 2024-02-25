@@ -39,7 +39,7 @@ def __mm(func: Callable, type_: type) -> Callable:
     return wrapper
 
 
-def _listable(allow_too_many: bool = False) -> Callable:
+def listable(allow_too_many: bool = False) -> Callable:
     """
     Make it so that a function can take a list of its arguments as the only
     argument. It will still be able to take its normal arguments.
@@ -86,7 +86,7 @@ def _listable(allow_too_many: bool = False) -> Callable:
     return wrapper_wrapper
 
 
-def _dictable(extra_routes: dict = None, slices: dict = None,
+def dictable(extra_routes: dict = None, slices: dict = None,
              needs: Iterable = None, needs_not: Iterable = None):
     """
     Make it so that a function can take a dictionary of its arguments as a
@@ -181,7 +181,7 @@ def _dictable(extra_routes: dict = None, slices: dict = None,
     return wrapper_wrapper
 
 
-def _class_init(*overrides: Union[str, Callable]) -> Callable:
+def class_init(*overrides: Union[str, Callable]) -> Callable:
     """
     Make it so that a function assigns arguments directly to the same-named
     properties of its containing class.

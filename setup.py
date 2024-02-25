@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 
-
 setup(
     name='funky_modifiers',
     version='0.1.2',
