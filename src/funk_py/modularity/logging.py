@@ -19,10 +19,10 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
                 default_level: Union[str, int] = logging.INFO,
                 show_function: bool = False,
                 **custom_levels: int) -> logging.Logger:
-    r"""
+    """
     This creates a logger with a few default settings as well as some custom
     levels, if specified. The format of messages for this logger should be
-    '
+    ``'{levelname}: {name} - {message}'``
 
     :param name: The name of the logger.
     :param env_var: The environment variable it should be linked to.
@@ -31,15 +31,22 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
     :param default_level: This may be either a str or an int representing the
         desired log level.
         `per python docs <https://docs.python.org/3/library/logging.html#levels>`__,
-        the default available levels are: logging.notset = 0,
-        logging.debug = 10, logging.info = 20, logging.warning = 30,
-        logging.error = 40, and logging.CRITICAL = 50.
+        the default available levels are:
+
+        .. code-block:: python
+
+            logging.NOTSET = 0
+            logging.DEBUG = 10
+            logging.INFO = 20
+            logging.WARNING = 30
+            logging.ERROR = 40
+            logging.CRITICAL = 50
+
     :param show_function: Whether you want the function name that is being
         logged from to show up in the info.
     :param custom_levels: *Please note that this is global. If you define it for
         one logger, it exists for all loggers. Those loggers may not be set up
         to use it by default, though.*
-    :return:
     """
     logger = logging.getLogger(name)
 
