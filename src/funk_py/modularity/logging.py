@@ -65,7 +65,7 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
 
     format_str = '%(levelname)-' + str(max_length) + 's: %(name)s - '
     if show_function:
-        format_str += '%funcName)s - %(message)s'
+        format_str += '%(funcName)s - %(message)s'
         formatter = logging.Formatter(format_str)
 
     else:
