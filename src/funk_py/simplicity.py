@@ -3,6 +3,10 @@ from functools import wraps
 from typing import Mapping, overload, Iterable, Union, Tuple
 
 
+class ObjAttributeError(AttributeError):
+    pass
+
+
 class Obj(dict):
     """
     ``Obj`` is a sort of wishy-washy map where branches can be implicitly
@@ -47,15 +51,17 @@ class Obj(dict):
     def __init__(self, iterable: Iterable, **kwargs): ...
 
     def __init__(self, map_: Mapping = ..., **kwargs):
-        if map_ is not ...:
-            dict.__init__(self, map_, **kwargs)
-
-        else:
-            dict.__init__(self, **kwargs)
+        # Don't use dict.__init__ to add the map_ and kwargs, since nested maps
+        # should be transformed to new Obj's, Obj should handle it with
+        # _no_check_update, since that will check for those instances.
+        dict.__init__(self)
+        map_ = {} if map_ is ... else dict(map_)
+        map_.update(kwargs)
+        self._no_check_update(map_)
 
         # Always use super's __setattr__ method to avoid triggering own
         # __setattr__ method.
-        dict.__setattr__(self, '_Obj__hardened', False)
+        dict.__setattr__(self, '_hardened', False)
         # The following is used by __setattr__ and __getattr__ methods later to
         # handle attributes that are not (usually) going to be set by the user
         # directly. It should primarily be for things like *shape*.
@@ -65,8 +71,7 @@ class Obj(dict):
 
     @property
     def is_hardened(self) -> bool:
-
-        return dict.__getattribute__(self, '_Obj__hardened')
+        return dict.__getattribute__(self, '_hardened')
 
     def harden(self):
         """
@@ -85,7 +90,7 @@ class Obj(dict):
             ``pop``, ``popitem``, ``clear``, and ``update`` methods of the
             instance.
         """
-        dict.__setattr__(self, '_Obj__hardened', True)
+        dict.__setattr__(self, '_hardened', True)
 
         no_new_msg = Obj._GEN_ERR.format('have new keys created')
         no_del_msg = Obj._GEN_ERR.format('have keys removed')
@@ -126,12 +131,12 @@ class Obj(dict):
 
             if key in i_self:
                 if isinstance(dict.__getitem__(i_self, key), Obj):
-                    raise AttributeError(blocked_msg, name=key)
+                    raise ObjAttributeError(blocked_msg, name=key)
 
                 dict.__setitem__(i_self, key, value)
 
             else:
-                raise AttributeError(no_new_msg, name=key)
+                raise ObjAttributeError(no_new_msg, name=key)
 
         @to_wrap('__setitem__')
         def new_setitem(i_self, key, value):
@@ -146,18 +151,18 @@ class Obj(dict):
                 dict.__setitem__(i_self, key, value)
 
             else:
-                raise AttributeError(no_new_msg, name=key)
+                raise ObjAttributeError(no_new_msg, name=key)
 
         @to_wrap('pop')
         def new_pop(i_self, key, default=...):
-            raise AttributeError(no_del_msg, name=key)
+            raise ObjAttributeError(no_del_msg, name=key)
 
         def new_delattr(i_self, item=...):
-            raise AttributeError(no_del_msg, name=item)
+            raise ObjAttributeError(no_del_msg, name=item)
 
         @to_wrap('clear')
         def new_clear(i_self):
-            raise AttributeError(no_del_msg, name='ALL KEYS')
+            raise ObjAttributeError(no_del_msg, name='ALL KEYS')
 
         @to_wrap('update')
         def new_update(i_self, map_: Mapping = ..., **kwargs):
@@ -169,21 +174,22 @@ class Obj(dict):
 
             if len(bad_keys):
                 if len(blocked_keys):
-                    raise AttributeError(
+                    raise ObjAttributeError(
                         no_new_msg + ' Not even via update.\n' + blocked_msg,
                         name=f'Missing Keys: {repr(bad_keys)}\n'
                              f'Blocked Keys: {repr(blocked_keys)}')
 
                 else:
-                    raise AttributeError(no_new_msg + ' Not even via update.',
-                                         name=repr(bad_keys))
+                    raise ObjAttributeError(
+                        no_new_msg + ' Not even via update.',
+                        name=repr(bad_keys))
 
             elif len(blocked_keys):
-                raise AttributeError(blocked_msg, name=repr(blocked_keys))
+                raise ObjAttributeError(blocked_msg, name=repr(blocked_keys))
 
             # Do not call dict.update here, it will cause any required
             # dict->Obj conversions not to occur.
-            # any data in map_ should have been transferred to kwargs at the
+            # Any data in map_ should have been transferred to kwargs at the
             # beginning of this.
             i_self._no_check_update(map_)
 
@@ -205,6 +211,8 @@ class Obj(dict):
     def _scan_dead_keys(self, map_: Mapping):
         # The reason this is written to NOT fail fast is so that as much
         # information as possible about what was wrong can be collected.
+        # We want to have this information, so we can give the user a detailed
+        # error message.
         bad_keys = []
         blocked_keys = []
         for key, val in map_.items():
@@ -231,13 +239,29 @@ class Obj(dict):
         """
         for key, val in map_.items():
             if key in self:
-                if isinstance(t := dict.__getitem__(self, key), Obj):
-                    t._no_check_update(val)
+                if isinstance(val, dict):
+                    # We could build the Obj for the dict right away, but that
+                    # isn't very efficient if we're going to be updating another
+                    # Obj with it. Instead, check if there is an Obj to add it
+                    # to first.
+                    if isinstance(t := dict.__getitem__(self, key), Obj):
+                        print(f'{val}-update')
+                        t._no_check_update(val)
+
+                    else:
+                        print(f'{val}-dict')
+                        dict.__setitem__(self, key, Obj(val))
 
                 else:
+                    print(f'{val}-direct')
                     dict.__setitem__(self, key, val)
 
+            elif isinstance(val, dict):
+                print(f'{val}-new dict')
+                dict.__setitem__(self, key, Obj(val))
+
             else:
+                print(f'{val}-new direct')
                 dict.__setitem__(self, key, val)
 
     @overload
