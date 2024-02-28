@@ -56,6 +56,23 @@ def del_methods(request):
     return request.param
 
 
+def get_attr(obj, key):
+    obj.__getattr__(key)
+
+
+def get_item(obj, key):
+    obj.__getitem__(key)
+
+
+BASIC_GET_LAMBDAS = (get_item, get_attr)
+BASIC_GET_LAMBDA_NAMES = ('getting an item', 'getting an attribute')
+
+
+@pytest.fixture(params=BASIC_GET_LAMBDAS, ids=BASIC_GET_LAMBDA_NAMES)
+def get_methods(request):
+    return request.param
+
+
 SIMPLE_VALS1 = (1, 'lorem', math.pi)
 SIMPLE_VALS2 = (2, 'ipsum', math.inf)
 SIMPLE_VAL_NAMES = ('int', 'str', 'flt')
@@ -550,8 +567,13 @@ class TestUnhardened:
 
         confirm_expected_storage_size(testy, len(update_overlap_dicts.unhardened))
 
-    def test_del_works(self, overlap_base_dict, overlap_keys):
+    def test_del_works(self, overlap_base_dict, overlap_keys, del_methods):
         testy = Obj(overlap_base_dict)
+        del_methods(testy, overlap_keys)
+        # the dict.__getitem__ method is used here because we expect
+        # Obj.__getitem__ and Obj.__getattr__ to mutate the Obj.
+        assert dict.get(testy, overlap_keys, ...) is ..., \
+            f'Deletion did not succeed for key {overlap_keys}.'
 
     def test_clear_works(self, regular_dict):
         testy = Obj(regular_dict)
@@ -560,3 +582,29 @@ class TestUnhardened:
         testy.clear()
         confirm_expected_storage_size(testy, 0)
 
+    def test_missing_key_returns_new_obj(self, get_methods):
+        testy = Obj()
+        assert dict.__len__(testy) == 0, \
+            ('Initial Obj has elements when it should not. This indicates a'
+             ' failure in instantiation.')
+        ans1 = get_methods(testy, SIMPLE_KEYS[-1])
+        assert isinstance(ans1, Obj), \
+            ('The tested method did not result in a new instance of Obj being'
+             ' generated. Obj is expected to generate a new object when it is'
+             ' not hardened and Obj.__getitem__ or Obj.__getattr__ is called.')
+        assert dict.__len__(ans1) == 0, \
+            ('The tested method did generate a new instance of Obj. However,'
+             ' this instance was not empty even though it should have been.')
+        # Use dict.__getitem__ to ensure the item was actually added to testy.
+        # Don't use a method of Obj to test this...
+        assert isinstance(dict.__getitem__(testy, SIMPLE_KEYS[-1]), Obj), \
+            ('The tested method did generate a new instance of Obj. However,'
+             ' it was not actually stored in the Obj.')
+
+        # Get the item one more time to make sure it isn't automatically
+        # overwritten for some reason.
+        ans2 = get_methods(testy, SIMPLE_KEYS[-1])
+        assert ans1 is ans2, \
+            ('The tested method did generate a new instance of Obj. However,'
+             ' it was overwritten when the mehtod was called again. There is a'
+             ' flaw in the logic that determines when to generate a new Obj.')
