@@ -30,8 +30,13 @@ def set_item(obj, key, value):
     obj[key] = value
 
 
-BASIC_ADD_LAMBDAS = (set_item, set_attr)
-BASIC_ADD_LAMBDA_NAMES = ('setting an item', 'setting an attribute')
+def direct_set_item(obj, key, value):
+    obj.__setitem__(key, value)
+
+
+BASIC_ADD_LAMBDAS = (set_item, set_attr, direct_set_item)
+BASIC_ADD_LAMBDA_NAMES = ('setting an item', 'setting an attribute',
+                          'setting an item by directly calling __setitem__')
 
 
 @pytest.fixture(params=BASIC_ADD_LAMBDAS, ids=BASIC_ADD_LAMBDA_NAMES)
@@ -57,11 +62,11 @@ def del_methods(request):
 
 
 def get_attr(obj, key):
-    obj.__getattr__(key)
+    return obj.__getattr__(key)
 
 
 def get_item(obj, key):
-    obj.__getitem__(key)
+    return obj.__getitem__(key)
 
 
 BASIC_GET_LAMBDAS = (get_item, get_attr)
@@ -77,6 +82,7 @@ SIMPLE_VALS1 = (1, 'lorem', math.pi)
 SIMPLE_VALS2 = (2, 'ipsum', math.inf)
 SIMPLE_VAL_NAMES = ('int', 'str', 'flt')
 SIMPLE_KEYS = tuple(c for c in 'abcdefghijklmnopqrstuvwxyz')
+ODD_VAL_OUT = 17.77777
 
 
 EXTRA_VALUE_SET = (3, 'dolor', -0)
@@ -86,6 +92,16 @@ SIMPLE_KEYS2 = SIMPLE_KEYS[len(SIMPLE_VALS1):
 EXTRA_KEYS = SIMPLE_KEYS[len(SIMPLE_VALS1) + len(SIMPLE_VALS2):
                          len(SIMPLE_VALS1) + len(SIMPLE_VALS2) +
                          len(EXTRA_VALUE_SET)]
+
+
+@pytest.fixture
+def odd_key_out():
+    return SIMPLE_KEYS[-1]
+
+
+@pytest.fixture
+def odd_val_out():
+    return ODD_VAL_OUT
 
 
 @pytest.fixture
@@ -195,11 +211,11 @@ def confirm_expected_storage_size(testy, expected_len):
     def err_msg(msg, d_len, o_len, state, prev_state):
         # It may be beneficial to add all len measurements, but data is limited
         # as much as is reasonable
-        builder = msg + (f'\nLength according to dict.__len__: {d_len}\n'
-                         f'Length according to Obj.__len__: {o_len}\n'
-                         f'Expected length: {expected_len}\n'
-                         f'Data in dict before measurement: {prev_state}\n'
-                         f'Data in dict after measurement: {state}')
+        return msg + (f'\nLength according to dict.__len__: {d_len}\n'
+                      f'Length according to Obj.__len__: {o_len}\n'
+                      f'Expected length: {expected_len}\n'
+                      f'Data in dict before measurement: {prev_state}\n'
+                      f'Data in dict after measurement: {state}')
 
     if dict_len != obj_len:
         if dict_len == expected_len:
@@ -266,7 +282,6 @@ def confirm_expected_storage_size(testy, expected_len):
                                   ' determine what is causing this.',
                                   dict_after_len, obj_after_len, inner_data2,
                                   inner_data1)
-
 
     elif obj_after_len != expected_len:
         assert False, err_msg('__len__ generated a key when it shouldn\'t have.'
@@ -560,7 +575,6 @@ class TestUnhardened:
         # Verify it works without any prior reads.
         testy = Obj(update_overlap_dicts.base)
         testy.update(update_overlap_dicts.added)
-        a = 1
         # Do a read of the values in the Obj to verify the expected Obj was created.
         multi_confirm_expected_storage(testy,
                                        update_overlap_dicts.unhardened.items())
@@ -582,12 +596,12 @@ class TestUnhardened:
         testy.clear()
         confirm_expected_storage_size(testy, 0)
 
-    def test_missing_key_returns_new_obj(self, get_methods):
+    def test_missing_key_returns_new_obj(self, get_methods, odd_key_out):
         testy = Obj()
         assert dict.__len__(testy) == 0, \
             ('Initial Obj has elements when it should not. This indicates a'
              ' failure in instantiation.')
-        ans1 = get_methods(testy, SIMPLE_KEYS[-1])
+        ans1 = get_methods(testy, odd_key_out)
         assert isinstance(ans1, Obj), \
             ('The tested method did not result in a new instance of Obj being'
              ' generated. Obj is expected to generate a new object when it is'
@@ -597,14 +611,94 @@ class TestUnhardened:
              ' this instance was not empty even though it should have been.')
         # Use dict.__getitem__ to ensure the item was actually added to testy.
         # Don't use a method of Obj to test this...
-        assert isinstance(dict.__getitem__(testy, SIMPLE_KEYS[-1]), Obj), \
+        assert isinstance(dict.__getitem__(testy, odd_key_out), Obj), \
             ('The tested method did generate a new instance of Obj. However,'
              ' it was not actually stored in the Obj.')
 
         # Get the item one more time to make sure it isn't automatically
         # overwritten for some reason.
-        ans2 = get_methods(testy, SIMPLE_KEYS[-1])
+        ans2 = get_methods(testy, odd_key_out)
         assert ans1 is ans2, \
             ('The tested method did generate a new instance of Obj. However,'
              ' it was overwritten when the mehtod was called again. There is a'
              ' flaw in the logic that determines when to generate a new Obj.')
+
+
+class TestHardened:
+    def test_adding_new_fails(self, add_methods, odd_key_out, odd_val_out):
+        testy = Obj()
+        testy.harden()
+        with pytest.raises(ObjAttributeError) as e_info:
+            add_methods(testy, odd_key_out, odd_val_out)
+
+        # Make sure the object didn't get mutated during the bad set event.
+        assert dict.__len__(testy) == 0, \
+            'The Obj was mutated when the exception occurred!'
+
+    def test_changing_keys(self, overlap_base_dict, add_methods, overlap_keys,
+                           overlap_vals):
+        testy = Obj(overlap_base_dict)
+        testy.harden()
+        add_methods(testy, overlap_keys, overlap_vals)
+        confirm_expected_storage(testy, overlap_keys, overlap_vals)
+        confirm_expected_storage_size(testy, len(overlap_base_dict))
+
+    def test_update_works(self, update_overlap_dicts):
+        # Verify it works without any prior reads.
+        testy = Obj(update_overlap_dicts.base)
+        testy.harden()
+        if update_overlap_dicts.hardened is not ...:
+            with pytest.raises(update_overlap_dicts.hardened):
+                testy.update(update_overlap_dicts.added)
+
+            # Make sure the object didn't get mutated during the bad update
+            # event.
+            assert dict.__len__(testy) == len(update_overlap_dicts.base), \
+                'The Obj was mutated when the exception occurred!'
+
+        else:
+            testy.update(update_overlap_dicts.added)
+            # Do a read of the values in the Obj to verify the expected Obj was
+            # created.
+            multi_confirm_expected_storage(
+                testy, update_overlap_dicts.unhardened.items())
+            confirm_expected_storage_size(testy,
+                                          len(update_overlap_dicts.unhardened))
+
+    def test_del_fails(self, overlap_base_dict, overlap_keys, del_methods):
+        testy = Obj(overlap_base_dict)
+        testy.harden()
+        with pytest.raises(ObjAttributeError):
+            del_methods(testy, overlap_keys)
+
+        # the dict.__getitem__ method is used here because we expect
+        # Obj.__getitem__ and Obj.__getattr__ to mutate the Obj.
+        assert dict.get(testy, overlap_keys, ...) is not ..., \
+            ('Hardening did not prevent deletion, but did raise the expected'
+             ' exception.')
+
+    def test_clear_fails(self, regular_dict):
+        testy = Obj(regular_dict)
+        testy.harden()
+        assert dict.__len__(testy) == len(regular_dict), \
+            'Test Invalid: expected Obj not generated!'
+        with pytest.raises(ObjAttributeError):
+            testy.clear()
+
+        multi_confirm_expected_storage(testy, regular_dict.items(),
+                                       'Hardening didn\'t prevent clearing'
+                                       ' completely, but did raise the expected'
+                                       ' exception.')
+
+    def test_missing_key_fails(self, get_methods):
+        testy = Obj()
+        testy.harden()
+        assert dict.__len__(testy) == 0, \
+            ('Initial Obj has elements when it should not. This indicates a'
+             ' failure in instantiation.')
+        with pytest.raises(ObjAttributeError):
+            ans1 = get_methods(testy, SIMPLE_KEYS[-1])
+
+        assert dict.__len__(testy) == 0, \
+            ('Even though it did raise the expected exception, getting a value'
+             ' generated a new key-val pair.')

@@ -2,6 +2,8 @@ import builtins
 from functools import wraps
 from typing import Mapping, overload, Iterable, Union, Tuple
 
+from funk_py.super_dicts import dict_input_processor
+
 
 class ObjAttributeError(AttributeError):
     pass
@@ -43,6 +45,14 @@ class Obj(dict):
     It can also be :meth:`hardened <Obj.harden>` so that new keys cannot be
     added and existing keys cannot be removed.
     """
+
+    _GEN_ERR = 'This Obj has been hardened. It can no longer {}.'
+    no_new_msg = _GEN_ERR.format('have new keys created')
+    no_del_msg = _GEN_ERR.format('have keys removed')
+    blocked_msg = ('This Obj has been hardened. While the target key'
+                   ' exists, it can not be changed because it is also an'
+                   ' instance of Obj.')
+
     @overload
     def __init__(self, **kwargs): ...
     @overload
@@ -67,8 +77,6 @@ class Obj(dict):
         # directly. It should primarily be for things like *shape*.
         dict.__setattr__(self, '_HIDE_THESE', ['shape'])
 
-    _GEN_ERR = 'This Obj has been hardened. It can no longer {}.'
-
     @property
     def is_hardened(self) -> bool:
         return dict.__getattribute__(self, '_hardened')
@@ -92,117 +100,30 @@ class Obj(dict):
         """
         dict.__setattr__(self, '_hardened', True)
 
-        no_new_msg = Obj._GEN_ERR.format('have new keys created')
-        no_del_msg = Obj._GEN_ERR.format('have keys removed')
-        blocked_msg = ('This Obj has been hardened. While the target key'
-                       ' exists, it can not be changed because it is also an'
-                       ' instance of Obj.')
-
         def to_wrap(attr):
             return wraps(dict.__getattribute__(self, attr))
 
-        # Create new functions that will raise exceptions when trying to add or
-        # remove keys and assign them in place of the original functions.
-        @to_wrap('__getattr__')
-        def new_getattr(i_self, item):
-            # The following prevents *system* variables from effecting the
-            # dictionary representation of the Obj.
-            # Use the super's __getattribute__ method to prevent infinite loops
-            # and to keep background data from being considered as elements in
-            # the dictionary.
-            if item in dict.__getattribute__(i_self, '_HIDE_THESE'):
-                return dict.__getattribute__(i_self, item)
-
-            if item not in i_self:
-                raise AttributeError(
-                    Obj.GEN_ERR.format('generate missing keys'), name=item)
-
-            return i_self[item]
-
-        @to_wrap('__setattr__')
-        def new_setattr(i_self, key, value):
-            # The following prevents *system* variables from effecting the
-            # dictionary representation of the Obj.
-            # Use the super's __getattribute__ and __setattr__ methods to
-            # prevent infinite loops and to keep background data from being
-            # considered as elements in the dictionary.
-            if key in dict.__getattribute__(self, '_HIDE_THESE'):
-                dict.__setattr__(self, key, value)
-
-            if key in i_self:
-                if isinstance(dict.__getitem__(i_self, key), Obj):
-                    raise ObjAttributeError(blocked_msg, name=key)
-
-                dict.__setitem__(i_self, key, value)
-
-            else:
-                raise ObjAttributeError(no_new_msg, name=key)
-
-        @to_wrap('__setitem__')
-        def new_setitem(i_self, key, value):
-            # This method should not require the same check for *system*
-            # variables that setattr requires. This is simply because its use
-            # means the user actually intends to set the corresponding key-value
-            # pair.
-            # Items in _HIDE_THESE can be entered as keys before hardening, so
-            # long as they are not set as an attribute, but instead as an actual
-            # key-value pair.
-            if key in i_self:
-                dict.__setitem__(i_self, key, value)
-
-            else:
-                raise ObjAttributeError(no_new_msg, name=key)
-
         @to_wrap('pop')
-        def new_pop(i_self, key, default=...):
-            raise ObjAttributeError(no_del_msg, name=key)
+        def new_pop(key, default=...):
+            raise ObjAttributeError(Obj.no_del_msg, name=key)
 
-        def new_delattr(i_self, item=...):
-            raise ObjAttributeError(no_del_msg, name=item)
+        def new_delattr(item=...):
+            raise ObjAttributeError(Obj.no_del_msg, name=item)
 
         @to_wrap('clear')
-        def new_clear(i_self):
-            raise ObjAttributeError(no_del_msg, name='ALL KEYS')
+        def new_clear():
+            raise ObjAttributeError(Obj.no_del_msg, name='ALL KEYS')
 
-        @to_wrap('update')
-        def new_update(i_self, map_: Mapping = ..., **kwargs):
-            map_ = {} if map_ is ... else map_
-            map_ = dict(map_) if not isinstance(map_, Mapping) else map_
-            map_.update(kwargs)
-
-            bad_keys, blocked_keys = i_self._scan_dead_keys(map_)
-
-            if len(bad_keys):
-                if len(blocked_keys):
-                    raise ObjAttributeError(
-                        no_new_msg + ' Not even via update.\n' + blocked_msg,
-                        name=f'Missing Keys: {repr(bad_keys)}\n'
-                             f'Blocked Keys: {repr(blocked_keys)}')
-
-                else:
-                    raise ObjAttributeError(
-                        no_new_msg + ' Not even via update.',
-                        name=repr(bad_keys))
-
-            elif len(blocked_keys):
-                raise ObjAttributeError(blocked_msg, name=repr(blocked_keys))
-
-            # Do not call dict.update here, it will cause any required
-            # dict->Obj conversions not to occur.
-            # Any data in map_ should have been transferred to kwargs at the
-            # beginning of this.
-            i_self._no_check_update(map_)
-
-        dict.__setattr__(self, '__getattr__', new_getattr)
-        dict.__setattr__(self, '__setattr__', new_setattr)
-        dict.__setattr__(self, '__setitem__', new_setitem)
-        dict.__setattr__(self, 'pop', new_pop)
-        dict.__setattr__(self, '__delattr__',
-                         to_wrap('__delattr__')(new_delattr))
-        dict.__setattr__(self, '__delitem__',
-                         to_wrap('__delitem__')(new_delattr))
-        dict.__setattr__(self, 'popitem', to_wrap('popitem')(new_delattr))
-        dict.__setattr__(self, 'update', new_update)
+        self.__dict__['__getattr__'] = self._hardened_getattr
+        self.__dict__['__getitem__'] = self._hardened_getitem
+        self.__dict__['__setattr__'] = self._hardened_setattr
+        self.__dict__['_setitem_to_be_disguised'] = self._hardened_setitem
+        self.__dict__['pop'] = new_pop
+        self.__dict__['__delattr__'] = to_wrap('__delattr__')(new_delattr)
+        self.__dict__['__delitem__'] = to_wrap('__delitem__')(new_delattr)
+        self.__dict__['popitem'] = to_wrap('popitem')(new_delattr)
+        self.__dict__['update'] = self._hardened_update
+        self.__dict__['clear'] = new_clear
 
         for val in self.values():
             if isinstance(val, Obj):
@@ -216,7 +137,7 @@ class Obj(dict):
         bad_keys = []
         blocked_keys = []
         for key, val in map_.items():
-            if key not in self:
+            if not dict.__contains__(self, key):
                 bad_keys.append(key)
 
             elif isinstance(t := dict.__getitem__(self, key), Obj):
@@ -238,7 +159,7 @@ class Obj(dict):
         ``Obj``, it should be safe.
         """
         for key, val in map_.items():
-            if key in self:
+            if dict.__contains__(self, key):
                 if isinstance(val, dict):
                     # We could build the Obj for the dict right away, but that
                     # isn't very efficient if we're going to be updating another
@@ -283,6 +204,39 @@ class Obj(dict):
         map_.update(kwargs)
         self._no_check_update(map_)
 
+    def _hardened_update(self, map_: Mapping = ..., **kwargs):
+        map_ = {} if map_ is ... else map_
+        map_ = dict(map_) if not isinstance(map_, Mapping) else map_
+        map_.update(kwargs)
+
+        bad_keys, blocked_keys = self._scan_dead_keys(map_)
+
+        if len(bad_keys):
+            if len(blocked_keys):
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.\n'
+                    + Obj.blocked_msg,
+                    name=f'Missing Keys: {repr(bad_keys)}\n'
+                         f'Blocked Keys: {repr(blocked_keys)}')
+
+            else:
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.',
+                    name=repr(bad_keys))
+
+        elif len(blocked_keys):
+            raise ObjAttributeError(Obj.blocked_msg, name=repr(blocked_keys))
+
+        # Do not call dict.update here, it will cause any required
+        # dict->Obj conversions not to occur.
+        # Any data in map_ should have been transferred to kwargs at the
+        # beginning of this.
+        self._no_check_update(map_)
+
+    @dict_input_processor
+    def false_update(self, map_):
+        return map_
+
     def __getattr__(self, item):
         # The following prevents *system* variables from effecting the
         # dictionary representation of the Obj.
@@ -292,11 +246,27 @@ class Obj(dict):
         if item in dict.__getattribute__(self, '_HIDE_THESE'):
             return dict.__getattribute__(self, item)
 
-        if item not in self:
-            gimme = self[item] = Obj()
-            return gimme
+        if not dict.__contains__(self, item):
+            value = Obj()
+            dict.__setitem__(self, item, value)
+            return value
 
         return self[item]
+
+    def _hardened_getattr(self, item):
+        # The following prevents *system* variables from effecting the
+        # dictionary representation of the Obj.
+        # Use the super's __getattribute__ method to prevent infinite loops
+        # and to keep background data from being considered as elements in
+        # the dictionary.
+        if item in dict.__getattribute__(self, '_HIDE_THESE'):
+            return dict.__getattribute__(self, item)
+
+        if item not in self:
+            raise ObjAttributeError(
+                Obj._GEN_ERR.format('generate missing keys'), name=item)
+
+        return dict.__getitem__(self, item)
 
     def __setattr__(self, key, value):
         # The following prevents *system* variables from effecting the
@@ -308,7 +278,76 @@ class Obj(dict):
             dict.__setattr__(self, key, value)
 
         else:
-            self[key] = value
+            self._no_check_update({key: value})
+
+    def _hardened_setattr(self, key, value):
+        map_ = {key: value}
+        bad_keys, blocked_keys = self._scan_dead_keys(map_)
+        if len(bad_keys):
+            if len(blocked_keys):
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.\n'
+                    + Obj.blocked_msg,
+                    name=f'Missing Keys: {repr(bad_keys)}\n'
+                         f'Blocked Keys: {repr(blocked_keys)}')
+
+            else:
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.',
+                    name=repr(bad_keys))
+
+        elif len(blocked_keys):
+            raise ObjAttributeError(Obj.blocked_msg,
+                                    name=repr(blocked_keys))
+
+        # The following prevents *system* variables from effecting the
+        # dictionary representation of the Obj.
+        if key in dict.__getattribute__(self, '_HIDE_THESE'):
+            dict.__setattr__(self, key, value)
+
+        self._no_check_update(map_)
+
+    def _setitem_to_be_disguised(self, key, value):
+        self._no_check_update({key: value})
+
+    def __setitem__(self, key, value):
+        self._setitem_to_be_disguised(key, value)
+
+    def _hardened_setitem(self, key, value):
+        map_ = {key: value}
+        bad_keys, blocked_keys = self._scan_dead_keys(map_)
+        if len(bad_keys):
+            if len(blocked_keys):
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.\n'
+                    + Obj.blocked_msg,
+                    name=f'Missing Keys: {repr(bad_keys)}\n'
+                         f'Blocked Keys: {repr(blocked_keys)}')
+
+            else:
+                raise ObjAttributeError(
+                    Obj.no_new_msg + ' Not even via update.',
+                    name=repr(bad_keys))
+
+        elif len(blocked_keys):
+            raise ObjAttributeError(Obj.blocked_msg, name=repr(blocked_keys))
+
+        self._no_check_update(map_)
+
+    def __getitem__(self, key):
+        if key in self:
+            return dict.__getitem__(self, key)
+
+        new_obj = Obj()
+        dict.__setitem__(self, key, new_obj)
+        return new_obj
+
+    def _hardened_getitem(self, item):
+        if item not in self:
+            raise ObjAttributeError(
+                Obj._GEN_ERR.format('generate missing keys'), name=item)
+
+        return dict.__getitem__(self, item)
 
     def __delattr__(self, item):
         if item in self:
@@ -738,3 +777,6 @@ class Obj(dict):
                 }
         """
         return self._as_thing(dict, recur)
+
+    def __repr__(self) -> str:
+        return '(Obj) ' + dict.__repr__(self)
