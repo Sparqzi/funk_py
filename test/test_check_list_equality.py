@@ -22,7 +22,7 @@ def c():
     if not cov_counter.value:
         cov.stop()
         cov.save()
-        cov.report()
+        cov.html_report()
 
 
 too_slow = too_slow_func('list')

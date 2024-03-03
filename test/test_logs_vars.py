@@ -25,7 +25,7 @@ def c():
     if not cov_counter.value:
         cov.stop()
         cov.save()
-        cov.report()
+        cov.html_report()
 
 ARGUMENTS = 'Arguments:'
 LOGGER = getLogger('testy')

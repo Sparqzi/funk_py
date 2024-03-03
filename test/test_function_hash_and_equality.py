@@ -26,7 +26,7 @@ def c():
     if not cov_counter.value:
         cov.stop()
         cov.save()
-        cov.report()
+        cov.html_report()
 
 
 # If this appears to be broken, please step through, reading the comments carefully. At the time

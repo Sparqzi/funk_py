@@ -28,7 +28,7 @@ def c():
     if not cov_counter.value:
         cov.stop()
         cov.save()
-        cov.report()
+        cov.html_report()
 
 
 def set_attr(obj, key, value):
