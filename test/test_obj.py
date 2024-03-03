@@ -27,37 +27,13 @@ def c():
 NEWLINE = '\n'
 
 
-# The following manages whether the generated coverage instance from t_support should report. This
-# method of coverage is used so that coverage can be turned off to not interfere in timed tests.
-@pytest.fixture(scope='session', autouse=True)
-def c():
-    if not cov_counter.value:
-        # We don't want to start coverage more than once
-        cov.start()
-
-    cov_counter.value += 1
-
-    yield cov
-
-    cov_counter.value -= 1
-
-    # We don't want to report till all test modules are completed...
-    if not cov_counter.value:
-        cov.stop()
-        cov.save()
-        cov.html_report()
+def set_attr(obj, key, value): obj.__setattr__(key, value)
 
 
-def set_attr(obj, key, value):
-    obj.__setattr__(key, value)
+def set_item(obj, key, value): obj[key] = value
 
 
-def set_item(obj, key, value):
-    obj[key] = value
-
-
-def direct_set_item(obj, key, value):
-    obj.__setitem__(key, value)
+def direct_set_item(obj, key, value): obj.__setitem__(key, value)
 
 
 BASIC_ADD_LAMBDAS = (set_item, set_attr, direct_set_item)
@@ -66,16 +42,13 @@ BASIC_ADD_LAMBDA_NAMES = ('setting an item', 'setting an attribute',
 
 
 @pytest.fixture(params=BASIC_ADD_LAMBDAS, ids=BASIC_ADD_LAMBDA_NAMES)
-def add_methods(request):
-    return request.param
+def add_methods(request): return request.param
 
 
-def del_attr(obj, key):
-    obj.__delattr__(key)
+def del_attr(obj, key): obj.__delattr__(key)
 
 
-def del_item(obj, key):
-    obj.__delitem__(key)
+def del_item(obj, key): obj.__delitem__(key)
 
 
 BASIC_DEL_LAMBDAS = (del_item, del_attr)
