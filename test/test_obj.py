@@ -7,6 +7,9 @@ from t_support import cov, cov_counter
 from funk_py.simplicity import Obj, ObjAttributeError
 
 
+NEWLINE = '\n'
+
+
 # The following manages whether the generated coverage instance from t_support should report. This
 # method of coverage is used so that coverage can be turned off to not interfere in timed tests.
 @pytest.fixture(scope='session', autouse=True)
@@ -168,6 +171,24 @@ def multi_confirm_expected_storage(testy, source, add_msg: str = ''):
 
         else:
             confirm_expected_storage(testy, key, val, add_msg)
+
+
+def safe_multi_confirm_expected_storage(testy, source, add_msg: str = ''):
+    for key, val in source:
+        if isinstance(val, dict):
+            o_val = dict.__getitem__(testy, key)
+            if not isinstance(o_val, Obj):
+                assert not isinstance(o_val, dict), (f'{add_msg}{NEWLINE if add_msg else ""}'
+                                                     f'Expected: {repr(val)}\n'
+                                                     f'Actual: {repr(o_val)}')
+                assert False, (f'{add_msg}{NEWLINE if add_msg else ""}'
+                               f'Expected: {repr(val)}\n'
+                               f'Actual: {repr(o_val)}')
+
+            safe_multi_confirm_expected_storage(o_val, val.items(), add_msg)
+
+        else:
+            safe_confirm_expected_storage(testy, key, val, add_msg)
 
 
 def confirm_expected_storage_size(testy, expected_len):
@@ -581,12 +602,65 @@ class TestUnhardened:
         # overwritten for some reason.
         ans2 = get_methods(testy, odd_key_out)
         assert ans1 is ans2, \
-            ('The tested method did generate a new instance of Obj. However,'
-             ' it was overwritten when the mehtod was called again. There is a'
-             ' flaw in the logic that determines when to generate a new Obj.')
             ('The tested method did generate a new instance of Obj. However, it was overwritten'
              ' when the mehtod was called again. There is a flaw in the logic that determines when'
              ' to generate a new Obj.')
+
+    def test_pop_works(self, regular_dict):
+        for key, val in regular_dict.items():
+            copier = regular_dict.copy()
+            testy = Obj(regular_dict)
+            safe_multi_confirm_expected_storage(testy, copier.items(), WRONG_START)
+
+            ans1 = testy.pop(key)
+            ans2 = copier.pop(key)
+            if ans1 != val:
+                if ans1 == ans2:
+                    assert False, (f'Somehow, the wrong value was popped, there may be an issue'
+                                   f' with how the test is written.\n'
+                                   f'Both Obj.pop({repr(key)}) and dict.pop({repr(key)}) returned'
+                                   f' {repr(ans1)}.\n'
+                                   f'Expected value was {repr(val)}.')
+
+                elif ans2 != val:
+                    assert False, (f'Somehow, a different value was popped from the source dict and'
+                                   f' the Obj. There may be an issue with how the test is written.'
+                                   f'\n'
+                                   f'Obj.pop({repr(key)}) returned {repr(ans1)}.\n'
+                                   f'dict.pop({repr(key)}) returned {repr(ans2)}.\n'
+                                   f'Expected value was {repr(val)}.')
+
+            safe_multi_confirm_expected_storage(testy, copier.items(),
+                                                f'Objects didn\'t agree despite'
+                                                f' Obj.pop({repr(key)}) returning the expected'
+                                                f' value.')
+
+    def test_popitem_works(self, regular_dict):
+        # Technically, if this works, dict does maintain order.
+        testy = Obj(regular_dict)
+        copier = regular_dict.copy()
+        safe_multi_confirm_expected_storage(testy, copier.items(), WRONG_START)
+        for item in reversed(regular_dict.items()):
+            ans1 = testy.popitem()
+            ans2 = copier.popitem()
+            if ans1 != item:
+                if ans1 == ans2:
+                    assert False, (f'Somehow, the wrong item was popped, there may be an issue'
+                                   f' with how the test is written.\n'
+                                   f'Both Obj.popitem() and dict.popitem() returned {repr(ans1)}.\n'
+                                   f'Expected value was {repr(item)}.')
+
+                elif ans2 != item:
+                    assert False, (f'Somehow, a different item was popped from the source dict and'
+                                   f' the Obj. There may be an issue with how the test is written.'
+                                   f'\n'
+                                   f'Obj.popitem() returned {repr(ans1)}.\n'
+                                   f'dict.popitem() returned {repr(ans2)}.\n'
+                                   f'Expected value was {repr(item)}.')
+
+            safe_multi_confirm_expected_storage(testy, copier.items(),
+                                                'Objects didn\'t agree despite Obj.popitem()'
+                                                ' returning the expected value.')
 
 
 class TestHardened:
@@ -659,7 +733,38 @@ class TestHardened:
             ans1 = get_methods(testy, SIMPLE_KEYS[-1])
 
         assert dict.__len__(testy) == 0, \
-            ('Even though it did raise the expected exception, getting a value'
-             ' generated a new key-val pair.')
             ('Even though it did raise the expected exception, getting a value generated a new'
              ' key-val pair.')
+
+    def test_pop_fails(self, regular_dict):
+        testy = Obj(regular_dict)
+        testy.harden()
+        safe_multi_confirm_expected_storage(testy, regular_dict.items(), WRONG_START)
+
+        for key, val in regular_dict.items():
+            ans = ...
+            with pytest.raises(ObjAttributeError):
+                ans = testy.pop(key)
+
+            assert ans is ..., (f'Obj.pop still returned something even though the Obj was '
+                                f'hardened.\n'
+                                f'Returned {repr(ans)}.')
+            safe_multi_confirm_expected_storage(testy, regular_dict.items(),
+                                                f'Obj.pop did not return anything, but still '
+                                                f'deleted the key.\n'
+                                                f'Deleted key {repr(key)}')
+
+    def test_popitem_fails(self, regular_dict):
+        testy = Obj(regular_dict)
+        testy.harden()
+        safe_multi_confirm_expected_storage(testy, regular_dict.items(), WRONG_START)
+        ans = ...
+        with pytest.raises(ObjAttributeError):
+            ans = testy.popitem()
+
+        assert ans is ..., (f'Obj.popitem still returned something even though the Obj was '
+                            f'hardened.\n'
+                            f'Returned {repr(ans)}.')
+        safe_multi_confirm_expected_storage(testy, regular_dict.items(),
+                                            f'Obj.pop did not return anything, but still deleted '
+                                            f'an item.')
