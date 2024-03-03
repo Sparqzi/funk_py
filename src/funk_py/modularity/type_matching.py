@@ -35,13 +35,12 @@ class TypeMatcher:
         return t
 
     # *DISREGARD python:S1144*
-    # This might trigger a warning for python:S1144, that is because some
-    # linters do not check the __new__ method properly. This does not violate
+    # This might trigger a warning for python:S1144, that is because some linters do not check the
+    # __new__ method properly. This does not violate
     # python:S1144.
     def __true_init(self, type_: Union[type, tuple, None]):  # noqa
-        # This serves as a hidden init so that instances are never
-        # re-initialized. This is important to prevent eating up too much
-        # memory. It can also decrease other resource usage.
+        # This serves as a hidden init so that instances are never re-initialized. This is important
+        # to prevent eating up too much memory. It can also decrease other resource usage.
         self._type = type_
         self._function = self.__get_new_function(type_)
 
@@ -70,8 +69,8 @@ class TypeMatcher:
         elif type_ is Any:
             return lambda x: True
 
-        # Cannot import NoneType, but when used in Union, None becomes
-        # NoneType. Therefore, must evaluate type_ against type(None)
+        # Cannot import NoneType, but when used in Union, None becomes NoneType. Therefore, must
+        # evaluate type_ against type(None)
         elif type_ is None or isinstance(type_, type(None)):
             return lambda x: x is None
 
@@ -81,8 +80,7 @@ class TypeMatcher:
         elif type_ is AnyStr:
             return lambda x: isinstance(x, str)
 
-        elif type_ in (str, int, float, bool, complex, object, Callable,
-                       bytes):
+        elif type_ in (str, int, float, bool, complex, object, bytes, Callable):
             return TypeMatcher.__generic_type(type_)
 
         elif type(type_) is tuple:
@@ -171,8 +169,7 @@ class TypeMatcher:
             inst_check = False
 
         basic_check_list = [str, int, float, bool, complex, object, Callable]
-        hard_check_list = [list, set, dict, Iterable, type(None), tuple, Union,
-                           Literal]
+        hard_check_list = [list, set, dict, Iterable, type(None), tuple, Union, Literal]
 
         easy_checks = []
         hard_checks = []
@@ -193,8 +190,7 @@ class TypeMatcher:
                                                                 inst_check)
 
     @staticmethod
-    def __get_glorified_union_check_function(easy_checks: list,
-                                             hard_checks: list,
+    def __get_glorified_union_check_function(easy_checks: list, hard_checks: list,
                                              inst_check: bool) -> Callable:
         """Actually construct the function for the __glorified_union_check"""
         if inst_check:
@@ -226,8 +222,7 @@ class TypeMatcher:
             checks = [TypeMatcher(t) for t in type_types]
 
             if repeat:
-                return TypeMatcher.__get_tuple_check_repeat_function(checks,
-                                                                     type__)
+                return TypeMatcher.__get_tuple_check_repeat_function(checks, type__)
 
             return TypeMatcher.__get_tuple_check_args_function(checks, type__)
 
@@ -248,8 +243,7 @@ class TypeMatcher:
 
                 j = 0
                 while j < len(value):
-                    if not all(checks[i](value[i + j])
-                               for i in range(unit)):
+                    if not all(checks[i](value[i + j]) for i in range(unit)):
                         return False
 
                     j += unit
@@ -262,13 +256,10 @@ class TypeMatcher:
 
     @staticmethod
     def __get_tuple_check_args_function(checks, type__) -> Callable:
-        """Actually construct the function for a tuple with non-repeating
-        types."""
+        """Actually construct the function for a tuple with non-repeating types."""
         def type_check(value: Any) -> bool:
             if type(value) is type__ and len(checks) == len(value):
-                return all(checks[i](value[i])
-                           for i
-                           in range(len(value)))
+                return all(checks[i](value[i]) for i in range(len(value)))
 
             return False
 
@@ -281,9 +272,7 @@ class TypeMatcher:
             type__ = get_origin(type_)
             check_key = TypeMatcher(type_types[0])
             check_val = TypeMatcher(type_types[1])
-            return TypeMatcher.__get_mapping_check_args_function(check_key,
-                                                                 check_val,
-                                                                 type__)
+            return TypeMatcher.__get_mapping_check_args_function(check_key, check_val, type__)
 
         def type_check(value: Any) -> bool:
             return type(value) is type_
@@ -293,7 +282,7 @@ class TypeMatcher:
     @staticmethod
     def __get_mapping_check_args_function(check_key, check_val, type__) \
             -> Callable:
-        """Actually construct the function for a mppaing with args."""
+        """Actually construct the function for a mapping with args."""
         def type_check(value: Any) -> bool:
             if type(value) is type__:
                 for key, val in value.items():
@@ -306,8 +295,7 @@ class TypeMatcher:
 
         return type_check
 
-    def __repr__(self) -> str:
-        return f'<TypeMatcher: {repr(self._type)}>'
+    def __repr__(self) -> str: return f'<TypeMatcher: {repr(self._type)}>'
 
     @property
     def type(self):
@@ -316,11 +304,10 @@ class TypeMatcher:
 
 
 class TransformerFilter:
-    def __init__(self,
-                 input_rules: Union[dict, list],
-                 raise_on_fail: bool = True):
-        """A filter with rules and methods to transform values put through it
-        based on their type."""
+    def __init__(self, input_rules: Union[dict, list], raise_on_fail: bool = True):
+        """
+        A filter with rules and methods to transform values put through it based on their type.
+        """
         self.__rules = []
         self.__outputs = []
         for type_, func in input_rules.items():
@@ -341,10 +328,7 @@ class TransformerFilter:
         return new_cls
 
     def _accept_args(self, rules: list, outputs: list, raise_on_fail: bool):
-        """
-        Used to set the args on an instance that was generated
-        without a call to __init__.
-        """
+        """Used to set the args on an instance that was generated without a call to __init__."""
         self.__rules = rules
         self.__outputs = outputs
         self._default = ...
@@ -354,57 +338,51 @@ class TransformerFilter:
         self.pn = {}
 
     def __call__(self, value: Any, *, inst: Any = None) -> Any:
-        """Check the type of the value and perform a specified transformation
-        on it based on predetermined instructions.
+        """
+        Check the type of the value and perform a specified transformation on it based on
+            predetermined instructions.
 
         :param value: The value to transform.
-        :param inst: The class instance from which the method should be called
-            (if applicable).
-        :return: Returns the transformed value if a transformer is found.
-            Should no transformer be found, and raise_on_fail is True, will
-            raise a TypeError exception. Otherwise, will return ellipsis.
+        :param inst: The class instance from which the method should be called (if applicable).
+        :return: Returns the transformed value if a transformer is found. Should no transformer be
+            found, and raise_on_fail is True, will raise a TypeError exception. Otherwise, will
+            return ellipsis.
         """
         for i in range(self._length):
             if self.__rules[i](value):
                 if type(func := self.__outputs[i]) is tuple:
                     call = func[0]
                     args = (value, *func[1:])
-                    # must ensure self parameter is passed in if the function
-                    # requires it.
-                    if hasattr(inst, call.__name__) \
-                            and inspect.ismethod(getattr(inst, call.__name__)):
+                    # must ensure self parameter is passed in if the function requires it.
+                    if (hasattr(inst, call.__name__)
+                            and inspect.ismethod(getattr(inst, call.__name__))):
                         return call(inst, *args)
 
                     return call(*args)
 
-                # must ensure self parameter is passed in if the function
-                # requires it.
-                if hasattr(inst, func.__name__) \
-                        and inspect.ismethod(getattr(inst, func.__name__)):
+                # must ensure self parameter is passed in if the function requires it.
+                if hasattr(inst, func.__name__) and inspect.ismethod(getattr(inst, func.__name__)):
                     return func(inst, value)
 
                 return func(value)
 
         if self._raise_on_fail:
-            raise TypeError(f"{type(value)} is not a valid type for this"
-                            f" attribute.")
+            raise TypeError(f'{type(value)} is not a valid type for this attribute.')
 
         return ...
 
     def __repr__(self) -> str:
-        dict_string = ', '.join(f"{repr(rule)}: {repr(out)}"
+        dict_string = ', '.join(f'{repr(rule)}: {repr(out)}'
                                 for rule, out
                                 in zip(self.__rules, self.__outputs))
         return f"<TransformerFilter{'{'}{dict_string}{'}'}>"
 
     def __set_name__(self, owner, name):
         if owner in self.pun:
-            # In this scenario, there is already a property in this owner. In
-            # order to avoid overwriting the current name, we should create
-            # a new class instance and assign that instance the owner/name
-            # combo we have here.
-            new = TransformerFilter.__from_existing(self.__rules,
-                                                    self.__outputs,
+            # In this scenario, there is already a property in this owner. In order to avoid
+            # overwriting the current name, we should create a new class instance and assign that
+            # instance the owner/name combo we have here.
+            new = TransformerFilter.__from_existing(self.__rules, self.__outputs,
                                                     self._raise_on_fail)
             new.__set_name__(owner, name)
             setattr(owner, name, new)
@@ -439,28 +417,24 @@ class TransformerFilter:
         inst.__setattr__(self.pn[inst.__class__], self(value, inst=inst))
 
     def copy(self) -> 'TransformerFilter':
-        new = self.__from_existing(self.__rules, self.__outputs,
-                                   self._raise_on_fail)
+        new = self.__from_existing(self.__rules, self.__outputs, self._raise_on_fail)
         return new
 
 
 DOUBLE_FAILED_RECURSION_MSG = \
-    ('During the process of checking whether two {%s}s were equal, the'
-     ' recursion limit was exceeded. An attempt was made to compare the {%s}s'
-     ' in a different way, since it was assumed the {%s} or something inside'
-     ' was self-containing. Unfortunately, it seems there were just too many'
-     ' nested objects.')
-UNKNOWN_RECURSION_MSG = ('Encountered a value which exhibits recursion, but is'
-                         ' not a known recursive type. Failed to handle'
-                         ' recursion.')
+    ('During the process of checking whether two {%s}s were equal, the recursion limit was '
+     'exceeded. An attempt was made to compare the {%s}s in a different way, since it was '
+     'assumed the {%s} or something inside was self-containing. Unfortunately, it seems there '
+     'were just too many nested objects.')
+UNKNOWN_RECURSION_MSG = ('Encountered a value which exhibits recursion, but is not a known '
+                         'recursive type. Failed to handle recursion.')
 
 
 def rec_lists_checker(recursion_points1, recursion_points2):
     _rec_tester = simple_trinomial(lambda x, y: recursion_points1[y] is x,
                                    lambda x, y: recursion_points2[y] is x)
 
-    # If you're not familiar with walrus operators, I advise you read up on
-    # them...
+    # If you're not familiar with walrus operators, I advise you read up on them...
     def rec_lists_check(v1, v2, func_if_missing):
         found = False
         for ji in range(len(recursion_points1)):
@@ -480,10 +454,7 @@ def rec_lists_checker(recursion_points1, recursion_points2):
 
     def point_check(v1, v2):
         # ... is the "continue to next" result of functions here.
-        t1 = _double_tuple_check(v1, v2) \
-            if (t := _double_list_check(v1, v2)) is ... \
-            else t
-
+        t1 = _double_tuple_check(v1, v2) if (t := _double_list_check(v1, v2)) is ... else t
         if t1 is True:
             t2 = rec_lists_check(v1, v2, _recursive_check_list_equality)
 
@@ -506,31 +477,30 @@ def rec_lists_checker(recursion_points1, recursion_points2):
 
 def _check_is_equality(obj1: Any, obj2: Any):
     """
-    This checks whether two objects are **definitely**, **definitely not**, or
-    **possibly** the same.
+    This checks whether two objects are *definitely*, *definitely not*, or *possibly* the same.
 
-    :return: ``False`` if the objects are **definitely not** the same.
-             ``True`` if the objects are **definitely** the same.
-             ``...`` if the objects are **possibly** the same.
+    :return: ``False`` if the objects are *definitely not* the same.
+
+        ``True`` if the objects are *definitely* the same.
+
+        ``...`` if the objects are *possibly* the same.
     """
-    # In the case that either object is None, Ellipsis, or a boolean, we can
-    # determine pass or fail immediately. There is no chance of returning an
-    # inconclusive result in this scenario.
+    # In the case that either object is None, Ellipsis, or a boolean, we can determine pass or fail
+    # immediately. There is no chance of returning an inconclusive result in this scenario.
     if obj1 in _WEIRDOS or obj2 in _WEIRDOS:
         return obj1 is obj2
 
-    # We do not necessarily want to return the result of obj1 is obj2, since if
-    # it is False, they may still be lists which are equal.
+    # We do not necessarily want to return the result of obj1 is obj2, since if it is False, they
+    # may still be lists which are equal.
     if obj1 is obj2:
         return True
 
-    # Ellipsis is used here to represent that the test was inconclusive. We did
-    # not prove they were equal, but we also didn't prove they were unequal.
+    # Ellipsis is used here to represent that the test was inconclusive. We did not prove they were
+    # equal, but we also didn't prove they were unequal.
     return ...
 
 
-def _get_simple_argument_data(func: FunctionType) \
-        -> Tuple[int, int, int, bool, bool]:
+def _get_simple_argument_data(func: FunctionType) -> Tuple[int, int, int, bool, bool]:
     signature = inspect.signature(func)
     arg_count = len(signature.parameters)
     pos_only_count = kw_only_count = 0
@@ -584,37 +554,36 @@ def _get_argument_data(func: FunctionType) \
         elif parameter.kind is parameter.VAR_KEYWORD:
             var_kwarg = True
 
-    return (arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg,
-            kw_names, pos_defaults, kw_defaults)
+    return (arg_count, pos_only_count, kw_only_count, var_arg, var_kwarg, kw_names, pos_defaults,
+            kw_defaults)
 
 
 def hash_function(func: FunctionType):
     """
-    This can *hash* a function insofar as its static image at the time of
-    hashing. Since functions are technically mutable, it is heavily advised
-    that use of this is avoided unless a function is truly going to be treated
-    as immutable. This means:
+    This can *hash* a function insofar as its static image at the time of hashing. Since functions
+        are technically mutable, it is heavily advised that use of this is avoided unless a function
+        is truly going to be treated as immutable. This means:
+
         1 - **No attributes may be set on a function** after hashing.
 
-        2 - The function **should not use *global* variables** that are
-        **changed after hashing**.
+        2 - The function **should not use *global* variables** that are **changed after hashing**.
 
         3 - The function should have **no internal constants which change**.
 
-    This may or may not be used on decorated functions, depending on how the
-    decorator works. lru_cache, for instance would break the hash, but something
-    like @wraps will not necessarily break it.
+    This should not be used on decorated functions.
     """
     return hash(sum(_get_simple_argument_data(func)))
 
 
 def check_function_equality(func1: FunctionType, func2: Any):
     """
-    Checks for equality of two functions. This equality is not standard
-    equality, but is closer to how a human would interpret similarity of
-    functions. It is intended to be location-agnostic as far as is possible,
-    and is tested for functions nested within other functions and static methods
-    in classes. Decorated functions will generally fail to compare equal.**
+    Checks for equality of two functions. This equality is not standard equality, but is closer to
+        how a human would interpret similarity of functions. It is intended to be location-agnostic
+        as far as is possible, and is tested for functions nested within other functions and static
+        methods in classes.
+
+        .. warning::
+            Decorated functions will generally fail to compare equal.
     """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
@@ -635,7 +604,7 @@ def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
                                        recursion_points2: list):
     """
     *check_function_equality*, but for use when a likely self-containing object
-    is contained within the constant pool or is a default value.
+        is contained within the constant pool or is a default value.
     """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
@@ -655,9 +624,8 @@ def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
 
 
 def _strict_has_no_issues(obj1, obj2):
-    # We should always have two same type objects when this is called, do not
-    # worry about making sure they are the same type. Only check the type of one
-    # object.
+    # We should always have two same type objects when this is called, do not worry about making
+    # sure they are the same type. Only check the type of one object.
     if isinstance(obj1, dict):
         for k1, v1 in obj1.items():
             if k1 == 0 or k1 == 1:
@@ -685,8 +653,7 @@ def _strict_has_no_issues(obj1, obj2):
 
                         break
 
-            if (isinstance(v1, list) or isinstance(v1, dict)
-                    or isinstance(v1, tuple)):
+            if isinstance(v1, list) or isinstance(v1, dict) or isinstance(v1, tuple):
                 for k2, v2 in obj2.items():
                     if k2 == k1:
                         if not _strict_has_no_issues(v1, v2):
@@ -700,8 +667,7 @@ def _strict_has_no_issues(obj1, obj2):
             if (v1 == 0 or v1 == 1) and v1 is not v2:
                 return False
 
-            if ((isinstance(v1, list) or isinstance(v1, dict)
-                    or isinstance(v1, tuple))
+            if ((isinstance(v1, list) or isinstance(v1, dict) or isinstance(v1, tuple))
                     and not _strict_has_no_issues(v1, v2)):
                 return False
 
@@ -732,12 +698,11 @@ def strict_check_list_equality(list1: Union[list, tuple],
             # Fail as fast as possible. If they aren't equal, they aren't equal.
             return False
 
-        # At this point, we know the lists should at least be similar, but
-        # since this is a strict check, we want to make sure that dicts
-        # containing False or True as a key or value don't get compared to dicts
-        # with 0 or 1 as a key or value, respectively. As well, we should
-        # confirm that lists which contain False or True do not get compared to
-        # lists that contain 0 or 1 respectively.
+        # At this point, we know the lists should at least be similar, but since this is a strict
+        # check, we want to make sure that dicts containing False or True as a key or value don't
+        # get compared to dicts with 0 or 1 as a key or value, respectively. As well, we should
+        # confirm that lists which contain False or True do not get compared to lists that contain 0
+        # or 1 respectively.
         return _strict_has_no_issues(list1, list2)
 
     except RecursionError:
@@ -750,12 +715,9 @@ def strict_check_list_equality(list1: Union[list, tuple],
             raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format(fill), e)
 
 
-def _recursive_check_list_equality(list1: Union[list, tuple],
-                                   list2: Union[list, tuple],
-                                   recursion_points1: list,
-                                   recursion_points2: list,
-                                   rec_lists_check: Callable = None,
-                                   strict: bool = False):
+def _recursive_check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple],
+                                   recursion_points1: list, recursion_points2: list,
+                                   rec_lists_check: Callable = None, strict: bool = False):
     if rec_lists_check is None:
         rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
 
@@ -773,11 +735,9 @@ def _recursive_check_list_equality(list1: Union[list, tuple],
 
         except RecursionError as e:
             t1 = rec_lists_check(val1, val2)
-            if ((t1 is not True
-                 and t1
+            if ((t1 is not True and t1
                  and not t1(val1, val2, recursion_points1, recursion_points2,
-                            rec_lists_check, strict=strict))
-                    or t1 is False):
+                            rec_lists_check, strict=strict)) or t1 is False):
                 return False
 
             elif t1 is ...:
@@ -805,27 +765,23 @@ def strict_check_dict_equality(dict1: dict, dict2: dict):
             # Fail as fast as possible. If they aren't equal, they aren't equal.
             return False
 
-        # At this point, we know the dicts should at least be similar, but
-        # since this is a strict check, we want to make sure that dicts
-        # containing False or True as a key or value don't get compared to dicts
-        # with 0 or 1 as a key or value, respectively. As well, we should
-        # confirm that lists which contain False or True do not get compared to
-        # lists that contain 0 or 1 respectively.
+        # At this point, we know the dicts should at least be similar, but since this is a strict
+        # check, we want to make sure that dicts containing False or True as a key or value don't
+        # get compared to dicts with 0 or 1 as a key or value, respectively. As well, we should
+        # confirm that lists which contain False or True do not get compared to lists that contain 0
+        # or 1 respectively.
         return _strict_has_no_issues(dict1, dict2)
 
     except RecursionError:
         try:
-            return _recursive_check_dict_equality(dict1, dict2, [dict1], [dict2],
-                                                  strict=True)
+            return _recursive_check_dict_equality(dict1, dict2, [dict1], [dict2], strict=True)
 
         except RecursionError as e:
             raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format('dict'), e)
 
 
-def _recursive_check_dict_equality(dict1: dict, dict2: dict,
-                                   recursion_points1: list,
-                                   recursion_points2: list,
-                                   rec_lists_check: Callable = None,
+def _recursive_check_dict_equality(dict1: dict, dict2: dict, recursion_points1: list,
+                                   recursion_points2: list, rec_lists_check: Callable = None,
                                    strict: bool = False):
     if rec_lists_check is None:
         rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
@@ -852,8 +808,8 @@ def _recursive_check_dict_equality(dict1: dict, dict2: dict,
             t1 = rec_lists_check(val1, val2)
             if ((t1 is not True
                  and t1
-                 and not t1(val1, val2, recursion_points1, recursion_points2,
-                            rec_lists_check, strict=strict))
+                 and not t1(val1, val2, recursion_points1, recursion_points2, rec_lists_check,
+                            strict=strict))
                     or t1 is False):
                 return False
 
