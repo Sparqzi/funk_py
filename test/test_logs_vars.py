@@ -11,10 +11,6 @@ from funk_py.modularity.logging import logs_vars
 # method of coverage is used so that coverage can be turned off to not interfere in timed tests.
 @pytest.fixture(scope='session', autouse=True)
 def c():
-    if not cov_counter.value:
-        # We don't want to start coverage more than once
-        cov.start()
-
     cov_counter.value += 1
 
     yield cov
@@ -26,6 +22,7 @@ def c():
         cov.stop()
         cov.save()
         cov.html_report()
+
 
 ARGUMENTS = 'Arguments:'
 LOGGER = getLogger('testy')
