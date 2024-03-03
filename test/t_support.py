@@ -2,10 +2,10 @@ from timeit import timeit
 from typing import Dict, Set, Union, Tuple, Any, Iterable
 
 import coverage
-from coverage import Coverage
 
 
 cov = coverage.Coverage()
+cov.start()
 
 
 class Object(object):
