@@ -5,15 +5,21 @@ from funk_py.modularity.type_matching import (check_dict_equality,
                                               strict_check_dict_equality)
 
 
+# The following manages whether the generated coverage instance from t_support should report. This
+# method of coverage is used so that coverage can be turned off to not interfere in timed tests.
 @pytest.fixture(scope='session', autouse=True)
 def c():
     if not cov_counter.value:
+        # We don't want to start coverage more than once
         cov.start()
-        cov_counter.value += 1
+
+    cov_counter.value += 1
 
     yield cov
 
     cov_counter.value -= 1
+
+    # We don't want to report till all test modules are completed...
     if not cov_counter.value:
         cov.stop()
         cov.save()
