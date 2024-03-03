@@ -43,30 +43,6 @@ def none_if(value: Any, none_val: Any = ..., *, plug_in: Callable = ...,
     return DropNoneDict.none_if(value, none_val, plug_in, plug_out)
 
 
-def multi_key_dict(map_: Mapping = ..., **kwargs) -> MultiKeyDict:
-    """
-    Checks a mapping for keys using the same value and assigns them a
-    reference to a holder for the value.
-
-    :param map_: A mapping
-    :param kwargs: Keywords to use to build a mapping or add on to a
-        mapping.
-    """
-    return MultiKeyDict(map_, **kwargs)
-
-
-def multi_value_dict(map_: Mapping = ..., **kwargs) -> MultiValueDict:
-    """
-    A dictionary where each key can have multiple values. Values for this
-    dictionary should be hashable.
-
-    :param map_: Initialize dictionary from mappings.
-
-    :param kwargs: Initialize dictionary from key-val pairs.
-    """
-    return MultiValueDict(map_, **kwargs)
-
-
 def list_dict(key_function: Callable, values: Iterable = None):
     """
     A list that sort of acts like a dictionary...
