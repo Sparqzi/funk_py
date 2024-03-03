@@ -1,8 +1,7 @@
 import pytest
 
 from t_support import build_nest, too_slow_func, cov, cov_counter
-from funk_py.modularity.type_matching import (check_list_equality,
-                                              strict_check_list_equality)
+from funk_py.modularity.type_matching import check_list_equality, strict_check_list_equality
 
 
 # The following manages whether the generated coverage instance from t_support should report. This
@@ -42,8 +41,7 @@ C_FALSY5 = 0  # actually necessary
 C_FALSY6 = ()  # sanity check
 C_FALSISH = '0'  # sanity check
 
-FALSY_VALS = (C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY6,
-              C_FALSISH, None)
+FALSY_VALS = (C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY6, C_FALSISH, None)
 
 TRUTHY = 1  # actually necessary
 C_TRUEISH = '1'  # sanity check
@@ -76,15 +74,12 @@ GEN_SET = (G_STR1, G_INT1, G_FLT1, True,
            G_STR2, G_INT2, G_FLT2, False,
            G_STR3, G_INT3, G_FLT3)
 
-CONFUSED_SET1 = (False, True, C_FALSISH, C_TRUEISH,
-                 C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY5, C_FALSY6,
-                 TRUTHY, None, ...)
-CONFUSED_SET2 = (False, True, C_FALSISH, C_TRUEISH,
-                 False, False, False, False, False, False,
+CONFUSED_SET1 = (False, True, C_FALSISH, C_TRUEISH, C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4,
+                 C_FALSY5, C_FALSY6, TRUTHY, None, ...)
+CONFUSED_SET2 = (False, True, C_FALSISH, C_TRUEISH, False, False, False, False, False, False,
                  TRUTHY, False, False)
-CONFUSED_SET3 = (False, True, C_FALSISH, True,
-                 C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY5, C_FALSY6,
-                 True, None, ...)
+CONFUSED_SET3 = (False, True, C_FALSISH, True, C_FALSY1, C_FALSY2, C_FALSY3, C_FALSY4, C_FALSY5,
+                 C_FALSY6, True, None, ...)
 
 
 GOOD_LISTS = (
@@ -155,37 +150,34 @@ def test_strict_does_not_hate_true_and_false():
     assert not strict_check_list_equality((False,), (0,))
 
 
-@pytest.fixture(params=[(v[0], *v[2:]) for v in GOOD_LISTS],
-                ids=[v[1] for v in GOOD_LISTS])
+@pytest.fixture(params=[(v[0], *v[2:]) for v in GOOD_LISTS], ids=[v[1] for v in GOOD_LISTS])
 def regular_equal_lists(request):
     s = request.param
-    # It is important that the lists returned are not the same exact list
-    # despite having same values.
+    # It is important that the lists returned are not the same exact list despite having same
+    # values.
     l1 = list(s[0])
     l2 = list(s[0])
     return l1, l2, s[1], s[2]
 
 
-@pytest.fixture(params=[v[0] for v in BAD_LISTS],
-                ids=[v[1] for v in BAD_LISTS])
-def regular_unequal_lists(request):
-    return request.param
+@pytest.fixture(params=[v[0] for v in BAD_LISTS], ids=[v[1] for v in BAD_LISTS])
+def regular_unequal_lists(request): return request.param
 
 
 def test_un_nested_list_equality(regular_equal_lists):
     assert check_list_equality(*regular_equal_lists[:2])
     too_slow(1000000, 0.4, *regular_equal_lists[:2], check_list_equality)
+
     assert strict_check_list_equality(*regular_equal_lists[:2])
-    too_slow(*regular_equal_lists[2:], *regular_equal_lists[:2],
-             strict_check_list_equality)
+    too_slow(*regular_equal_lists[2:], *regular_equal_lists[:2], strict_check_list_equality)
 
 
 def test_un_nested_list_inequality(regular_unequal_lists):
     assert not check_list_equality(*regular_unequal_lists)
     too_slow(1000000, 0.3, *regular_unequal_lists, check_list_equality)
+
     assert not strict_check_list_equality(*regular_unequal_lists)
-    too_slow(1000000, 1.6, *regular_unequal_lists,
-             strict_check_list_equality)
+    too_slow(1000000, 1.6, *regular_unequal_lists, strict_check_list_equality)
 
 
 TOP_NESTED_LISTS = (
@@ -393,17 +385,15 @@ BAD_NON_RECURSIVE_NESTED_LISTS = BAD_TOP_NESTED_LISTS + BAD_DOUBLE_NESTED_LISTS
 
 
 @pytest.fixture(params=(tuple, list))
-def types(request):
-    return request.param
+def types(request): return request.param
 
 
 @pytest.fixture(params=[(v[0], *v[2:]) for v in NON_RECURSIVE_NESTED_LISTS],
                 ids=[v[1] for v in NON_RECURSIVE_NESTED_LISTS])
 def nested_non_recursive_equal_lists(request, types):
-    # It is important that the lists returned are not the same exact list
-    # despite having same values.
-    return (build_nest(types, **request.param[0]),
-            build_nest(types, **request.param[0]),
+    # It is important that the lists returned are not the same exact list despite having same
+    # values.
+    return (build_nest(types, **request.param[0]), build_nest(types, **request.param[0]),
             *request.param[1:])
 
 
@@ -411,28 +401,24 @@ def nested_non_recursive_equal_lists(request, types):
                 ids=[v[1] for v in BAD_NON_RECURSIVE_NESTED_LISTS])
 def nested_non_recursive_unequal_lists(request, types):
     d1, d2 = request.param
-    return (build_nest(types, **d1),
-            build_nest(types, **d2))
+    return build_nest(types, **d1), build_nest(types, **d2)
 
 
 def test_nested_non_recursive_list_equality(nested_non_recursive_equal_lists):
     assert check_list_equality(*nested_non_recursive_equal_lists[:2])
-    too_slow(1000000, 0.3, *nested_non_recursive_equal_lists[:2],
-             check_list_equality)
+    too_slow(1000000, 0.3, *nested_non_recursive_equal_lists[:2], check_list_equality)
+
     assert strict_check_list_equality(*nested_non_recursive_equal_lists[:2])
-    too_slow(*nested_non_recursive_equal_lists[2:],
-             *nested_non_recursive_equal_lists[:2],
+    too_slow(*nested_non_recursive_equal_lists[2:], *nested_non_recursive_equal_lists[:2],
              strict_check_list_equality)
 
 
-def test_nested_non_recursive_list_inequality(
-        nested_non_recursive_unequal_lists):
+def test_nested_non_recursive_list_inequality(nested_non_recursive_unequal_lists):
     assert not check_list_equality(*nested_non_recursive_unequal_lists)
-    too_slow(1000000, 0.25, *nested_non_recursive_unequal_lists,
-             check_list_equality)
+    too_slow(1000000, 0.25, *nested_non_recursive_unequal_lists, check_list_equality)
+
     assert not strict_check_list_equality(*nested_non_recursive_unequal_lists)
-    too_slow(1000000, 0.3, *nested_non_recursive_unequal_lists,
-             strict_check_list_equality)
+    too_slow(1000000, 0.3, *nested_non_recursive_unequal_lists, strict_check_list_equality)
 
 
 SHARING_LISTS = (
@@ -441,8 +427,7 @@ SHARING_LISTS = (
 )
 
 
-@pytest.fixture(params=[v[0] for v in SHARING_LISTS],
-                ids=[v[1] for v in SHARING_LISTS])
+@pytest.fixture(params=[v[0] for v in SHARING_LISTS], ids=[v[1] for v in SHARING_LISTS])
 def nested_with_shared_equal_lists(request, types):
     point = request.param
     shared = types(INT_SET)
@@ -459,7 +444,8 @@ def nested_with_shared_equal_lists(request, types):
 
 @pytest.fixture(params=(
         (INSERT_POINT2_1, INSERT_POINT2_2),
-        (INSERT_POINT2_2, INSERT_POINT2_1)), ids=(
+        (INSERT_POINT2_2, INSERT_POINT2_1)
+), ids=(
     'L1->(*,S1,*)!=L1->(*,S1)',
     'L1->(*,S1)!=L1->(*,S1,*)'
 ))
@@ -478,22 +464,18 @@ def nested_with_shared_unequal_lists(request, types):
 
 def test_sharing_works(nested_with_shared_equal_lists):
     assert check_list_equality(*nested_with_shared_equal_lists)
-    too_slow(1000000, 0.2, *nested_with_shared_equal_lists,
-             check_list_equality)
+    too_slow(1000000, 0.2, *nested_with_shared_equal_lists, check_list_equality)
 
     assert strict_check_list_equality(*nested_with_shared_equal_lists)
-    too_slow(100000, 0.5, *nested_with_shared_equal_lists,
-             strict_check_list_equality)
+    too_slow(100000, 0.5, *nested_with_shared_equal_lists, strict_check_list_equality)
 
 
 def test_no_false_pass_sharing(nested_with_shared_unequal_lists):
     assert not strict_check_list_equality(*nested_with_shared_unequal_lists)
-    too_slow(1000000, 0.2, *nested_with_shared_unequal_lists,
-             check_list_equality)
+    too_slow(1000000, 0.2, *nested_with_shared_unequal_lists, check_list_equality)
 
     assert not check_list_equality(*nested_with_shared_unequal_lists)
-    too_slow(100000, 0.2, *nested_with_shared_unequal_lists,
-             strict_check_list_equality)
+    too_slow(100000, 0.2, *nested_with_shared_unequal_lists, strict_check_list_equality)
 
 
 NASTY_RECURSIVE_LIST = (
@@ -648,20 +630,20 @@ def screwy_tests(request, types):
     return types(l1), types(l2)
 
 
-# If for some reason Python makes it so that comparing recursive lists does not
-# raise exceptions, then the function being tested here is useless.
+# If for some reason Python makes it so that comparing recursive lists does not raise exceptions,
+# then the function being tested here is useless.
 def test_still_has_purpose(recursive_equal_lists):
     l1, l2, timeout = recursive_equal_lists
     with pytest.raises(RecursionError):
-        # Your linter may dislike this line because "it has no side effects"
-        # It absolutely has effects. It should always raise an exception.
+        # Your linter may dislike this line because "it has no side effects" It absolutely has
+        # effects. It should always raise an exception.
         l1 == l2  # noqa
 
 
 def test_recursive_equality(recursive_equal_lists):
     assert check_list_equality(*recursive_equal_lists[:2])
-    too_slow(10000, recursive_equal_lists[2], *recursive_equal_lists[:2],
-             check_list_equality)
+    too_slow(10000, recursive_equal_lists[2], *recursive_equal_lists[:2], check_list_equality)
+
     assert strict_check_list_equality(*recursive_equal_lists[:2])
     too_slow(10000, recursive_equal_lists[2], *recursive_equal_lists[:2],
              strict_check_list_equality)
@@ -678,6 +660,7 @@ def test_strict_not_follows_rules_for_true_and_false(screwy_tests):
 def test_recursive_inequality(recursive_unequal_lists):
     assert not check_list_equality(*recursive_unequal_lists)
     too_slow(10000, 0.6, *recursive_unequal_lists, check_list_equality)
+
     assert not strict_check_list_equality(*recursive_unequal_lists)
     too_slow(10000, 0.7, *recursive_unequal_lists, strict_check_list_equality)
 
@@ -688,8 +671,7 @@ def confused_recursive_list_positions(request):
 
 
 @pytest.fixture(params=FALSY_VALS)
-def confused_unequal_falsy_recursive_lists(request, types,
-                                           confused_recursive_list_positions):
+def confused_unequal_falsy_recursive_lists(request, types, confused_recursive_list_positions):
     s1 = (True, False, request.param)
     s2 = (True, False, False)
     ip = 1
@@ -723,8 +705,7 @@ def confused_unequal_falsy_recursive_lists(request, types,
 
 
 @pytest.fixture(params=TRUTHY_VALS)
-def confused_unequal_truthy_recursive_lists(request, types,
-                                            confused_recursive_list_positions):
+def confused_unequal_truthy_recursive_lists(request, types, confused_recursive_list_positions):
     s1 = (True, False, request.param)
     s2 = (True, False, True)
     ip = 1
@@ -758,24 +739,18 @@ def confused_unequal_truthy_recursive_lists(request, types,
 
 
 @pytest.mark.timeout(2)
-def test_confused_falsy_recursive_inequality(
-        confused_unequal_falsy_recursive_lists):
+def test_confused_falsy_recursive_inequality(confused_unequal_falsy_recursive_lists):
     assert not check_list_equality(*confused_unequal_falsy_recursive_lists)
-    too_slow(10000, 0.6, *confused_unequal_falsy_recursive_lists,
-             check_list_equality)
-    assert not strict_check_list_equality(
-        *confused_unequal_falsy_recursive_lists)
-    too_slow(10000, 0.7, *confused_unequal_falsy_recursive_lists,
-             strict_check_list_equality)
+    too_slow(10000, 0.6, *confused_unequal_falsy_recursive_lists, check_list_equality)
+
+    assert not strict_check_list_equality(*confused_unequal_falsy_recursive_lists)
+    too_slow(10000, 0.7, *confused_unequal_falsy_recursive_lists, strict_check_list_equality)
 
 
 @pytest.mark.timeout(2)
-def test_confused_truthy_recursive_inequality(
-        confused_unequal_truthy_recursive_lists):
+def test_confused_truthy_recursive_inequality(confused_unequal_truthy_recursive_lists):
     assert not check_list_equality(*confused_unequal_truthy_recursive_lists)
-    too_slow(10000, 0.6, *confused_unequal_truthy_recursive_lists,
-             check_list_equality)
-    assert not strict_check_list_equality(
-        *confused_unequal_truthy_recursive_lists)
-    too_slow(10000, 0.7, *confused_unequal_truthy_recursive_lists,
-             strict_check_list_equality)
+    too_slow(10000, 0.6, *confused_unequal_truthy_recursive_lists, check_list_equality)
+
+    assert not strict_check_list_equality(*confused_unequal_truthy_recursive_lists)
+    too_slow(10000, 0.7, *confused_unequal_truthy_recursive_lists, strict_check_list_equality)

@@ -28,8 +28,7 @@ def c():
         cov.report()
 
 
-NOT_CAUSE = 'Test failed to generate the expected start value. The issue is' \
-            ' probably elsewhere.'
+NOT_CAUSE = 'Test failed to generate the expected start value. The issue is probably elsewhere.'
 
 ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
 
@@ -78,8 +77,7 @@ def confused_values(request, confused_values_base):
 
 
 @pytest.fixture
-def regular_values_base():
-    return {K[i]: V[i] for i in range(len(V))}
+def regular_values_base(): return {K[i]: V[i] for i in range(len(V))}
 
 
 @pytest.fixture
@@ -120,9 +118,8 @@ def test_not_add_none(confused_values):
     expected = confused_values[1]
     key = confused_values[2]
 
-    # Always test that we started out right. If this first assertion fails, then
-    # it's unlikely that the root cause is directly related to what this test
-    # should check.
+    # Always test that we started out right. If this first assertion fails, then it's unlikely that
+    # the root cause is directly related to what this test should check.
     dnd = DnD(expected, none_condition=none)
     assert dnd == expected, NOT_CAUSE
 
@@ -135,9 +132,8 @@ def test_set_to_none(confused_values):
     expected = confused_values[1]
     key_rem_prog = confused_values[3]
 
-    # Always test that we started out right. If this first assertion fails, then
-    # it's unlikely that the root cause is directly related to what this test
-    # should check.
+    # Always test that we started out right. If this first assertion fails, then it's unlikely that
+    # the root cause is directly related to what this test should check.
     dnd = DnD(expected, none_condition=none)
     assert dnd == expected, NOT_CAUSE
 
@@ -149,9 +145,8 @@ def test_add_non_none_not_confused(confused_values):
     expected = confused_values[1]
     key_add_prog = confused_values[4]
 
-    # Always test that we started out right. If this first assertion fails, then
-    # it's unlikely that the root cause is directly related to what this test
-    # should check.
+    # Always test that we started out right. If this first assertion fails, then it's unlikely that
+    # the root cause is directly related to what this test should check.
     dnd = DnD(expected, none_condition=none)
     assert dnd == expected, NOT_CAUSE
 
@@ -159,9 +154,8 @@ def test_add_non_none_not_confused(confused_values):
 
 
 def test_add_non_none(regular_values_base, regular_values):
-    # Always test that we started out right. If this first assertion fails, then
-    # it's unlikely that the root cause is directly related to what this test
-    # should check.
+    # Always test that we started out right. If this first assertion fails, then it's unlikely that
+    # the root cause is directly related to what this test should check.
     dnd = DnD(regular_values_base)
     assert dnd == regular_values_base, NOT_CAUSE
 
@@ -169,27 +163,25 @@ def test_add_non_none(regular_values_base, regular_values):
 
 
 def test_del_keys(regular_values_base):
-    # Always test that we started out right. If this first assertion fails, then
-    # it's unlikely that the root cause is directly related to what this test
-    # should check.
+    # Always test that we started out right. If this first assertion fails, then it's unlikely that
+    # the root cause is directly related to what this test should check.
     dnd = DnD(regular_values_base)
     assert dnd == regular_values_base, NOT_CAUSE
 
     copied = regular_values_base.copy()
     for key in regular_values_base.keys():
-        # Essentially, just do the same operation on both a DropNoneDict and a
-        # dict, they should do the same thing and still test equivalent.
+        # Essentially, just do the same operation on both a DropNoneDict and a dict, they should do
+        # the same thing and still test equivalent.
         del dnd[key]
         del copied[key]
         assert dnd == copied
 
 
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # none_if tests
-# ------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
-NoneIfTst = namedtuple('NoneIfTst',
-                       {'value', 'none_val', 'plug_in', 'plug_out', 'output'})
+NoneIfTst = namedtuple('NoneIfTst', {'value', 'none_val', 'plug_in', 'plug_out', 'output'})
 
 GV = 19
 LV = GV - 1
@@ -201,8 +193,7 @@ DIFFERENT_PLUG_OUT = 'different_type_plug_out'
 
 
 def none_if_dicts(tst: NoneIfTst, values_base: dict):
-    # This test is a little overkill for none_if's that actually end up being
-    # None, but so be it.
+    # This test is a little overkill for none_if's that actually end up being None, but so be it.
     m_key = K[len(V)]
     none_if = DnD.none_if(tst.value, tst.none_val, plug_in=tst.plug_in,
                           plug_out=tst.plug_out)
@@ -213,8 +204,7 @@ def none_if_dicts(tst: NoneIfTst, values_base: dict):
     out1 = {m_key: tst.output} if tst.output is not None else {}
     out1.update(values_base)
 
-    # Test case to ensure if none_if is neither the first nor last value,
-    # position is maintained.
+    # Test case to ensure if none_if is neither the first nor last value, position is maintained.
     bi = iter(values_base.items())
     k, v = next(bi)
     input2 = {k: v, m_key: none_if}
@@ -254,8 +244,7 @@ def simple_none_if_args(request):
         'value == none_val (Diff Type)'])
 def plug_in_none_if_args(request):
     value, output, plug_in = request.param
-    return NoneIfTst(value=value, none_val=GV, plug_in=plug_in, plug_out=...,
-                     output=output)
+    return NoneIfTst(value=value, none_val=GV, plug_in=plug_in, plug_out=..., output=output)
 
 
 @pytest.fixture(params=[
@@ -302,8 +291,7 @@ def plug_out_none_if_args(request):
     if types[0] is not int:
         value = HasValidPlugOut(value)
 
-    return NoneIfTst(value=value, none_val=none_val, plug_in=...,
-                     plug_out=plug_out, output=output)
+    return NoneIfTst(value=value, none_val=none_val, plug_in=..., plug_out=plug_out, output=output)
 
 
 def test_none_if_later_creates_outside_of_dict_simple(simple_none_if_args):
@@ -316,8 +304,7 @@ def test_none_if_later_creates_outside_of_dict_simple(simple_none_if_args):
 
 
 def test_none_if_later_creates_outside_of_dict_plug_in(plug_in_none_if_args):
-    testy = DnD.none_if(plug_in_none_if_args.value,
-                        plug_in_none_if_args.none_val,
+    testy = DnD.none_if(plug_in_none_if_args.value, plug_in_none_if_args.none_val,
                         plug_in=plug_in_none_if_args.plug_in)
     assert isinstance(testy, DnD._NoneIfLater)
     assert testy.none_val == plug_in_none_if_args.none_val
@@ -327,8 +314,7 @@ def test_none_if_later_creates_outside_of_dict_plug_in(plug_in_none_if_args):
 
 
 def test_none_if_later_creates_outside_of_dict_plug_out(plug_out_none_if_args):
-    testy = DnD.none_if(plug_out_none_if_args.value,
-                        plug_out_none_if_args.none_val,
+    testy = DnD.none_if(plug_out_none_if_args.value, plug_out_none_if_args.none_val,
                         plug_out=plug_out_none_if_args.plug_out)
     assert isinstance(testy, DnD._NoneIfLater)
     assert testy.none_val == plug_out_none_if_args.none_val
@@ -342,8 +328,7 @@ VF2 = 'none_if as second value failed!'
 VF3 = 'none_if as last value failed!'
 
 
-def test_none_if_later_works_in_dict_simple(simple_none_if_args,
-                                            regular_values_base):
+def test_none_if_later_works_in_dict_simple(simple_none_if_args, regular_values_base):
     tests = none_if_dicts(simple_none_if_args, regular_values_base)
 
     testy = DnD(tests[0][0])
@@ -356,8 +341,7 @@ def test_none_if_later_works_in_dict_simple(simple_none_if_args,
     assert testy == tests[2][1], VF3
 
 
-def test_none_if_later_works_in_dict_plug_in(plug_in_none_if_args,
-                                             regular_values_base):
+def test_none_if_later_works_in_dict_plug_in(plug_in_none_if_args, regular_values_base):
     tests = none_if_dicts(plug_in_none_if_args, regular_values_base)
 
     testy = DnD(tests[0][0])
@@ -370,8 +354,7 @@ def test_none_if_later_works_in_dict_plug_in(plug_in_none_if_args,
     assert testy == tests[2][1], VF3
 
 
-def test_none_if_later_works_in_dict_plug_out(plug_out_none_if_args,
-                                              regular_values_base):
+def test_none_if_later_works_in_dict_plug_out(plug_out_none_if_args, regular_values_base):
     tests = none_if_dicts(plug_out_none_if_args, regular_values_base)
 
     testy = DnD(tests[0][0])
