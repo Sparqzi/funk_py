@@ -6,8 +6,8 @@ class ListDict(list):
         """
         A list that sort of acts like a dictionary...
 
-        :param key_function: The function that should be called on each item
-            to get its appropriate key.
+        :param key_function: The function that should be called on each item to get its appropriate
+            key.
         :param values: The values that should be put in the list.
         """
         list.__init__(self)
@@ -18,19 +18,17 @@ class ListDict(list):
 
     def __process_item(self, item) -> tuple[Any, str]:
         """
-        An internal helper function used to apply the key_function to
-        incoming values.
+        An internal helper function used to apply the key_function to incoming values.
 
         :param item: The item that needs to be converted to a key-value pair.
         :return: A tuple consisting of the value and key for the item.
         """
         return item, self.__key_function(item)
 
-    def __locate_index(self,
-                       key: Union[str, int, slice, Tuple[str, int]]) -> int:
+    def __locate_index(self, key: Union[str, int, slice, Tuple[str, int]]) -> int:
         """
-        An internal helper function used to determine what index an item
-        should be at. Will throw an error if the key is invalid.
+        An internal helper function used to determine what index an item should be at. Will throw an
+            error if the key is invalid.
 
         :param key: The key/index that should be sought.
         :return: An integer indicating the item's index in the list.
@@ -54,67 +52,53 @@ class ListDict(list):
 
         raise KeyError(key)
 
-    def __setitem__(self, key: Union[str, int, slice, Tuple[str, int]],
-                    value) -> None:
+    def __setitem__(self, key: Union[str, int, slice, Tuple[str, int]], value) -> None:
         """
-        Sets an item in the ListDict. Will raise an exception if the item
-        index cannot be determined.
+        Sets an item in the ListDict. Will raise an exception if the item index cannot be
+            determined.
 
-        :param key: If key is a string, will attempt to find an item with
-            a matching key. Will raise an exception if said key cannot be
-            located. If key is an integer or a slice, normal list indexing
-            rules will be used to search. If key is a tuple consisting of
-            a string and an integer (n), will attempt to find items with
-            matching keys, then replaces the nth element with a matching key.
-        :param value: The value that should be assigned in place of the old
-            value.
+        :param key: If this is a ``str``, will attempt to find an item with a matching key. Will
+            raise an exception if it cannot be located. If this is an ``int`` or a ``slice``, normal
+            list indexing rules will be used to search. If this is a ``tuple`` consisting of a
+            ``str`` and an ``int`` (*n), it will attempt to find items with matching keys, then
+            replaces the *nth* element with a matching key.
+        :param value: The value that should be assigned in place of the old value.
         :return: Does not return anything.
         """
         index = self.__locate_index(key)
         if type(index) is slice:
-            list.__setitem__(self, index,
-                             [self.__process_item(val) for val in value])
+            list.__setitem__(self, index, [self.__process_item(val) for val in value])
 
         else:
             list.__setitem__(self, index, self.__process_item(value))
 
-    def __getitem__(self,
-                    key: Union[str, int, slice, Tuple[str, int]]) -> Any:
+    def __getitem__(self, key: Union[str, int, slice, Tuple[str, int]]) -> Any:
         """
-        Gets an item from the ListDict. Will raise an exception if the item
-        index cannot be determined.
+        Gets an item from the ListDict. Will raise an exception if the item index cannot be
+            determined.
 
-        :param key: If key is a string, will attempt to find an item with a
-            matching key. Will raise an exception if said key cannot be
-            located. If key is an integer or a slice, normal list indexing
-            rules will be used to search. If key is a tuple consisting of
-            a string and an integer (n), will attempt to find items with
-            matching keys, then return the nth element.
+        :param key: If this is a ``str``, will attempt to find an item with a matching key. Will
+            raise an exception if it cannot be located. If this is an ``int`` or a ``slice``, normal
+            list indexing rules will be used to search. If this is a ``tuple`` consisting of a
+            ``str`` and an ``int`` (*n*), will attempt to find items with matching keys, then return
+            the *nth* element with a matching key.
         :return: The item(s) at the desired key/index.
         """
         if type(key) is slice:
-            return self.__class__(
-                [t[0]
-                 for t
-                 in list.__getitem__(self, self.__locate_index(key))]
-            )
+            return self.__class__([t[0] for t in list.__getitem__(self, self.__locate_index(key))])
 
         return list.__getitem__(self, self.__locate_index(key))[0]
 
-    def get(self, key: Union[str, Tuple[str, int]],
-            default: Any = None) -> Any:
+    def get(self, key: Union[str, Tuple[str, int]], default: Any = None) -> Any:
         """
-        Gets an item from the ListDict by **key**. Will not raise an exception
-        if the **key** does not exist, but will instead return default.
+        Gets an item from the ``ListDict`` by *key*. Will not raise an exception if the *key*
+        does not exist, but will instead return default.
 
-        :param key: If key is a string, will attempt to find an item with a
-            matching key. If key is a tuple consisting of a string and an
-            integer (n), will attempt to find items with matching keys, then
-            return the nth element.
-        :param default: The default value to return if requested key does not
-        exist.
-        :return: The item at the desired key or - should the key not be
-            found - default.
+        :param key: If this is a ``str``, will attempt to find an item with a matching key. If this
+            is a ``tuple`` consisting of a ``str`` and an ``int`` (*n*), will attempt to find items
+            with matching keys, then return the *nth* element with a matching key.
+        :param default: The default value to return if requested key does not exist.
+        :return: The item at the desired key or - should the key not be found - default.
         """
         if type(key) in [int, slice]:
             raise KeyError(f'{repr(key)} is not a valid key for {type(self)}.')
@@ -127,18 +111,15 @@ class ListDict(list):
 
     def pop(self, key: Union[str, int, Tuple[str, int]] = ...) -> Any:
         """
-        Pops an item from the ListDict. Will raise an exception if the item
-        index cannot be determined.
+        Pops an item from the ``ListDict``. Will raise an exception if the item index cannot be
+            determined.
 
-        :param key: If key is a string, will attempt to find an item with a
-            matching key. Will raise an exception if said key cannot be
-            located. If key is an integer, normal list indexing rules will be
-            used to search. If key is a tuple consisting of a string and an
-            integer (n), will attempt to find items with matching keys, then
-            return the nth element. If omitted, the last item in the list
-            will be returned.
-        :return: The item at the desired key/index, will also delete from the
-            list.
+        :param key: If this is a ``str``, will attempt to find an item with a matching key. Will
+            raise an exception if it cannot be located. If this is an ``int``, normal list indexing
+            rules will be used to search. If this is a ``tuple`` consisting of a ``str`` and an
+            ``int`` (*n*), will attempt to find items with matching keys, then return the *nth*
+            element with a matching key. If omitted, the last item in the list will be returned.
+        :return: The item at the desired key/index, will also delete from the list.
         """
         if not len(self):
             raise IndexError('pop from empty list')
@@ -151,26 +132,25 @@ class ListDict(list):
 
     def __delitem__(self, key) -> None:
         """
-        Deletes an item from the ListDict. Will raise an exception if the item
-        index cannot be determined.
+        Deletes an item from the ListDict. Will raise an exception if the item index cannot be
+            determined.
 
-        :param key: If key is a string, will attempt to find an item with a
-            matching key. Will raise an exception if said key cannot be
-            located. If key is an integer or a slice, normal list indexing
-            rules will be used to search. If key is a tuple consisting of a
-            string and an integer (n), will attempt to find items with
-            matching keys, then return the nth element.
+        :param key: If this is a ``str``, will attempt to find an item with a matching key. Will
+            raise an exception if it cannot be located. If this is an ``int`` or a ``slice``, normal
+            list indexing rules will be used to search. If this is a ``tuple`` consisting of a
+            ``str`` and an ``int`` (*n*), will attempt to find items with matching keys, then return
+            the *nth* element with a matching key.
         :return: No return.
         """
         list.__delitem__(self, self.__locate_index(key))
 
     def __contains__(self, item) -> bool:
         """
-        Figure out if an item is contained in the ListDict.
+        Figure out if an item is contained in the ``ListDict``.
 
-        :param item: If item is a string, a search for a key will be done.
-            Otherwise, a search for an exact match will be carried out.
-        :return: A bool indicating whether the item was found in the ListDict.
+        :param item: If this is a ``str``, a search for a key will be done. Otherwise, a search for
+            an exact match will be carried out.
+        :return: A bool indicating whether the item was found in the ``ListDict``.
         """
         if type(item) is str:
             for i in range(len(self)):
