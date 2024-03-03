@@ -1,8 +1,12 @@
 import builtins
-from functools import wraps
+import inspect
 from typing import Mapping, overload, Iterable, Union, Tuple
 
+from funk_py.modularity.logging import make_logger, logs_vars
 from funk_py.super_dicts import dict_input_processor
+
+
+obj_logger = make_logger('Obj', 'OBJ_LOGGING', show_function=False, TRACE=5)
 
 
 class ObjAttributeError(AttributeError):
@@ -60,6 +64,12 @@ class Obj(dict):
     @overload
     def __init__(self, iterable: Iterable, **kwargs): ...
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Initializing new instance of Obj...',
+               start_message_level='info',
+               end_message='Obj initialized.',
+               end_message_level='info',
+               var_message_level='trace')
     def __init__(self, map_: Mapping = ..., **kwargs):
         # Don't use dict.__init__ to add the map_ and kwargs, since nested maps should be
         # transformed to new Obj's, Obj should handle it with _no_check_update, since that will
@@ -96,25 +106,23 @@ class Obj(dict):
             ``__getattr__``, ``__getitem__``, ``__delitem__``, ``__delattr__``, ``pop``,
             ``popitem``, ``clear``, and ``update`` methods of the instance.
         """
+        obj_logger.info('Hardening an instance of Obj...')
+        if dict.__getattribute__(self, '_hardened') is True:
+            obj_logger.info('Obj already hardened. Exiting.')
+            return
+
         dict.__setattr__(self, '_hardened', True)
 
         def new_pop(key, default=...): raise ObjAttributeError(Obj.no_del_msg, name=key)
 
-        def new_delattr(item=...):
-            raise ObjAttributeError(Obj.no_del_msg, name=item)
+        def new_delattr(item=...): raise ObjAttributeError(Obj.no_del_msg, name=item)
 
         def new_clear(): raise ObjAttributeError(Obj.no_del_msg, name='ALL KEYS')
 
-        self.__dict__['__getattr__'] = self._hardened_getattr
-        self.__dict__['__getitem__'] = self._hardened_getitem
-        self.__dict__['__setattr__'] = self._hardened_setattr
-        self.__dict__['_setitem_to_be_disguised'] = self._hardened_setitem
-        self.__dict__['pop'] = new_pop
-        self.__dict__['__delattr__'] = to_wrap('__delattr__')(new_delattr)
-        self.__dict__['__delitem__'] = to_wrap('__delitem__')(new_delattr)
-        self.__dict__['popitem'] = to_wrap('popitem')(new_delattr)
-        self.__dict__['update'] = self._hardened_update
-        self.__dict__['clear'] = new_clear
+        def setting_msg(orig: str, new: str):
+            return 'Setting self.__dict__[\'' + orig + '\'] to self.' + new + '...'
+
+        def new_func_msg(func): return 'Should become:\n' + inspect.getsource(func)
 
         def override_func_safely(old_func_name: str, new_func: callable):
             obj_logger.trace(setting_msg(old_func_name, new_func.__name__))
@@ -139,8 +147,18 @@ class Obj(dict):
         obj_logger.info('Checking for internal Objs to harden...')
         for val in self.values():
             if isinstance(val, Obj):
+                obj_logger.debug('Found one...')
                 val.harden()
+                obj_logger.debug('Hardened internal Obj. Continuing to evaluate...')
 
+        obj_logger.info('Done checking for internal Objs to harden.')
+        obj_logger.info('Done hardening instance of Obj.')
+
+    @logs_vars(obj_logger, 'self',
+               start_message='Checking for keys that can no longer be changed, but for which a'
+                             ' change is being attempted...',
+               end_message='Finished checking for conflicting keys.',
+               var_message_level='trace')
     def _scan_dead_keys(self, map_: Mapping):
         # The reason this is written to NOT fail fast is so that as much information as possible
         # about what was wrong can be collected. We want to have this information, so we can give
@@ -148,18 +166,26 @@ class Obj(dict):
         bad_keys = []
         blocked_keys = []
         for key, val in map_.items():
+            obj_logger.trace(f'Checking\n'
+                             f'Key: {repr(key)}\n'
+                             f'Value: {repr(val)}')
             if not dict.__contains__(self, key):
+                obj_logger.trace('BAD KEY! Obj does not already contain key.')
                 bad_keys.append(key)
 
             elif isinstance(t := dict.__getitem__(self, key), Obj):
+                obj_logger.trace('Obj contains instance of Obj at key. Checking if safe...')
                 if isinstance(val, dict):
+                    obj_logger.trace('val is an instance of dict, should be used to update '
+                                     ' internal Obj, checking internal Obj...')
                     _bad_keys, _blocked_keys = t._scan_dead_keys(val)
-                    bad_keys.extend(_bad_keys)
-                    blocked_keys.extend(_blocked_keys)
+                    obj_logger.trace('adding any bad keys to existing bad keys...')
                     bad_keys.extend([str(key) + ':' + b_key for b_key in _bad_keys])
+                    obj_logger.trace('adding any blocked keys to existing blocked keys...')
                     blocked_keys.extend([str(key) + ':' + b_key for b_key in _blocked_keys])
 
                 else:
+                    obj_logger.trace('BLOCKED KEY! val is not an instance of dict.')
                     blocked_keys.append(key)
 
         return bad_keys, blocked_keys
@@ -181,18 +207,30 @@ class Obj(dict):
                        + (' ' if extra_msg else '') + extra_msg)
                 name1 = f'Missing Keys: {repr(bad_keys)}'
                 name2 = f'Blocked Keys: {repr(blocked_keys)}'
+                obj_logger.error(msg)
+                obj_logger.error(name1)
+                obj_logger.error(name2)
                 raise ObjAttributeError(msg, name=name1 + '\n' + name2)
 
             else:
                 msg = Obj.no_new_msg + (' ' if extra_msg else '') + extra_msg
                 name = repr(bad_keys)
+                obj_logger.error(msg)
+                obj_logger.error(name)
                 raise ObjAttributeError(msg, name=name)
 
         elif len(blocked_keys):
             msg = Obj.blocked_msg + (' ' if extra_msg else '') + extra_msg
             name = repr(blocked_keys)
+            obj_logger.error(msg)
+            obj_logger.error(name)
             raise ObjAttributeError(msg, name=name)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Performing update...',
+               start_message_level='info',
+               end_message='Update completed...',
+               end_message_level='info')
     def _no_check_update(self, map_: Mapping):
         """
         This method simply updates the dictionary without a check for collisions or bad keys. On a
@@ -200,33 +238,39 @@ class Obj(dict):
         On an unhardened ``Obj``, it should be safe.
         """
         for key, val in map_.items():
+            obj_logger.trace(f'Checking\n'
+                             f'Key: {repr(key)}\n'
+                             f'Value: {repr(val)}')
             if dict.__contains__(self, key):
+                obj_logger.trace('Key exists. Checking if it should be replaced or updated...')
                 if isinstance(val, dict):
-                    # We could build the Obj for the dict right away, but that
-                    # isn't very efficient if we're going to be updating another
-                    # Obj with it. Instead, check if there is an Obj to add it
-                    # to first.
+                    obj_logger.trace('Val is an instance of dict. Checking whether to replace '
+                                     ' original or update original...')
                     # We could build the Obj for the dict right away, but that isn't very efficient
                     # if we're going to be updating another Obj with it. Instead, check if there is
                     # an Obj to add it to first.
                     if isinstance(t := dict.__getitem__(self, key), Obj):
-                        print(f'{val}-update')
+                        obj_logger.trace('Value at key is already an Obj. Updating it with val...')
                         t._no_check_update(val)
 
                     else:
-                        print(f'{val}-dict')
+                        obj_logger.trace('Value is not already an Obj. Replacing with new Obj '
+                                         ' generated from val...')
                         dict.__setitem__(self, key, Obj(val))
 
                 else:
-                    print(f'{val}-direct')
+                    obj_logger.trace('Val is not an instance of dict. Replacing with val...')
                     dict.__setitem__(self, key, val)
 
             elif isinstance(val, dict):
-                print(f'{val}-new dict')
+                obj_logger.trace('Key does not exist. Adding pair...')
+                obj_logger.trace('Val is an instance of dict. Generating a new Obj and adding it '
+                                 'at the key...')
                 dict.__setitem__(self, key, Obj(val))
 
             else:
-                print(f'{val}-new direct')
+                obj_logger.trace('Key does not exist. Adding pair...')
+                obj_logger.trace('Val is not an instance of dict. Adding val at key...')
                 dict.__setitem__(self, key, val)
 
     @overload
@@ -262,9 +306,11 @@ class Obj(dict):
     def false_update(self, map_):
         return map_
 
-    ACTUALLY_ATTRIBUTE = ('Attribute in _HIDE_THESE. Proceeding to actually {}'
-                          ' attribute...')
+    ACTUALLY_ATTRIBUTE = 'Attribute in _HIDE_THESE. Proceeding to actually {} attribute...'
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Getting attribute of Obj via unhardened method...',
+               end_message='Attribute retrieved.')
     def __getattr__(self, item):
         # The following prevents *system* variables from effecting the
         # dictionary representation of the Obj.
@@ -272,15 +318,20 @@ class Obj(dict):
         # to keep background data from being considered as elements in the
         # dictionary.
         if item in dict.__getattribute__(self, '_HIDE_THESE'):
+            obj_logger.debug(Obj.ACTUALLY_ATTRIBUTE.format('get'))
             return dict.__getattribute__(self, item)
 
         if not dict.__contains__(self, item):
+            obj_logger.debug('New attribute detected. Generating new Obj and adding...')
             value = Obj()
             dict.__setitem__(self, item, value)
             return value
 
-        return self[item]
+        return dict.__getitem__(self, item)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Getting attribute of Obj via hardened method...',
+               end_message='Finished getting.')
     def _hardened_getattr(self, item):
         # The following prevents *system* variables from effecting the
         # dictionary representation of the Obj.
@@ -288,66 +339,91 @@ class Obj(dict):
         # and to keep background data from being considered as elements in
         # the dictionary.
         if item in dict.__getattribute__(self, '_HIDE_THESE'):
+            obj_logger.debug(Obj.ACTUALLY_ATTRIBUTE.format('get'))
             return dict.__getattribute__(self, item)
 
         if item not in self:
-            raise ObjAttributeError(
-                Obj._GEN_ERR.format('generate missing keys'), name=item)
             msg = Obj._GEN_ERR.format('generate missing keys')
             name = repr(item)
+            obj_logger.error(msg)
+            obj_logger.error(name)
             raise ObjAttributeError(msg, name=name)
 
         return dict.__getitem__(self, item)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Setting attribute of Obj via unhardened method...',
+               end_message='Attribute set.')
     def __setattr__(self, key, value):
         # The following prevents *system* variables from effecting the dictionary representation of
         # the Obj. Use the super's __getattribute__ and __setattr__ methods to prevent infinite
         # loops and to keep background data from being considered as elements in the dictionary.
         if key in dict.__getattribute__(self, '_HIDE_THESE'):
+            obj_logger.debug(Obj.ACTUALLY_ATTRIBUTE.format('set'))
             dict.__setattr__(self, key, value)
 
         else:
             self._no_check_update({key: value})
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Setting attribute of Obj via hardened method...',
+               end_message='Finished setting.')
     def _hardened_setattr(self, key, value):
         # The following prevents *system* variables from effecting the dictionary representation of
         # the Obj.
         if key in dict.__getattribute__(self, '_HIDE_THESE'):
+            obj_logger.debug(Obj.ACTUALLY_ATTRIBUTE.format('set'))
             dict.__setattr__(self, key, value)
 
         map_ = {key: value}
         self._raise_correct_errors(map_)
         self._no_check_update(map_)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Setting item of Obj via unhardened method...',
+               end_message='Item set.')
     def _setitem_to_be_disguised(self, key, value):
         self._no_check_update({key: value})
 
     def __setitem__(self, key, value):
         self._setitem_to_be_disguised(key, value)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Setting item of Obj via hardened method...',
+               end_message='Finished setting.')
     def _hardened_setitem(self, key, value):
         map_ = {key: value}
         self._raise_correct_errors(map_)
         self._no_check_update(map_)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Getting item of Obj via unhardened method...',
+               end_message='Item retrieved.')
     def __getitem__(self, key):
         if key in self:
             return dict.__getitem__(self, key)
 
+        obj_logger.debug('Attribute does not exist. Generating new Obj...')
         new_obj = Obj()
         dict.__setitem__(self, key, new_obj)
         return new_obj
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Getting item of Obj via hardened method...',
+               end_message='Finished getting.')
     def _hardened_getitem(self, item):
         if item not in self:
-            raise ObjAttributeError(
-                Obj._GEN_ERR.format('generate missing keys'), name=item)
             msg = Obj._GEN_ERR.format('generate missing keys')
             name = repr(item)
+            obj_logger.error(msg)
+            obj_logger.error(name)
             raise ObjAttributeError(msg, name=name)
 
         return dict.__getitem__(self, item)
 
+    @logs_vars(obj_logger, 'self',
+               start_message='Deleting attribute via unhardened method...',
+               end_message='Attribute deleted if it existed.')
     def __delattr__(self, item):
         if dict.__contains__(self, item):
             dict.__delitem__(self, item)
