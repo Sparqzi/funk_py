@@ -6,7 +6,8 @@ from funk_py.modularity.logging import make_logger, logs_vars
 from funk_py.super_dicts import dict_input_processor
 
 
-obj_logger = make_logger('Obj', 'OBJ_LOGGING', show_function=False, TRACE=5)
+obj_logger = make_logger('Obj', 'OBJ_LOGGING', show_function=False, default_level='warning',
+                         TRACE=5)
 
 
 class ObjAttributeError(AttributeError):
