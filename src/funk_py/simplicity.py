@@ -11,8 +11,7 @@ class ObjAttributeError(AttributeError):
 
 class Obj(dict):
     """
-    ``Obj`` is a sort of wishy-washy map where branches can be implicitly
-    generated easily.
+    ``Obj`` is a sort of wishy-washy map where branches can be implicitly generated easily.
         For example:
 
         .. code-block:: python
@@ -38,43 +37,43 @@ class Obj(dict):
                 'general': 'Washington'
             }
 
-    It has :meth:`~Obj.as_list` and :meth:`~Obj.as_tuple` methods which can be
-    used to return only the values of the dict, and an :meth:`~Obj.as_dict`
-    option which will return the entire dict.
+    It has :meth:`~Obj.as_list` and :meth:`~Obj.as_tuple` methods which can be used to return only
+        the values of the dict, and an :meth:`~Obj.as_dict` option which will return the entire
+        dict.
 
-    It can also be :meth:`hardened <Obj.harden>` so that new keys cannot be
-    added and existing keys cannot be removed.
+    It can also be :meth:`hardened <Obj.harden>` so that new keys cannot be added and existing keys
+        cannot be removed.
     """
 
     _GEN_ERR = 'This Obj has been hardened. It can no longer {}.'
     no_new_msg = _GEN_ERR.format('have new keys created')
     no_del_msg = _GEN_ERR.format('have keys removed')
-    blocked_msg = ('This Obj has been hardened. While the target key'
-                   ' exists, it can not be changed because it is also an'
-                   ' instance of Obj.')
+    blocked_msg = ('This Obj has been hardened. While the target key exists, it can not be '
+                   'changed because it is also an instance of Obj.')
 
     @overload
     def __init__(self, **kwargs): ...
+
     @overload
     def __init__(self, map_: Mapping, **kwargs): ...
+
     @overload
     def __init__(self, iterable: Iterable, **kwargs): ...
 
     def __init__(self, map_: Mapping = ..., **kwargs):
-        # Don't use dict.__init__ to add the map_ and kwargs, since nested maps
-        # should be transformed to new Obj's, Obj should handle it with
-        # _no_check_update, since that will check for those instances.
+        # Don't use dict.__init__ to add the map_ and kwargs, since nested maps should be
+        # transformed to new Obj's, Obj should handle it with _no_check_update, since that will
+        # check for those instances.
         dict.__init__(self)
         map_ = {} if map_ is ... else dict(map_)
         map_.update(kwargs)
         self._no_check_update(map_)
 
-        # Always use super's __setattr__ method to avoid triggering own
-        # __setattr__ method.
+        # Always use super's __setattr__ method to avoid triggering own __setattr__ method.
         dict.__setattr__(self, '_hardened', False)
-        # The following is used by __setattr__ and __getattr__ methods later to
-        # handle attributes that are not (usually) going to be set by the user
-        # directly. It should primarily be for things like *shape*.
+        # The following is used by __setattr__ and __getattr__ methods later to handle attributes
+        # that are not (usually) going to be set by the user directly. It should primarily be for
+        # things like *shape*.
         dict.__setattr__(self, '_HIDE_THESE', ['shape'])
 
     @property
@@ -87,32 +86,24 @@ class Obj(dict):
 
         When an ``Obj`` is hardened:
 
-        - New keys/attributes may not be added to it and attempts to add new
-          keys/attributes will fail, raising an exception.
-        - Current keys/attributes may not be removed from it and attempts to do
-          so will fail, raising an exception.
+        - New keys/attributes may not be added to it and attempts to add new keys/attributes will
+            fail, raising an exception.
+        - Current keys/attributes may not be removed from it and attempts to do so will fail,
+            raising an exception.
 
         .. warning::
-            This will erase and replace the existing ``__setitem__``,
-            ``__setattr__``, ``__getattr__``, ``__delitem__``, ``__delattr__``,
-            ``pop``, ``popitem``, ``clear``, and ``update`` methods of the
-            instance.
+            This will erase and replace the existing ``__setitem__``, ``__setattr__``,
+            ``__getattr__``, ``__getitem__``, ``__delitem__``, ``__delattr__``, ``pop``,
+            ``popitem``, ``clear``, and ``update`` methods of the instance.
         """
         dict.__setattr__(self, '_hardened', True)
 
-        def to_wrap(attr):
-            return wraps(dict.__getattribute__(self, attr))
-
-        @to_wrap('pop')
-        def new_pop(key, default=...):
-            raise ObjAttributeError(Obj.no_del_msg, name=key)
+        def new_pop(key, default=...): raise ObjAttributeError(Obj.no_del_msg, name=key)
 
         def new_delattr(item=...):
             raise ObjAttributeError(Obj.no_del_msg, name=item)
 
-        @to_wrap('clear')
-        def new_clear():
-            raise ObjAttributeError(Obj.no_del_msg, name='ALL KEYS')
+        def new_clear(): raise ObjAttributeError(Obj.no_del_msg, name='ALL KEYS')
 
         self.__dict__['__getattr__'] = self._hardened_getattr
         self.__dict__['__getitem__'] = self._hardened_getitem
@@ -125,15 +116,35 @@ class Obj(dict):
         self.__dict__['update'] = self._hardened_update
         self.__dict__['clear'] = new_clear
 
+        def override_func_safely(old_func_name: str, new_func: callable):
+            obj_logger.trace(setting_msg(old_func_name, new_func.__name__))
+            obj_logger.trace(new_func_msg(self._hardened_getattr))
+            self.__dict__[old_func_name] = new_func
+            obj_logger.trace(old_func_name + ' overridden.')
+
+        obj_logger.debug('Replacing methods capable of mutating the class with'
+                         ' new methods...')
+        override_func_safely('__getattr__', self._hardened_getattr)
+        override_func_safely('__getitem__', self._hardened_getitem)
+        override_func_safely('__setattr__', self._hardened_setattr)
+        override_func_safely('_setitem_to_be_disguised', self._hardened_setitem)
+        override_func_safely('pop', new_pop)
+        override_func_safely('__delattr__', new_delattr)
+        override_func_safely('__delitem__', new_delattr)
+        override_func_safely('popitem', new_delattr)
+        override_func_safely('update', self._hardened_update)
+        override_func_safely('clear', new_clear)
+        obj_logger.debug('Methods replaced.')
+
+        obj_logger.info('Checking for internal Objs to harden...')
         for val in self.values():
             if isinstance(val, Obj):
                 val.harden()
 
     def _scan_dead_keys(self, map_: Mapping):
-        # The reason this is written to NOT fail fast is so that as much
-        # information as possible about what was wrong can be collected.
-        # We want to have this information, so we can give the user a detailed
-        # error message.
+        # The reason this is written to NOT fail fast is so that as much information as possible
+        # about what was wrong can be collected. We want to have this information, so we can give
+        # the user a detailed error message.
         bad_keys = []
         blocked_keys = []
         for key, val in map_.items():
@@ -145,18 +156,48 @@ class Obj(dict):
                     _bad_keys, _blocked_keys = t._scan_dead_keys(val)
                     bad_keys.extend(_bad_keys)
                     blocked_keys.extend(_blocked_keys)
+                    bad_keys.extend([str(key) + ':' + b_key for b_key in _bad_keys])
+                    blocked_keys.extend([str(key) + ':' + b_key for b_key in _blocked_keys])
 
                 else:
                     blocked_keys.append(key)
 
         return bad_keys, blocked_keys
 
+    def _raise_correct_errors(self, map_, extra_msg: str = ''):
+        """
+        When working on a hardened ``Obj``, there are multiple ways keys or values can be considered
+            invalid. This just checks all of those when needed. It also handles checking nested Obj
+            instances.
+
+        :param map_: The ``Mapping`` to update with.
+        :param extra_msg: Any message that should be appended to the default message if an error
+            occurs.
+        """
+        bad_keys, blocked_keys = self._scan_dead_keys(map_)
+        if len(bad_keys):
+            if len(blocked_keys):
+                msg = (Obj.no_new_msg + Obj.blocked_msg
+                       + (' ' if extra_msg else '') + extra_msg)
+                name1 = f'Missing Keys: {repr(bad_keys)}'
+                name2 = f'Blocked Keys: {repr(blocked_keys)}'
+                raise ObjAttributeError(msg, name=name1 + '\n' + name2)
+
+            else:
+                msg = Obj.no_new_msg + (' ' if extra_msg else '') + extra_msg
+                name = repr(bad_keys)
+                raise ObjAttributeError(msg, name=name)
+
+        elif len(blocked_keys):
+            msg = Obj.blocked_msg + (' ' if extra_msg else '') + extra_msg
+            name = repr(blocked_keys)
+            raise ObjAttributeError(msg, name=name)
+
     def _no_check_update(self, map_: Mapping):
         """
-        This method simply updates the dictionary without a check for
-        collisions or bad keys. On a hardened ``Obj``, it is to be used only
-        all key-value pairs are verified to be safe to add. On an unhardened
-        ``Obj``, it should be safe.
+        This method simply updates the dictionary without a check for collisions or bad keys. On a
+        hardened ``Obj``, it is to be used only all key-value pairs are verified to be safe to add.
+        On an unhardened ``Obj``, it should be safe.
         """
         for key, val in map_.items():
             if dict.__contains__(self, key):
@@ -165,6 +206,9 @@ class Obj(dict):
                     # isn't very efficient if we're going to be updating another
                     # Obj with it. Instead, check if there is an Obj to add it
                     # to first.
+                    # We could build the Obj for the dict right away, but that isn't very efficient
+                    # if we're going to be updating another Obj with it. Instead, check if there is
+                    # an Obj to add it to first.
                     if isinstance(t := dict.__getitem__(self, key), Obj):
                         print(f'{val}-update')
                         t._no_check_update(val)
@@ -193,10 +237,9 @@ class Obj(dict):
 
     def update(self, map_: Mapping = ..., **kwargs):
         """
-        This method updates the ``Obj`` much the same way that
-        ``dict.update`` works. The major difference is that if a dictionary is
-        set as the value for a key that already has an ``Obj`` as its value, the
-        dictionary will be used to update the existing ``Obj`` instead of
+        This method updates the ``Obj`` much the same way that ``dict.update`` works. The major
+        difference is that if a dictionary is set as the value for a key that already has an ``Obj``
+        as its value, the dictionary will be used to update the existing ``Obj`` instead of
         replacing it.
         """
         map_ = {} if map_ is ... else map_
@@ -209,33 +252,18 @@ class Obj(dict):
         map_ = dict(map_) if not isinstance(map_, Mapping) else map_
         map_.update(kwargs)
 
-        bad_keys, blocked_keys = self._scan_dead_keys(map_)
+        self._raise_correct_errors(map_, ' Not even via update.')
 
-        if len(bad_keys):
-            if len(blocked_keys):
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.\n'
-                    + Obj.blocked_msg,
-                    name=f'Missing Keys: {repr(bad_keys)}\n'
-                         f'Blocked Keys: {repr(blocked_keys)}')
-
-            else:
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.',
-                    name=repr(bad_keys))
-
-        elif len(blocked_keys):
-            raise ObjAttributeError(Obj.blocked_msg, name=repr(blocked_keys))
-
-        # Do not call dict.update here, it will cause any required
-        # dict->Obj conversions not to occur.
-        # Any data in map_ should have been transferred to kwargs at the
-        # beginning of this.
+        # Do not call dict.update here, it will cause any required dict->Obj conversions not to
+        # occur. Any data in map_ should have been transferred to kwargs at the beginning of this.
         self._no_check_update(map_)
 
     @dict_input_processor
     def false_update(self, map_):
         return map_
+
+    ACTUALLY_ATTRIBUTE = ('Attribute in _HIDE_THESE. Proceeding to actually {}'
+                          ' attribute...')
 
     def __getattr__(self, item):
         # The following prevents *system* variables from effecting the
@@ -265,15 +293,16 @@ class Obj(dict):
         if item not in self:
             raise ObjAttributeError(
                 Obj._GEN_ERR.format('generate missing keys'), name=item)
+            msg = Obj._GEN_ERR.format('generate missing keys')
+            name = repr(item)
+            raise ObjAttributeError(msg, name=name)
 
         return dict.__getitem__(self, item)
 
     def __setattr__(self, key, value):
-        # The following prevents *system* variables from effecting the
-        # dictionary representation of the Obj.
-        # Use the super's __getattribute__ and __setattr__ methods to prevent
-        # infinite loops and to keep background data from being considered as
-        # elements in the dictionary.
+        # The following prevents *system* variables from effecting the dictionary representation of
+        # the Obj. Use the super's __getattribute__ and __setattr__ methods to prevent infinite
+        # loops and to keep background data from being considered as elements in the dictionary.
         if key in dict.__getattribute__(self, '_HIDE_THESE'):
             dict.__setattr__(self, key, value)
 
@@ -281,30 +310,13 @@ class Obj(dict):
             self._no_check_update({key: value})
 
     def _hardened_setattr(self, key, value):
-        map_ = {key: value}
-        bad_keys, blocked_keys = self._scan_dead_keys(map_)
-        if len(bad_keys):
-            if len(blocked_keys):
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.\n'
-                    + Obj.blocked_msg,
-                    name=f'Missing Keys: {repr(bad_keys)}\n'
-                         f'Blocked Keys: {repr(blocked_keys)}')
-
-            else:
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.',
-                    name=repr(bad_keys))
-
-        elif len(blocked_keys):
-            raise ObjAttributeError(Obj.blocked_msg,
-                                    name=repr(blocked_keys))
-
-        # The following prevents *system* variables from effecting the
-        # dictionary representation of the Obj.
+        # The following prevents *system* variables from effecting the dictionary representation of
+        # the Obj.
         if key in dict.__getattribute__(self, '_HIDE_THESE'):
             dict.__setattr__(self, key, value)
 
+        map_ = {key: value}
+        self._raise_correct_errors(map_)
         self._no_check_update(map_)
 
     def _setitem_to_be_disguised(self, key, value):
@@ -315,23 +327,7 @@ class Obj(dict):
 
     def _hardened_setitem(self, key, value):
         map_ = {key: value}
-        bad_keys, blocked_keys = self._scan_dead_keys(map_)
-        if len(bad_keys):
-            if len(blocked_keys):
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.\n'
-                    + Obj.blocked_msg,
-                    name=f'Missing Keys: {repr(bad_keys)}\n'
-                         f'Blocked Keys: {repr(blocked_keys)}')
-
-            else:
-                raise ObjAttributeError(
-                    Obj.no_new_msg + ' Not even via update.',
-                    name=repr(bad_keys))
-
-        elif len(blocked_keys):
-            raise ObjAttributeError(Obj.blocked_msg, name=repr(blocked_keys))
-
+        self._raise_correct_errors(map_)
         self._no_check_update(map_)
 
     def __getitem__(self, key):
@@ -346,11 +342,14 @@ class Obj(dict):
         if item not in self:
             raise ObjAttributeError(
                 Obj._GEN_ERR.format('generate missing keys'), name=item)
+            msg = Obj._GEN_ERR.format('generate missing keys')
+            name = repr(item)
+            raise ObjAttributeError(msg, name=name)
 
         return dict.__getitem__(self, item)
 
     def __delattr__(self, item):
-        if item in self:
+        if dict.__contains__(self, item):
             dict.__delitem__(self, item)
 
     def _as_thing(self, thing: type, recur: Union[type, Tuple[type]] = ...):
@@ -384,15 +383,13 @@ class Obj(dict):
 
     def as_list(self, recur: Union[type, Tuple[type]] = ...) -> list:
         """
-        Generates a ``list`` of the values in an ``Obj``. These values may or
-        may not be in the expected order.
+        Generates a ``list`` of the values in an ``Obj``. These values should be in the expected
+            order.
 
-        :param recur: The type of conversion that should be used on
-            internally-nested ``Objs``. Valid types for this are ``list``,
-            ``tuple``, and ``dict``, and it can be specified either for the
-            entire depth of the ``Obj`` or as a tuple of those types to be used
-            for each depth. If it is not provided, nested ``Objs`` will be
-            included as-is.
+        :param recur: The type of conversion that should be used on internally-nested ``Objs``.
+            Valid types for this are ``list``, ``tuple``, and ``dict``, and it can be specified
+            either for the entire depth of the ``Obj`` or as a tuple of those types to be used for
+            each depth. If it is not provided, nested ``Objs`` will be included as-is.
 
             For Example:
 
@@ -476,8 +473,8 @@ class Obj(dict):
                     'mi'
                 ]
 
-            Example 3 - Recur is a Tuple of Types (Longer than or Equal to
-            the Max Depth of the Nesting):
+            Example 3 - Recur is a Tuple of Types (Longer than or Equal to the Max Depth of the
+                Nesting):
 
             .. code-block:: python
 
@@ -494,8 +491,7 @@ class Obj(dict):
                     'mi'
                 ]
 
-            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of
-            the Nesting):
+            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of the Nesting):
 
             .. code-block:: python
 
@@ -516,15 +512,13 @@ class Obj(dict):
 
     def as_tuple(self, recur: Union[type, Tuple[type]] = ...) -> tuple:
         """
-        Generates a ``tuple`` of the values in an ``Obj``. These values may or
-        may not be in the expected order.
+        Generates a ``tuple`` of the values in an ``Obj``. These values may or may not be in the
+            expected order.
 
-        :param recur: The type of conversion that should be used on
-            internally-nested ``Objs``. Valid types for this are ``list``,
-            ``tuple``, and ``dict``, and it can be specified either for the
-            entire depth of the ``Obj`` or as a tuple of those types to be used
-            for each depth. If it is not provided, nested ``Objs`` will be
-            included as-is.
+        :param recur: The type of conversion that should be used on internally-nested ``Objs``.
+            Valid types for this are ``list``, ``tuple``, and ``dict``, and it can be specified
+            either for the entire depth of the ``Obj`` or as a tuple of those types to be used for
+            each depth. If it is not provided, nested ``Objs`` will be included as-is.
 
             For Example:
 
@@ -608,8 +602,8 @@ class Obj(dict):
                     'mi'
                 )
 
-            Example 3 - Recur is a Tuple of Types (Longer than or Equal to
-            the Max Depth of the Nesting):
+            Example 3 - Recur is a Tuple of Types (Longer than or Equal to the Max Depth of the
+                Nesting):
 
             .. code-block:: python
 
@@ -626,8 +620,7 @@ class Obj(dict):
                     'mi'
                 )
 
-            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of
-            the Nesting):
+            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of the Nesting):
 
             .. code-block:: python
 
@@ -648,15 +641,13 @@ class Obj(dict):
 
     def as_dict(self, recur: Union[type, Tuple[type]] = ...) -> dict:
         """
-        Generates a ``dict`` of the key-value pairs in an ``Obj``. These pairs
-        may or may not be in the expected order.
+        Generates a ``dict`` of the key-value pairs in an ``Obj``. These pairs may or may not be in
+            the expected order.
 
-        :param recur: The type of conversion that should be used on
-            internally-nested ``Objs``. Valid types for this are ``list``,
-            ``tuple``, and ``dict``, and it can be specified either for the
-            entire depth of the ``Obj`` or as a tuple of those types to be used
-            for each depth. If it is not provided, nested ``Objs`` will be
-            included as-is.
+        :param recur: The type of conversion that should be used on internally-nested ``Objs``.
+            Valid types for this are ``list``, ``tuple``, and ``dict``, and it can be specified
+            either for the entire depth of the ``Obj`` or as a tuple of those types to be used for
+            each depth. If it is not provided, nested ``Objs`` will be included as-is.
 
             For Example:
 
@@ -740,8 +731,8 @@ class Obj(dict):
                     543: 'mi'
                 }
 
-            Example 3 - Recur is a Tuple of Types (Longer than or Equal to
-            the Max Depth of the Nesting):
+            Example 3 - Recur is a Tuple of Types (Longer than or Equal to the Max Depth of the
+                Nesting):
 
             .. code-block:: python
 
@@ -758,8 +749,7 @@ class Obj(dict):
                     543: 'mi'
                 }
 
-            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of
-            the Nesting):
+            Example 4 - Recur is a Tuple of Types(Shorter than the Max Depth of the Nesting):
 
             .. code-block:: python
 
