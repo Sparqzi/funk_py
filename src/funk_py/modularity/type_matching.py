@@ -623,35 +623,27 @@ def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
                                                recursion_points2))
 
 
+def _true_key_match(key1: Any, obj2: dict):
+    for key2 in obj2.keys():
+        if key2 == key1:
+            if key2 is not key1:
+                return False
+
+            return True
+
+
 def _strict_has_no_issues(obj1, obj2):
     # We should always have two same type objects when this is called, do not worry about making
     # sure they are the same type. Only check the type of one object.
     if isinstance(obj1, dict):
         for k1, v1 in obj1.items():
             if k1 == 0 or k1 == 1:
-                if v1 == 0 or v1 == 1:
-                    for k2, v2 in obj2.items():
-                        if k2 == k1:
-                            if v2 is not v1:
-                                return False
+                if (k1 not in obj2 or not _true_key_match(k1, obj2)
+                        or ((v1 == 0 or v1 == 1) and obj2[k1] is not v1)):
+                    return False
 
-                            break
-
-                else:
-                    for k2 in obj2.keys():
-                        if k2 == k1:
-                            if k2 is not k1:
-                                return False
-
-                            break
-
-            elif v1 == 0 or v1 == 1:
-                for k2, v2 in obj2.items():
-                    if k2 == k1:
-                        if v2 is not v1:
-                            return False
-
-                        break
+            elif (v1 == 0 or v1 == 1) and obj2[k1] is not v1:
+                return False
 
             if isinstance(v1, list) or isinstance(v1, dict) or isinstance(v1, tuple):
                 for k2, v2 in obj2.items():
