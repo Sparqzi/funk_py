@@ -326,7 +326,7 @@ class TestFunctionInt:
         for i in range(len(t_runs[2])):
             assert caplog.records[i].msg == t_runs[2][i]
 
-    def test_result_unvoided(self, t_runs):
+    def test_result_not_voided(self, t_runs):
         LOGGER.setLevel(t_runs[1])
         ans = t_runs[0](NAME, AGE)
 
