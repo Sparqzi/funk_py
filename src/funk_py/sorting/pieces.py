@@ -7,15 +7,33 @@ from typing import Mapping, Any, Literal, Union, List, Dict, Tuple, Optional, It
     Callable
 
 import yaml
-from typing import Mapping, Any, Literal, Union, List, Dict
 
+from funk_py.modularity.logging import make_logger
+
+
+main_logger = make_logger('pieces', 'PIECES_LOG_LEVEL', default_level='warning')
+
+main_logger.info('Setting up simple types...')
+OutputMapType = (
+    Union[Mapping,
+          List[Union[str,
+                     Mapping,
+                     Literal['json',
+                             'jsonl',
+                             'json\'',
+                             'xml',
+                             'xml-sa',
+                             'e-list',
+                             'list',
+                             'csv',
+                             'yaml']]]])
 
 class PickType(IntEnum):
-    MULTIPLIED = 0
-    ADDITIVE = 1
-    NESTED = 2
     MULTIPLICATIVE = 0
     AGGREGATION = 1
+
+
+main_logger.info('Finished setting up simple types.')
 
 
 def pick(
