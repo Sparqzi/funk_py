@@ -174,43 +174,6 @@ def similar_lists(request):
     })
 
 
-# @pytest.fixture(params=(
-#     (make_json_list, None),
-#     (make_json_list_str, 'json'),
-#     (make_jsonl_list, 'jsonl'),
-#     (make_xml_list_attr, 'xml'),
-#     (make_xml_list_no_attr, 'xml-sa'),
-#     (make_csv, 'csv'),
-#     (make_spacy_csv, 'csv'),
-#     (make_yaml_list, 'yaml'),
-# ), ids=(
-#     'regular lists',
-#     'json string lists',
-#     'jsonl string',
-#     'xml with attributes lists',
-#     'xml without attributes lists',
-#     'csv lists',
-#     'spacy csv lists',
-#     'yaml lists',
-# ))
-# def similar_lists(request):
-#     func, instruction = request.param
-#     list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
-#     list2 = func(KEYS[:3], VALS4, VALS5, VALS6)
-#     _instruction = dict(zip(KEYS[:3], OUT_KEYS[:3]))
-#     if instruction is not None:
-#         if instruction in ('xml', 'xml-sa'):
-#             _instruction = [instruction, {DATA_KEY1: {DATA_KEY2: _instruction}}]
-#
-#         else:
-#             _instruction = [instruction, _instruction]
-#
-#     result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
-#     result2 = make_json_list(OUT_KEYS[:3], VALS4, VALS5, VALS6)
-#
-#     return ListSet(list1, list2, _instruction, result1, result2)
-
-
 @list_fixture
 def dissimilar_lists(request):
     func, instruction = request.param
