@@ -360,73 +360,90 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
 
 
 class TestMultiplicative:
+    name = MUL
+    pick_type = PickType.MULTIPLICATIVE
+
     def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.instruction, similar_lists.list1)
-        assert ans == similar_lists.result_set[MUL][0]
+        ans = pick(similar_lists.instruction, similar_lists.list1, self.pick_type)
+        assert ans == similar_lists.result_set[self.name][0]
 
-        ans = pick(similar_lists.instruction, similar_lists.list2)
-        assert ans == similar_lists.result_set[MUL][1]
-
-    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
-        ans = pick(dicts_with_one_nested_list.instruction, dicts_with_one_nested_list.list1)
-        assert ans == dicts_with_one_nested_list.result_set[MUL][0]
-
-        ans = pick(dicts_with_one_nested_list.instruction, dicts_with_one_nested_list.list2)
-        assert ans == dicts_with_one_nested_list.result_set[MUL][1]
-
-    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        ans = pick(dict_with_two_nested_similar_lists_in_list.instruction,
-                   dict_with_two_nested_similar_lists_in_list.dict)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[MUL]
-
-    def test_dict_nested_dissimilar_lists_in_list(
-            self,
-            dict_with_two_nested_dissimilar_lists_in_list
-    ):
-        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.instruction,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[MUL]
-
-    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        ans = pick(two_nested_lists_under_keys.instruction, two_nested_lists_under_keys.dict)
-        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[MUL])
-
-
-class TestTandem:
-    def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.instruction, similar_lists.list1, PickType.TANDEM)
-        assert ans == similar_lists.result_set[TAN][0]
-
-        ans = pick(similar_lists.instruction, similar_lists.list2, PickType.TANDEM)
-        assert ans == similar_lists.result_set[TAN][1]
+        ans = pick(similar_lists.instruction, similar_lists.list2, self.pick_type)
+        assert ans == similar_lists.result_set[self.name][1]
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
         ans = pick(dicts_with_one_nested_list.instruction,
                    dicts_with_one_nested_list.list1,
-                   PickType.TANDEM)
-        assert ans == dicts_with_one_nested_list.result_set[TAN][0]
+                   self.pick_type)
+        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
 
         ans = pick(dicts_with_one_nested_list.instruction,
                    dicts_with_one_nested_list.list2,
-                   PickType.TANDEM)
-        assert ans == dicts_with_one_nested_list.result_set[TAN][1]
+                   self.pick_type)
+        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
         ans = pick(dict_with_two_nested_similar_lists_in_list.instruction,
                    dict_with_two_nested_similar_lists_in_list.dict,
-                   PickType.TANDEM)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[TAN]
+                   self.pick_type)
+        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
             dict_with_two_nested_dissimilar_lists_in_list
     ):
         ans = pick(dict_with_two_nested_dissimilar_lists_in_list.instruction,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[TAN]
+                   dict_with_two_nested_dissimilar_lists_in_list.dict,
+                   self.pick_type)
+        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
+
+    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
+        ans = pick(two_nested_lists_under_keys.instruction,
+                   two_nested_lists_under_keys.dict,
+                   self.pick_type)
+        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[self.name])
+
+
+class TestTandem:
+    name = TAN
+    pick_type = PickType.TANDEM
+
+    def test_simple_lists(self, similar_lists):
+        ans = pick(similar_lists.instruction, similar_lists.list1, self.pick_type)
+        assert ans == similar_lists.result_set[self.name][0]
+
+        ans = pick(similar_lists.instruction, similar_lists.list2, self.pick_type)
+        assert ans == similar_lists.result_set[self.name][1]
+
+    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+        ans = pick(dicts_with_one_nested_list.instruction,
+                   dicts_with_one_nested_list.list1,
+                   self.pick_type)
+        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
+
+        ans = pick(dicts_with_one_nested_list.instruction,
+                   dicts_with_one_nested_list.list2,
+                   self.pick_type)
+        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
+
+    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
+        ans = pick(dict_with_two_nested_similar_lists_in_list.instruction,
+                   dict_with_two_nested_similar_lists_in_list.dict,
+                   self.pick_type)
+        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
+
+    def test_dict_nested_dissimilar_lists_in_list(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list
+    ):
+        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.instruction,
+                   dict_with_two_nested_dissimilar_lists_in_list.dict,
+                   self.pick_type)
+        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
         ans = pick(two_nested_lists_under_keys.instruction,
                    two_nested_lists_under_keys.dict,
                    PickType.TANDEM)
         compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[TAN])
+                   self.pick_type)
+        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[self.name])
