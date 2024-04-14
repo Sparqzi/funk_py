@@ -27,10 +27,13 @@ OutputMapType = (
                              'list',
                              'csv',
                              'yaml']]]])
+PickProcessFunc = Callable[[list, list, dict], None]
+PickFinalFunc = Callable[[list, dict], None]
+
 
 class PickType(IntEnum):
     MULTIPLICATIVE = 0
-    AGGREGATION = 1
+    TANDEM = 1
 
 
 main_logger.info('Finished setting up simple types.')
@@ -42,7 +45,23 @@ def pick(
         list_handling_method: PickType = PickType.MULTIPLICATIVE
 ) -> list:
     if list_handling_method == PickType.MULTIPLICATIVE:
-        return _pick_multiplicative(output_map, _input)
+        return _pick(
+            output_map,
+            _input,
+            _mul_tan_start_and_list_func,
+            _mul_tan_start_and_list_func,
+            _mul_iter_func,
+            _mul_tan_final_func
+        )
+    elif list_handling_method == PickType.TANDEM:
+        return _pick(
+            output_map,
+            _input,
+            _mul_tan_start_and_list_func,
+            _mul_tan_start_and_list_func,
+            _tan_iter_func,
+            _mul_tan_final_func
+        )
 
 
 def _pick_setup(
@@ -147,7 +166,68 @@ def _pick_iter(
     yield None, None, True
 
 
-def _pick_multiplicative_func(ans: list, builder: list, static_builder: dict) -> None:
+def _pick(
+        output_map: OutputMapType,
+        _input: Any,
+        start_func: PickProcessFunc,
+        list_func: PickProcessFunc,
+        iter_func: PickProcessFunc,
+        final_func: PickFinalFunc
+) -> list:
+    """
+    The core of :func:`pick`. All pick types run through this method.
+
+    :param output_map: The map which describes how incoming data should be parsed.
+    :param _input: The incoming data.
+    :param start_func: The function that should be used when parsing a list of results for ingestion
+        into the list being built.
+    :param iter_func: The function that should be used to parse a list of results during iteration
+        over the ``output_map``.
+    :param final_func: The function which should be called to finalize the result at the end of
+        retrieving all possible data.
+    :return:
+    """
+    static_builder = {}
+    output_map, worker, builder, fail = _pick_setup(output_map, _input)
+    if fail or len(builder):
+        return builder
+
+    __pick = lambda o_map, w: _pick(o_map, w, start_func, list_func, iter_func, final_func)  # noqa
+
+    if isinstance(worker, list):
+        for item in worker:
+            list_func(__pick(output_map, item), builder, static_builder)
+
+    else:
+        output_map_iter = iter(output_map.items())
+        *instruction, return_now = _find_and_follow_first_path_in_pick(
+            output_map_iter, worker, builder, static_builder)
+        if return_now:
+            return builder
+
+        elif instruction[0] is not None:
+            # If instructions were given by _find_and_follow_first_path_in_pick, then we need to
+            # recursively call this function with the results.
+            start_func(__pick(*instruction), builder, static_builder)
+
+        pick_iter = _pick_iter(output_map_iter, worker, builder, static_builder, iter_func)
+
+        for *instruction, return_now in pick_iter:
+            if instruction[0] is not None:
+                # If instructions were given by pick_iter, then we need to recursively call this
+                # function and pass the results back to pick_iter.
+                pick_iter.send(__pick(*instruction))
+
+        final_func(builder, static_builder)
+
+    return builder
+
+
+def _mul_tan_start_and_list_func(ans: list, builder: list, static_builder: dict) -> None:
+    builder.extend(ans)
+
+
+def _mul_iter_func(ans: list, builder: list, static_builder: dict) -> None:
     if len(ans) != 1:
         for i in range(len(builder)):
             for _ans in ans[1:]:
@@ -162,41 +242,22 @@ def _pick_multiplicative_func(ans: list, builder: list, static_builder: dict) ->
             source.update(ans[0])
 
 
-def _pick_multiplicative(output_map: OutputMapType, _input: Any) -> list:
-    static_builder = {}
-    output_map, worker, builder, fail = _pick_setup(output_map, _input)
-    if fail or len(builder):
-        return builder
+def _mul_tan_final_func(builder: list, static_builder: dict) -> None:
+    for result in builder:
+        result.update(static_builder)
 
-    if isinstance(worker, list):
-        for item in worker:
-            builder.extend(_pick_multiplicative(output_map, item))
+
+def _tan_iter_func(ans: list, builder: list, static_builder: dict) -> None:
+    if len(builder) >= len(ans):
+        for i in range(len(ans)):
+            builder[i].update(ans[i])
 
     else:
-        output_map_iter = iter(output_map.items())
-        *instruction, return_now = _find_and_follow_first_path_in_pick(
-            output_map_iter, worker, builder, static_builder)
-        if return_now:
-            return builder
+        for i in range(len(builder)):
+            builder[i].update(ans[i])
 
-        elif instruction[0] is not None:
-            # If instructions were given by _find_and_follow_first_path_in_pick, then we need to
-            # recursively call this function with the results.
-            builder.extend(_pick_multiplicative(*instruction))
-
-        pick_iter = _pick_iter(
-            output_map_iter, worker, builder, static_builder, _pick_multiplicative_func)
-
-        for *instruction, return_now in pick_iter:
-            if instruction[0] is not None:
-                # If instructions were given by pick_iter, then we need to recursively call this
-                # function and pass the results back to pick_iter.
-                pick_iter.send(_pick_multiplicative(*instruction))
-
-        for result in builder:
-            result.update(static_builder)
-
-    return builder
+        for i in range(len(builder), len(ans)):
+            builder.append(ans[i])
 
 
 def parse_type_as(
@@ -233,7 +294,14 @@ def parse_type_as(
         raise ValueError('Invalid type specified.')
 
 
-def csv_to_json(data: str):
+def csv_to_json(data: str) -> list:
+    """
+    Converts a CSV string to a list of json dicts. Will use the first row as the keys for all other
+    rows.
+
+    :param data: The ``str`` to be converted.
+    :return: A list of the rows as dictionaries.
+    """
     builder = []
     csv_reader = csv.reader(io.StringIO(data))
     headers = [header.strip() for header in next(csv_reader)]

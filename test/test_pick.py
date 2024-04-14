@@ -8,7 +8,11 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from funk_py.sorting.pieces import pick
+from funk_py.sorting.pieces import pick, PickType
+
+MUL = 'multiplicative'
+TAN = 'tandem'
+
 
 KEYS = ['k' + str(i) for i in range(100)]
 OUT_KEYS = ['o' + str(i) for i in range(100)]
@@ -121,11 +125,13 @@ def make_yaml_list(keys: List[str], *val_sets: list) -> str:
     return yaml.dump(make_json_list(keys, *val_sets))
 
 
-ListSet = namedtuple('ListSet', ('list1', 'list2', 'instruction', 'result1', 'result2'))
-DictSet = namedtuple('DictSet', ('dict', 'instruction', 'result'))
+SimpleDirection = namedtuple('SimpleDirection', ('func', 'instruction'))
+ListSet = namedtuple('ListSet', ('list1', 'list2', 'instruction', 'result_set'))
+ListBase = namedtuple('ListCommand', ('func', 'instruction', 'keys', 'vals'))
+DictSet = namedtuple('DictSet', ('dict', 'instruction', 'result_set'))
 
 
-@pytest.fixture(params=(
+list_fixture = pytest.fixture(params=(
     (make_json_list, None),
     (make_json_list_str, 'json'),
     (make_jsonl_list, 'jsonl'),
@@ -144,6 +150,9 @@ DictSet = namedtuple('DictSet', ('dict', 'instruction', 'result'))
     'spacy csv lists',
     'yaml lists',
 ))
+
+
+@list_fixture
 def similar_lists(request):
     func, instruction = request.param
     list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
@@ -159,28 +168,50 @@ def similar_lists(request):
     result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
     result2 = make_json_list(OUT_KEYS[:3], VALS4, VALS5, VALS6)
 
-    return ListSet(list1, list2, _instruction, result1, result2)
+    return ListSet(list1, list2, _instruction, {
+        MUL: [result1, result2],
+        TAN: [result1, result2],
+    })
 
 
-@pytest.fixture(params=(
-    (make_json_list, None),
-    (make_json_list_str, 'json'),
-    (make_jsonl_list, 'jsonl'),
-    (make_xml_list_attr, 'xml'),
-    (make_xml_list_no_attr, 'xml-sa'),
-    (make_csv, 'csv'),
-    (make_spacy_csv, 'csv'),
-    (make_yaml_list, 'yaml'),
-), ids=(
-    'regular lists',
-    'json string lists',
-    'jsonl string',
-    'xml with attributes lists',
-    'xml without attributes lists',
-    'csv lists',
-    'spacy csv lists',
-    'yaml lists',
-))
+# @pytest.fixture(params=(
+#     (make_json_list, None),
+#     (make_json_list_str, 'json'),
+#     (make_jsonl_list, 'jsonl'),
+#     (make_xml_list_attr, 'xml'),
+#     (make_xml_list_no_attr, 'xml-sa'),
+#     (make_csv, 'csv'),
+#     (make_spacy_csv, 'csv'),
+#     (make_yaml_list, 'yaml'),
+# ), ids=(
+#     'regular lists',
+#     'json string lists',
+#     'jsonl string',
+#     'xml with attributes lists',
+#     'xml without attributes lists',
+#     'csv lists',
+#     'spacy csv lists',
+#     'yaml lists',
+# ))
+# def similar_lists(request):
+#     func, instruction = request.param
+#     list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
+#     list2 = func(KEYS[:3], VALS4, VALS5, VALS6)
+#     _instruction = dict(zip(KEYS[:3], OUT_KEYS[:3]))
+#     if instruction is not None:
+#         if instruction in ('xml', 'xml-sa'):
+#             _instruction = [instruction, {DATA_KEY1: {DATA_KEY2: _instruction}}]
+#
+#         else:
+#             _instruction = [instruction, _instruction]
+#
+#     result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
+#     result2 = make_json_list(OUT_KEYS[:3], VALS4, VALS5, VALS6)
+#
+#     return ListSet(list1, list2, _instruction, result1, result2)
+
+
+@list_fixture
 def dissimilar_lists(request):
     func, instruction = request.param
     list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
@@ -201,10 +232,13 @@ def dissimilar_lists(request):
     result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
     result2 = make_json_list(OUT_KEYS[3:6], VALS4, VALS5, VALS6)
 
-    return ListSet(list1, list2, _instruction, result1, result2)
+    return ListSet(list1, list2, _instruction, {
+        MUL: [result1, result2],
+        TAN: [result1, result2],
+    })
 
 
-@pytest.fixture(params=(
+dict_fixture = pytest.fixture(params=(
     (make_json_dict, None),
     (make_json_dict_str, 'json'),
     (make_xml_dict_attr, 'xml'),
@@ -217,6 +251,9 @@ def dissimilar_lists(request):
     'xml without attributes dict',
     'yaml dict',
 ))
+
+
+@dict_fixture
 def dicts_with_one_nested_list(request, similar_lists):
     func, instruction = request.param
     dict1 = func([KEYS[3]], similar_lists.list1)
@@ -235,22 +272,13 @@ def dicts_with_one_nested_list(request, similar_lists):
     else:
         _instruction = {KEYS[3]: _instruction}
 
-    return ListSet(dict1, dict2, _instruction, similar_lists.result1, similar_lists.result2)
+    return ListSet(dict1, dict2, _instruction, {
+        MUL: similar_lists.result_set[MUL],
+        TAN: similar_lists.result_set[TAN],
+    })
 
 
-@pytest.fixture(params=(
-    (make_json_dict, None),
-    (make_json_dict_str, 'json'),
-    (make_xml_dict_attr, 'xml'),
-    (make_xml_dict_no_attr, 'xml-sa'),
-    (make_yaml_dict, 'yaml'),
-), ids=(
-    'regular dict',
-    'json string dict',
-    'xml with attributes dict',
-    'xml without attributes dict',
-    'yaml dict',
-))
+@dict_fixture
 def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
     func, instruction = request.param
     _dict = func([KEYS[6]], [similar_lists.list1, similar_lists.list2])
@@ -265,22 +293,15 @@ def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
     else:
         _instruction = {KEYS[6]: _instruction}
 
-    return DictSet(_dict, _instruction, similar_lists.result1 + similar_lists.result2)
+    res = similar_lists.result_set[MUL]
+
+    return DictSet(_dict, _instruction, {
+        MUL: res[0] + res[1],
+        TAN: res[0] + res[1],
+    })
 
 
-@pytest.fixture(params=(
-    (make_json_dict, None),
-    (make_json_dict_str, 'json'),
-    (make_xml_dict_attr, 'xml'),
-    (make_xml_dict_no_attr, 'xml-sa'),
-    (make_yaml_dict, 'yaml'),
-), ids=(
-    'regular dict',
-    'json string dict',
-    'xml with attributes dict',
-    'xml without attributes dict',
-    'yaml dict',
-))
+@dict_fixture
 def dict_with_two_nested_dissimilar_lists_in_list(request, dissimilar_lists):
     func, instruction = request.param
     _dict = func([KEYS[6]], [dissimilar_lists.list1, dissimilar_lists.list2])
@@ -312,28 +333,19 @@ def dict_with_two_nested_dissimilar_lists_in_list(request, dissimilar_lists):
     else:
         _instruction = {KEYS[6]: _instruction}
 
-    return DictSet(_dict, _instruction, dissimilar_lists.result1 + dissimilar_lists.result2)
+    res = dissimilar_lists.result_set[MUL]
+
+    return DictSet(_dict, _instruction, {
+        MUL: res[0] + res[1],
+        TAN: res[0] + res[1],
+    })
 
 
-@pytest.fixture(params=(
-        (make_json_dict, None),
-        (make_json_dict_str, 'json'),
-        (make_xml_dict_attr, 'xml'),
-        (make_xml_dict_no_attr, 'xml-sa'),
-        (make_yaml_dict, 'yaml'),
-), ids=(
-        'regular dict',
-        'json string dict',
-        'xml with attributes dict',
-        'xml without attributes dict',
-        'yaml dict',
-))
+@dict_fixture
 def two_nested_lists_under_keys(request, dissimilar_lists):
     func, instruction = request.param
     _dict = func(KEYS[6:8], dissimilar_lists.list1, dissimilar_lists.list2)
     _instruction1, _instruction2 = dissimilar_lists.instruction
-    t = None
-
     if instruction is not None:
         if instruction in ('xml', 'xml-sa'):
             if isinstance(_instruction1, dict):
@@ -364,35 +376,45 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
     else:
         _instruction = {KEYS[6]: _instruction1, KEYS[7]: _instruction2}
 
-    result = []
-    for result1 in dissimilar_lists.result1:
-        for result2 in dissimilar_lists.result2:
+    mul_result = []
+    res = dissimilar_lists.result_set[MUL]
+    for result1 in res[0]:
+        for result2 in res[1]:
             copier = result1.copy()
             copier.update(result2)
-            result.append(copier)
+            mul_result.append(copier)
 
-    return DictSet(_dict, _instruction, result)
+    tan_result = []
+    for i in range(len(res[0])):
+        copier = res[0][i].copy()
+        copier.update(res[1][i])
+        tan_result.append(copier)
+
+    return DictSet(_dict, _instruction, {
+        MUL: mul_result,
+        TAN: tan_result,
+    })
 
 
 class TestMultiplicative:
     def test_simple_lists(self, similar_lists):
         ans = pick(similar_lists.instruction, similar_lists.list1)
-        assert ans == similar_lists.result1
+        assert ans == similar_lists.result_set[MUL][0]
 
         ans = pick(similar_lists.instruction, similar_lists.list2)
-        assert ans == similar_lists.result2
+        assert ans == similar_lists.result_set[MUL][1]
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
         ans = pick(dicts_with_one_nested_list.instruction, dicts_with_one_nested_list.list1)
-        assert ans == dicts_with_one_nested_list.result1
+        assert ans == dicts_with_one_nested_list.result_set[MUL][0]
 
         ans = pick(dicts_with_one_nested_list.instruction, dicts_with_one_nested_list.list2)
-        assert ans == dicts_with_one_nested_list.result2
+        assert ans == dicts_with_one_nested_list.result_set[MUL][1]
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
         ans = pick(dict_with_two_nested_similar_lists_in_list.instruction,
                    dict_with_two_nested_similar_lists_in_list.dict)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result
+        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[MUL]
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
@@ -400,8 +422,48 @@ class TestMultiplicative:
     ):
         ans = pick(dict_with_two_nested_dissimilar_lists_in_list.instruction,
                    dict_with_two_nested_dissimilar_lists_in_list.dict)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result
+        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[MUL]
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
         ans = pick(two_nested_lists_under_keys.instruction, two_nested_lists_under_keys.dict)
-        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result)
+        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[MUL])
+
+
+class TestTandem:
+    def test_simple_lists(self, similar_lists):
+        ans = pick(similar_lists.instruction, similar_lists.list1, PickType.TANDEM)
+        assert ans == similar_lists.result_set[TAN][0]
+
+        ans = pick(similar_lists.instruction, similar_lists.list2, PickType.TANDEM)
+        assert ans == similar_lists.result_set[TAN][1]
+
+    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+        ans = pick(dicts_with_one_nested_list.instruction,
+                   dicts_with_one_nested_list.list1,
+                   PickType.TANDEM)
+        assert ans == dicts_with_one_nested_list.result_set[TAN][0]
+
+        ans = pick(dicts_with_one_nested_list.instruction,
+                   dicts_with_one_nested_list.list2,
+                   PickType.TANDEM)
+        assert ans == dicts_with_one_nested_list.result_set[TAN][1]
+
+    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
+        ans = pick(dict_with_two_nested_similar_lists_in_list.instruction,
+                   dict_with_two_nested_similar_lists_in_list.dict,
+                   PickType.TANDEM)
+        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[TAN]
+
+    def test_dict_nested_dissimilar_lists_in_list(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list
+    ):
+        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.instruction,
+                   dict_with_two_nested_dissimilar_lists_in_list.dict)
+        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[TAN]
+
+    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
+        ans = pick(two_nested_lists_under_keys.instruction,
+                   two_nested_lists_under_keys.dict,
+                   PickType.TANDEM)
+        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[TAN])
