@@ -337,75 +337,37 @@ def _pick(
     return builder
 
 
-def _mul_tan_start_and_list_func(ans: list, builder: list, static_builder: dict) -> None:
-    builder.extend(ans)
+def parse_type_as(_type: OutputMapSpecifier, data: Any) -> Union[dict, list]:
+    match _type:
+        case 'json':
+            return json.loads(data)
 
+        case 'jsonl':
+            return jsonl_to_json(data)
 
-def _mul_iter_func(ans: list, builder: list, static_builder: dict) -> None:
-    if len(ans) != 1:
-        for i in range(len(builder)):
-            for _ans in ans[1:]:
-                copier = builder[i].copy()
-                copier.update(_ans)
-                builder.append(copier)
+        case 'json\'':
+            return wonky_json_to_json(data)
 
-            builder[i].update(ans[0])
+        case 'xml':
+            return xml_to_json(data)
 
-    else:
-        for source in builder:
-            source.update(ans[0])
+        case 'xml-sa':
+            return xml_to_json(data, True)
 
+        case 'e-list':
+            return data if isinstance(data, list) else [data]
 
-def _mul_tan_final_func(builder: list, static_builder: dict) -> None:
-    for result in builder:
-        result.update(static_builder)
+        case 'csv':
+            return csv_to_json(data)
 
+        case 'list':
+            return data.split(',')
 
-def _tan_iter_func(ans: list, builder: list, static_builder: dict) -> None:
-    if len(builder) >= len(ans):
-        for i in range(len(ans)):
-            builder[i].update(ans[i])
+        case 'yaml':
+            return yaml.safe_load(data)
 
-    else:
-        for i in range(len(builder)):
-            builder[i].update(ans[i])
-
-        for i in range(len(builder), len(ans)):
-            builder.append(ans[i])
-
-
-def parse_type_as(
-        _type: Literal['json', 'xml', 'xml-sa', 'e-list', 'list', 'csv', 'yaml'],
-        data: Any) -> Union[dict, list]:
-    if _type == 'json':
-        return json.loads(data)
-
-    elif _type == 'jsonl':
-        return jsonl_to_json(data)
-
-    elif _type == 'json\'':
-        return wonky_json_to_json(data)
-
-    elif _type == 'xml':
-        return xml_to_json(data)
-
-    elif _type == 'xml-sa':
-        return xml_to_json(data, True)
-
-    elif _type == 'e-list':
-        return data if isinstance(data, list) else [data]
-
-    elif _type == 'csv':
-        return csv_to_json(data)
-
-    elif _type == 'list':
-        return data.split(',')
-
-    elif _type == 'yaml':
-        return yaml.safe_load(data)
-
-    else:
-        raise ValueError('Invalid type specified.')
+        case _:
+            raise ValueError('Invalid type specified.')
 
 
 def csv_to_json(data: str) -> list:
