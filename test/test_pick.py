@@ -42,19 +42,19 @@ def compare_lists_of_dicts_unordered(list1, list2):
 
 
 def make_csv(keys: List[str], *val_sets: list) -> str:
-    builder = ','.join(keys)
+    builder = ','.join(key if ',' not in key else f'"{key}"' for key in keys)
     for vals in zip(*val_sets):
         builder += '\n'
-        builder += ','.join(vals)
+        builder += ','.join(val if ',' not in val else f'"{val}"' for val in vals)
 
     return builder
 
 
 def make_spacy_csv(keys: List[str], *val_sets: list) -> str:
-    builder = ', '.join(keys)
+    builder = ', '.join(key if ',' not in key else f'"{key}"' for key in keys)
     for vals in zip(*val_sets):
         builder += '\n'
-        builder += ', '.join(vals)
+        builder += ','.join(f' {val}' if ',' not in val else f'"{val}"' for val in vals)
 
     return builder
 
