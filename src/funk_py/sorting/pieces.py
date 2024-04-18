@@ -26,7 +26,7 @@ PickFinalFunc = Callable[[list, dict], None]
 
 
 class PickType(IntEnum):
-    MULTIPLICATIVE = 0
+    COMBINATORIAL = 0
     TANDEM = 1
     REDUCE = 2
     ACCUMULATE = 3

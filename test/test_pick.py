@@ -10,7 +10,7 @@ import pytest
 
 from funk_py.sorting.pieces import pick, PickType
 
-MUL = 'multiplicative'
+COM = 'combinatorial'
 TAN = 'tandem'
 RED = 'reduce'
 ACC = 'accumulate'
@@ -260,7 +260,7 @@ def more_dissimilar_lists(request):
     result2 = make_json_list(OUT_KEYS[9:12], VALS10, VALS11, VALS12)
 
     return ListSet(list1, list2, _output_map, {
-        MUL: [result1, result2],
+        COM: [result1, result2],
         TAN: [result1, result2],
         RED: [[result1[2]], [result2[2]]],
         ACC: [
@@ -291,11 +291,6 @@ def dicts_with_one_nested_list(request, similar_lists):
     func, output_map = request.param
     dict1 = func([KEYS[3]], similar_lists.list1)
     dict2 = func([KEYS[3]], similar_lists.list2)
-    _instruction = similar_lists.instruction
-    if instruction is not None:
-        if instruction in ('xml', 'xml-sa'):
-            if type(similar_lists.instruction) is dict:
-                _instruction = ['json', _instruction]
     _output_map = similar_lists.output_map
     if output_map is not None:
         if output_map == 'xml':
@@ -319,7 +314,7 @@ def dicts_with_one_nested_list(request, similar_lists):
         _output_map = {KEYS[3]: _output_map}
 
     return ListSet(dict1, dict2, _output_map, {
-        MUL: similar_lists.result_set[MUL],
+        COM: similar_lists.result_set[COM],
         TAN: similar_lists.result_set[TAN],
         RED: similar_lists.result_set[RED],
         ACC: similar_lists.result_set[ACC],
@@ -349,18 +344,13 @@ def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
 
         _output_map = [output_map, _output_map]
 
-        else:
-            _instruction = [instruction, {KEYS[6]: _instruction}]
-
-    else:
-        _instruction = {KEYS[6]: _instruction}
     else:
         _output_map = {KEYS[6]: _output_map}
 
-    res = similar_lists.result_set[MUL]
+    res = similar_lists.result_set[COM]
 
     return DictSet(_dict, _output_map, {
-        MUL: res[0] + res[1],
+        COM: res[0] + res[1],
         TAN: res[0] + res[1],
         RED: [res[1][2]],
         ACC: [dict(zip(OUT_KEYS[:3], [VALS1 + VALS4, VALS2 + VALS5, VALS3 + VALS6]))],
@@ -400,14 +390,14 @@ def dict_with_two_nested_dissimilar_lists_in_list(request, dissimilar_lists):
     else:
         _output_map = {KEYS[6]: _output_map}
 
-    res = dissimilar_lists.result_set[MUL]
+    res = dissimilar_lists.result_set[COM]
 
     copier = res[0][2].copy()
     copier.update(res[1][2])
     red_result = [copier]
 
     return DictSet(_dict, _output_map, {
-        MUL: res[0] + res[1],
+        COM: res[0] + res[1],
         TAN: res[0] + res[1],
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
@@ -441,7 +431,7 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
         _output_map = {KEYS[6]: _output_map1, KEYS[7]: _output_map2}
 
     mul_result = []
-    res = dissimilar_lists.result_set[MUL]
+    res = dissimilar_lists.result_set[COM]
     for result1 in res[0]:
         for result2 in res[1]:
             copier = result1.copy()
@@ -459,7 +449,7 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
     red_result = [copier]
 
     return DictSet(_dict, _output_map, {
-        MUL: mul_result,
+        COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
@@ -491,7 +481,7 @@ def dict_with_list_of_dicts(request):
         tan_result.append({OUT_KEYS[6 + i]: VALS2[i]})
 
     return DictSet(_input, output_map, {
-        MUL: mul_result,
+        COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: acc_result,
@@ -526,7 +516,7 @@ def two_nested_lists_under_double_keys(request, dissimilar_lists):
         _output_map = {KEYS[6]: {KEYS[8]: _output_map1}, KEYS[7]: {KEYS[9]: _output_map2}}
 
     mul_result = []
-    res = dissimilar_lists.result_set[MUL]
+    res = dissimilar_lists.result_set[COM]
     for result1 in res[0]:
         for result2 in res[1]:
             copier = result1.copy()
@@ -544,7 +534,7 @@ def two_nested_lists_under_double_keys(request, dissimilar_lists):
     red_result = [copier]
 
     return DictSet(_dict, _output_map, {
-        MUL: mul_result,
+        COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
@@ -590,8 +580,8 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
         }
 
     mul_result = []
-    res1 = dissimilar_lists.result_set[MUL]
-    res2 = more_dissimilar_lists.result_set[MUL]
+    res1 = dissimilar_lists.result_set[COM]
+    res2 = more_dissimilar_lists.result_set[COM]
 
     for result1 in res1[0]:
         for result2 in res1[1]:
@@ -618,7 +608,7 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
     red_result = [copier]
 
     return DictSet(_dict, _output_map, {
-        MUL: mul_result,
+        COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:12], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6,
@@ -627,8 +617,8 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
 
 
 class TestMultiplicative:
-    name = MUL
-    pick_type = PickType.MULTIPLICATIVE
+    name = COM
+    pick_type = PickType.COMBINATORIAL
 
     def test_simple_lists(self, similar_lists):
         ans = pick(similar_lists.output_map, similar_lists.list1, self.pick_type)
