@@ -14,19 +14,13 @@ from funk_py.modularity.logging import make_logger
 main_logger = make_logger('pieces', 'PIECES_LOG_LEVEL', default_level='warning')
 
 main_logger.info('Setting up simple types...')
-OutputMapType = (
-    Union[Mapping,
-          List[Union[str,
-                     Mapping,
-                     Literal['json',
-                             'jsonl',
-                             'json\'',
-                             'xml',
-                             'xml-sa',
-                             'e-list',
-                             'list',
+OutputMapSpecifier = Literal['json', 'jsonl', 'json\'',
+                             'xml', 'xml-sa',
+                             'e-list', 'list',
                              'csv',
-                             'yaml']]]])
+                             'yaml',
+                             'combinatorial', 'tandem', 'reduce', 'accumulate']
+OutputMapType = Union[Mapping, List[Union[str, Mapping, OutputMapSpecifier]]]
 PickProcessFunc = Callable[[list, list, dict], None]
 PickFinalFunc = Callable[[list, dict], None]
 
@@ -34,40 +28,140 @@ PickFinalFunc = Callable[[list, dict], None]
 class PickType(IntEnum):
     MULTIPLICATIVE = 0
     TANDEM = 1
+    REDUCE = 2
+    ACCUMULATE = 3
 
 
 main_logger.info('Finished setting up simple types.')
 
 
+def _com_tan_start_and_list_func(ans: list, builder: list, static_builder: dict) -> None:
+    builder.extend(ans)
+
+
+def _com_iter_func(ans: list, builder: list, static_builder: dict) -> None:
+    if (t := len(ans)) >= 1:
+        for i in range(len(builder)):
+            for _ans in ans[1:]:
+                copier = builder[i].copy()
+                copier.update(_ans)
+                builder.append(copier)
+
+            builder[i].update(ans[0])
+
+    elif t == 1:
+        for source in builder:
+            source.update(ans[0])
+
+
+def _com_tan_final_func(builder: list, static_builder: dict) -> None:
+    for result in builder:
+        result.update(static_builder)
+
+
+def _tan_iter_func(ans: list, builder: list, static_builder: dict) -> None:
+    if len(ans) == 0:
+        return
+
+    if len(builder) >= len(ans):
+        for i in range(len(ans)):
+            builder[i].update(ans[i])
+
+    else:
+        for i in range(len(builder)):
+            builder[i].update(ans[i])
+
+        for i in range(len(builder), len(ans)):
+            builder.append(ans[i])
+
+
+def _acc_start_list_and_iter_func(ans: list, builder: list, static_builder: dict) -> None:
+    if not len(builder):
+        builder.extend(ans)
+
+    else:
+        for _ans in ans:
+            for k, v in _ans.items():
+                if k in builder[0]:
+                    if isinstance(v, list):
+                        builder[0][k].extend(v)
+
+                    else:
+                        builder[0][k].append(v)
+
+                elif isinstance(v, list):
+                    builder[0][k] = v
+
+                else:
+                    builder[0][k] = [v]
+
+
+def _acc_final_func(builder: list, static_builder: dict) -> None:
+    if not len(builder):
+        builder.append(static_builder)
+
+    else:
+        for k, v in static_builder.items():
+            if k in builder[0]:
+                if isinstance(v, list):
+                    builder[0][k].extend(v)
+
+                else:
+                    builder[0][k].append(v)
+
+            elif isinstance(v, list):
+                builder[0][k] = v
+
+            else:
+                builder[0][k] = [v]
+
+
+_PICK_TYPE_DEFS = {
+    PickType.COMBINATORIAL: (
+        _com_tan_start_and_list_func,
+        _com_tan_start_and_list_func,
+        _com_iter_func,
+        _com_tan_final_func,
+    ),
+    PickType.TANDEM: (
+        _com_tan_start_and_list_func,
+        _com_tan_start_and_list_func,
+        _tan_iter_func,
+        _com_tan_final_func,
+    ),
+    PickType.REDUCE: (
+        _com_tan_start_and_list_func,
+        _tan_iter_func,
+        _com_iter_func,
+        _com_tan_final_func,
+    ),
+    PickType.ACCUMULATE: (
+        _acc_start_list_and_iter_func,
+        _acc_start_list_and_iter_func,
+        _acc_start_list_and_iter_func,
+        _acc_final_func,
+    ),
+}
+_PICK_TYPE_NAMES = {
+    'combinatorial': _PICK_TYPE_DEFS[PickType.COMBINATORIAL],
+    'tandem': _PICK_TYPE_DEFS[PickType.TANDEM],
+    'reduce': _PICK_TYPE_DEFS[PickType.REDUCE],
+    'accumulate': _PICK_TYPE_DEFS[PickType.ACCUMULATE],
+}
+
+
 def pick(
         output_map: OutputMapType,
         _input: Any,
-        list_handling_method: PickType = PickType.MULTIPLICATIVE
+        list_handling_method: PickType = PickType.COMBINATORIAL
 ) -> list:
-    if list_handling_method == PickType.MULTIPLICATIVE:
-        return _pick(
-            output_map,
-            _input,
-            _mul_tan_start_and_list_func,
-            _mul_tan_start_and_list_func,
-            _mul_iter_func,
-            _mul_tan_final_func
-        )
-    elif list_handling_method == PickType.TANDEM:
-        return _pick(
-            output_map,
-            _input,
-            _mul_tan_start_and_list_func,
-            _mul_tan_start_and_list_func,
-            _tan_iter_func,
-            _mul_tan_final_func
-        )
+    return _pick(output_map, _input, *_PICK_TYPE_DEFS[list_handling_method])
 
 
 def _pick_setup(
         output_map: OutputMapType,
         _input: Any
-) -> Tuple[Optional[OutputMapType], Any, list, bool]:
+) -> Tuple[Optional[OutputMapType], Any, list, bool, Optional[PickType]]:
     if isinstance(output_map, list):
         # If the output_map is a list, that should mean the user specified a type of conversion to
         # enact on the input (as long as their output_map is valid).
@@ -77,29 +171,34 @@ def _pick_setup(
             # so this branch won't execute, and we'll move over to the next step. If they didn't, we
             # continue on our mary way, and don't move forward on the output_map yet. We want to
             # pass the non-mutated _input as well since there's no mutation to be performed on it.
-            return output_map, _input, [], False
+            return output_map, _input, [], False, None
 
         else:
             # In the case that _input is not a list, we will just attempt to parse as the user
             # expected.
             try:
+                if (t := output_map[0]) in _PICK_TYPE_NAMES:
+                    # This should handle cases where the user specifies changing modes during
+                    # parsing.
+                    return output_map[1], _input, [], False, _PICK_TYPE_NAMES[t]
+
                 worker = parse_type_as(output_map[0], _input)
 
             except Exception as e:
                 main_logger.warning(f'User\'s expected parsing method failed. Exception raised: '
                                     f'{e}')
-                return None, None, [], True
+                return None, None, [], True, None
 
-            return output_map[1], worker, [], False
+            return output_map[1], worker, [], False, None
 
     elif isinstance(output_map, str):
         # Theoretically, we should never get here, but just in case, this line should catch
         # instances where a key is immediately requested. Who knows, maybe a change down the line
         # will cause this code to be needed.
-        return None, None, [{output_map: _input}], False
+        return None, None, [{output_map: _input}], False, None
 
     # If nothing caught, just pass everything back as-is.
-    return output_map, _input, [], False
+    return output_map, _input, [], False, None
 
 
 def _find_and_follow_first_path_in_pick(
@@ -130,6 +229,8 @@ def _find_and_follow_first_path_in_pick(
                     # This is done this way to limit how deep we go on the stack. It also means the
                     # caller can decide which function to call on the values.
                     return instruction, worker[path], False
+                    if isinstance(worker, dict):
+                        return instruction, worker[path], False
 
         except StopIteration:
             # Welp, the caller will have to return immediately, none of the paths requested were
@@ -148,10 +249,11 @@ def _pick_iter(
     Finishes iterating after the first path was successfully followed. Expects the result of an
     external function call to be sent to it if it yields an instruction.
     """
-    for path, instruction in output_map_iter:
-        if path in worker:
-            if isinstance(instruction, str):
-                static_builder[instruction] = worker[path]
+    if type(worker) is dict:
+        for path, instruction in output_map_iter:
+            if path in worker:
+                if isinstance(instruction, str):
+                    static_builder[instruction] = worker[path]
 
             else:
                 # Rather than recursively calling a function from inside of this function, we
@@ -160,8 +262,13 @@ def _pick_iter(
                 # caller can decide which function to call on the values.
                 # The caller should send the result of the function back to us here so that we can
                 # call func on it.
-                result = yield instruction, worker[path], False
-                func(result, builder, static_builder)
+                else:
+                    # Rather than recursively calling a function from inside of this function, we
+                    # pass back the values that the caller needs to use to call the function itself.
+                    # This is done this way to limit how deep we go on the stack. It also means the
+                    # caller can decide which function to call on the values.
+                    # The caller should send the result of the function back to us here so that we
+                    # can call func on it.
 
     yield None, None, True
 
@@ -188,9 +295,12 @@ def _pick(
     :return:
     """
     static_builder = {}
-    output_map, worker, builder, fail = _pick_setup(output_map, _input)
+    output_map, worker, builder, fail, new_mode = _pick_setup(output_map, _input)
     if fail or len(builder):
         return builder
+
+    elif new_mode is not None:
+        start_func, list_func, iter_func, final_func = new_mode
 
     __pick = lambda o_map, w: _pick(o_map, w, start_func, list_func, iter_func, final_func)  # noqa
 
