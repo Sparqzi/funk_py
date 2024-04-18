@@ -434,7 +434,49 @@ def dicts_with_one_nested_list(request, similar_lists):
 
 @dict_fixture
 def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
-    func, instruction = request.param
+    """
+    .. code-block:: python
+
+        input = {
+            'k6': [
+                [
+                    {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                    {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                    {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+                ],
+                [
+                    {'k0': 'v40', 'k1': 'v50', 'k2': 'v60'},
+                    {'k0': 'v41', 'k1': 'v51', 'k2': 'v61'},
+                    {'k0': 'v42', 'k1': 'v52', 'k2': 'v62'}
+                ]
+            ]
+        }
+        output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+        mul_result = [
+            {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+            {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+            {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+            {'o0': 'v40', 'o1': 'v50', 'o2': 'v60'},
+            {'o0': 'v41', 'o1': 'v51', 'o2': 'v61'},
+            {'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}
+        ]
+        tan_result = [
+            {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+            {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+            {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+            {'o0': 'v40', 'o1': 'v50', 'o2': 'v60'},
+            {'o0': 'v41', 'o1': 'v51', 'o2': 'v61'},
+            {'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}
+        ]
+        red_result = [{'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}]
+        acc_result = [
+            {
+                'o0': ['v10', 'v11', 'v12', 'v40', 'v41', 'v43'],
+                'o1': ['v20', 'v21', 'v22', 'v50', 'v51', 'v53'],
+                'o2': ['v30', 'v31', 'v32', 'v60', 'v61', 'v63'],
+            }
+        ]
+    """
     func, output_map = request.param
     _dict = func([KEYS[6]], [similar_lists.list1, similar_lists.list2])
     _output_map = similar_lists.output_map
