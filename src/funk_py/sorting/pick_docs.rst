@@ -1,0 +1,436 @@
+The Pick Function
+====================================================================================================
+
+This document is in reference to the *pick* function in :mod:`pieces`.
+
+The :func:`pick` function is used to pick attributes out of data into dictionaries following a
+user-defined format. It has multiple modes which each differently effect how it translates a given
+input, currently having four pre-defined :ref:`modes <mode-label>` as of the time of this document
+being made. Its core intent is to flatten complex maps down to one level. The modes primarily effect
+how lists are handled internally, but general, when a list is encountered where a key is specified,
+:func:`pick` should iterate over the list and continue following the ``output_map`` to find data
+within each item in the list.
+
+Modes
+----------------------------------------------------------------------------------------------------
+
+.. _mode-label:
+
+There are currently four modes available: :ref:`Combinatorial <combinatorial-label>`,
+:ref:`tandem <tandem-label>`, :ref:`reduce <reduce-label>`, and :ref:`accumulate <accumulate-label>`
+modes as of the time of this document being made. These modes can actually be switched between
+during parsing of a single piece of data based on user specification in the ``output_map``. Each of
+these modes change how :func:`pick` processes input.
+
+.. combinatorial-label:
+
+Combinatorial Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the mode ``PickType.COMBINATORIAL`` each element of one list is combined with every
+element of the other lists, one by one. This mode is designed to cover all possible combinations of
+elements from the lists. It applies combination only to lists under different keys. If lists are
+contained directly within another list, they will be concatenated into a longer list rather than
+combined the same way.
+
+.. tip::
+
+    Please keep in mind that using ``PickType.COMBINATORIAL`` does not guarantee results in a
+    a specific order.
+
+Examples:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Example 1:**
+
+.. code-block:: python
+
+    _input = {
+        'k3': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ]
+    }
+
+    output_map = {'k3': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'}
+    # ]
+
+**Example 2:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k0': 'v40', 'k1': 'v50', 'k2': 'v60'},
+                {'k0': 'v41', 'k1': 'v51', 'k2': 'v61'},
+                {'k0': 'v42', 'k1': 'v52', 'k2': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+    #     {'o0': 'v40', 'o1': 'v50', 'o2': 'v60'},
+    #     {'o0': 'v41', 'o1': 'v51', 'o2': 'v61'},
+    #     {'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}
+    # ]
+
+**Example 3:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2', 'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+    #     {'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}
+    # ]
+
+**Example 4:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ],
+        'k7': [
+            {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+            {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+            {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+        ]
+    }
+
+    output_map = {
+        'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'},
+        'k7': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}
+    }
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'}
+    # ]
+
+**Example 5:**
+
+.. code-block:: python
+
+    _input = {
+        'k0': {
+            'k1': [
+                {'k2': {'k3': 'v10'}},
+                {'k2': {'k4': 'v11'}},
+                {'k2': {'k5': 'v12'}},
+                {'k2': {'k6': 'v20'}},
+                {'k2': {'k7': 'v21'}},
+                {'k2': {'k8': 'v22'}}
+            ]
+        }
+    }
+
+    output_map = {
+        'k0': {
+            'k1': {
+                'k2': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5', 'k6': 'o6', 'k7': 'o7', 'k8': 'o8'}
+            }
+        }
+    }
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o3': 'v10'}, {'o4': 'v11'}, {'o5': 'v12'}, {'o6': 'v20'}, {'o7': 'v21'}, {'o8': 'v22'}
+    # ]
+
+**Example 6:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': {
+            'k8': [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ]
+        },
+        'k7': {
+            'k9': [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        }
+    }
+
+    output_map = {
+        'k6': {'k8': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}},
+        'k7': {'k9': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+    }
+
+    result = pick(output_map, _input, PickType.COMBINATORIAL)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'}
+    # ]
+
+.. _tandem-label:
+
+Tandem Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the mode ``PickType.TANDEM`` data will be picked simultaneously from each key. In other
+words, if there is a list of values, under ``key1`` and another list of values under ``key2``, the
+values obtained from those lists will be combined at the same index from each list.
+
+Examples:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Example 1:**
+
+.. code-block:: python
+
+    _input = {
+        'k3': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ]
+    }
+
+    output_map = {'k3': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'}
+    # ]
+
+**Example 2:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k0': 'v40', 'k1': 'v50', 'k2': 'v60'},
+                {'k0': 'v41', 'k1': 'v51', 'k2': 'v61'},
+                {'k0': 'v42', 'k1': 'v52', 'k2': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+    #     {'o0': 'v40', 'o1': 'v50', 'o2': 'v60'},
+    #     {'o0': 'v41', 'o1': 'v51', 'o2': 'v61'},
+    #     {'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}
+    # ]
+
+**Example 3:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2', 'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32'},
+    #     {'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}
+    # ]
+
+**Example 4:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ],
+        'k7': [
+            {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+            {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+            {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+        ]
+    }
+
+    output_map = {
+        'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'},
+        'k7': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}
+    }
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}
+    # ]
+
+**Example 5:**
+
+.. code-block:: python
+
+    _input = {
+        'k0': {
+            'k1': [
+                {'k2': {'k3': 'v10'}},
+                {'k2': {'k4': 'v11'}},
+                {'k2': {'k5': 'v12'}},
+                {'k2': {'k6': 'v20'}},
+                {'k2': {'k7': 'v21'}},
+                {'k2': {'k8': 'v22'}}
+            ]
+        }
+    }
+
+    output_map = {
+        'k0': {
+            'k1': {
+                'k2': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5', 'k6': 'o6', 'k7': 'o7', 'k8': 'o8'}
+            }
+        }
+    }
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o3': 'v10'}, {'o4': 'v11'}, {'o5': 'v12'}, {'o6': 'v20'}, {'o7': 'v21'}, {'o8': 'v22'}
+    # ]
+
+**Example 6:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': {
+            'k8': [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ]
+        },
+        'k7': {
+            'k9': [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        }
+    }
+
+    output_map = {
+        'k6': {'k8': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}},
+        'k7': {'k9': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+    }
+
+    result = pick(output_map, _input, PickType.TANDEM)
+
+    # result == [
+    #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60'},
+    #     {'o0': 'v11', 'o1': 'v21', 'o2': 'v31', 'o3': 'v41', 'o4': 'v51', 'o5': 'v61'},
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}
+    # ]
+
+.. _reduce-label:
+
+Reduce Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bonjour
+
+.. _accumulate-label:
+
+Accumulate Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Gentlemen
