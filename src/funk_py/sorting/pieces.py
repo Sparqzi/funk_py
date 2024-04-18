@@ -228,9 +228,10 @@ def _find_and_follow_first_path_in_pick(
                     # pass back the values that the caller needs to use to call the function itself.
                     # This is done this way to limit how deep we go on the stack. It also means the
                     # caller can decide which function to call on the values.
-                    return instruction, worker[path], False
                     if isinstance(worker, dict):
                         return instruction, worker[path], False
+
+                    main_logger.warning(f'Path ended early. {repr(worker)} does not have keys.')
 
         except StopIteration:
             # Welp, the caller will have to return immediately, none of the paths requested were
@@ -255,13 +256,6 @@ def _pick_iter(
                 if isinstance(instruction, str):
                     static_builder[instruction] = worker[path]
 
-            else:
-                # Rather than recursively calling a function from inside of this function, we
-                # pass back the values that the caller needs to use to call the function itself.
-                # This is done this way to limit how deep we go on the stack. It also means the
-                # caller can decide which function to call on the values.
-                # The caller should send the result of the function back to us here so that we can
-                # call func on it.
                 else:
                     # Rather than recursively calling a function from inside of this function, we
                     # pass back the values that the caller needs to use to call the function itself.
@@ -269,6 +263,16 @@ def _pick_iter(
                     # caller can decide which function to call on the values.
                     # The caller should send the result of the function back to us here so that we
                     # can call func on it.
+                    result = yield instruction, worker[path], False
+                    try:
+                        func(result, builder, static_builder)
+
+                    except Exception as e:
+                        main_logger.warning(f'There was an error when attempting to process a '
+                                            f'result. Exception raised: {e}')
+
+    else:
+        main_logger.warning(f'Cannot follow a path in a non-dict. ({worker})')
 
     yield None, None, True
 
