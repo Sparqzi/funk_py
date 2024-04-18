@@ -195,7 +195,7 @@ def similar_lists(request):
     result2 = make_json_list(OUT_KEYS[:3], VALS4, VALS5, VALS6)
 
     return ListSet(list1, list2, _output_map, {
-        MUL: [result1, result2],
+        COM: [result1, result2],
         TAN: [result1, result2],
         RED: [[result1[2]], [result2[2]]],
         ACC: [
@@ -228,7 +228,7 @@ def dissimilar_lists(request):
     result2 = make_json_list(OUT_KEYS[3:6], VALS4, VALS5, VALS6)
 
     return ListSet(list1, list2, _output_map, {
-        MUL: [result1, result2],
+        COM: [result1, result2],
         TAN: [result1, result2],
         RED: [[result1[2]], [result2[2]]],
         ACC: [
