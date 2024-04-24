@@ -9,12 +9,14 @@ input, currently having four pre-defined :ref:`modes <mode-label>` as of the tim
 being made. Its core intent is to flatten complex maps down to one level. The modes primarily effect
 how lists are handled internally, but general, when a list is encountered where a key is specified,
 :func:`pick` should iterate over the list and continue following the ``output_map`` to find data
-within each item in the list.
+within each item in the list. It further has several available
+:ref:`special instructions <instruction-label>` which can be used to specify means to decode
+strings to lists and dictionaries.
+
+.. _mode-label:
 
 Modes
 ----------------------------------------------------------------------------------------------------
-
-.. _mode-label:
 
 There are currently four modes available: :ref:`Combinatorial <combinatorial-label>`,
 :ref:`tandem <tandem-label>`, :ref:`reduce <reduce-label>`, and :ref:`accumulate <accumulate-label>`
@@ -22,7 +24,7 @@ modes as of the time of this document being made. These modes can actually be sw
 during parsing of a single piece of data based on user specification in the ``output_map``. Each of
 these modes change how :func:`pick` processes input.
 
-.. combinatorial-label:
+.. _combinatorial-label:
 
 Combinatorial Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -710,7 +712,7 @@ Examples:
 
     output_map = {'k3': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o0': 'v12', 'o1': 'v22', 'o2': 'v32'}]
 
@@ -735,7 +737,7 @@ Examples:
 
     output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o0': 'v42', 'o1': 'v52', 'o2': 'v62'}]
 
@@ -786,7 +788,7 @@ Examples:
         'k7': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}
     }
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}]
 
@@ -815,7 +817,7 @@ Examples:
         }
     }
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o3': 'v10', 'o4': 'v11', 'o5': 'v12', 'o6': 'v20', 'o7': 'v21', 'o8': 'v22'}]
 
@@ -845,7 +847,7 @@ Examples:
         'k7': {'k9': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
     }
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}]
 
@@ -891,15 +893,327 @@ Examples:
         }
     }
 
-    result = pick(output_map, _input, PickType.COMBINATORIAL)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [
-        {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62',
-         'o6': 'v72', 'o7': 'v82', 'o8': 'v92', 'o9': 'v102', 'o10': 'v112', 'o11': 'v122'}
-    ]
+    #     {'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62',
+    #      'o6': 'v72', 'o7': 'v82', 'o8': 'v92', 'o9': 'v102', 'o10': 'v112', 'o11': 'v122'}
+    # ]
 
 .. _accumulate-label:
 
 Accumulate Mode
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Gentlemen
+When using the mode ``PickType.ACCUMULATE`` a single dictionary is constructed (but still returned
+in a list) where each key value pair is filled in with a list of every value discovered for the
+pair.
+
+Examples:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Example 1:**
+
+.. code-block:: python
+
+    _input = {
+        'k3': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ]
+    }
+
+    output_map = {'k3': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12'],
+    #         'o1': ['v20', 'v21', 'v22'],
+    #         'o2': ['v30', 'v31', 'v32']
+    #     }
+    # ]
+
+**Example 2:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k0': 'v40', 'k1': 'v50', 'k2': 'v60'},
+                {'k0': 'v41', 'k1': 'v51', 'k2': 'v61'},
+                {'k0': 'v42', 'k1': 'v52', 'k2': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}}
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12', 'v40', 'v41', 'v43'],
+    #         'o1': ['v20', 'v21', 'v22', 'v50', 'v51', 'v53'],
+    #         'o2': ['v30', 'v31', 'v32', 'v60', 'v61', 'v63'],
+    #     }
+    # ]
+
+**Example 3:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        ]
+    }
+
+    output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2', 'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12'],
+    #         'o1': ['v20', 'v21', 'v22'],
+    #         '02': ['v30', 'v31', 'v32'],
+    #         'o3': ['v40', 'v41', 'v43'],
+    #         'o4': ['v50', 'v51', 'v53'],
+    #         'o5': ['v60', 'v61', 'v63']
+    #     }
+    # ]
+
+**Example 4:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': [
+            {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+            {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+            {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+        ],
+        'k7': [
+            {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+            {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+            {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+        ]
+    }
+
+    output_map = {
+        'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'},
+        'k7': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}
+    }
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12'],
+    #         'o1': ['v20', 'v21', 'v22'],
+    #         'o2': ['v30', 'v31', 'v32'],
+    #         'o3': ['v40', 'v41', 'v42'],
+    #         'o4': ['v50', 'v51', 'v52'],
+    #         'o5': ['v60', 'v61', 'v62']
+    #     }
+    # ]
+
+**Example 5:**
+
+.. code-block:: python
+
+    _input = {
+        'k0': {
+            'k1': [
+                {'k2': {'k3': 'v10'}},
+                {'k2': {'k4': 'v11'}},
+                {'k2': {'k5': 'v12'}},
+                {'k2': {'k6': 'v20'}},
+                {'k2': {'k7': 'v21'}},
+                {'k2': {'k8': 'v22'}}
+            ]
+        }
+    }
+
+    output_map = {
+        'k0': {
+            'k1': {
+                'k2': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5', 'k6': 'o6', 'k7': 'o7', 'k8': 'o8'}
+            }
+        }
+    }
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o3': ['v10'], 'o4': ['v11'], 'o5': ['v12'],
+    #         'o6': ['v20'], 'o7': ['v21'], 'o8': ['v22']
+    #     }
+    # ]
+
+**Example 6:**
+
+.. code-block:: python
+
+    _input = {
+        'k6': {
+            'k8': [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ]
+        },
+        'k7': {
+            'k9': [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        }
+    }
+
+    output_map = {
+        'k6': {'k8': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'}},
+        'k7': {'k9': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
+    }
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12'],
+    #         'o1': ['v20', 'v21', 'v22'],
+    #         'o2': ['v30', 'v31', 'v32'],
+    #         'o3': ['v40', 'v41', 'v42'],
+    #         'o4': ['v50', 'v51', 'v52'],
+    #         'o5': ['v60', 'v61', 'v62']
+    #     }
+    # ]
+
+**Example 7:**
+
+.. code-block:: python
+
+    _input = {
+        'k12': {
+            'k13': [
+                {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
+                {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
+                {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
+            ],
+            'k14': [
+                {'k3': 'v40', 'k4': 'v50', 'k5': 'v60'},
+                {'k3': 'v41', 'k4': 'v51', 'k5': 'v61'},
+                {'k3': 'v42', 'k4': 'v52', 'k5': 'v62'}
+            ]
+        },
+        'k15': {
+            'k16': [
+                {'k6': 'v70', 'k7': 'v80', 'k8': 'v90'},
+                {'k6': 'v71', 'k7': 'v81', 'k8': 'v91'},
+                {'k6': 'v72', 'k7': 'v82', 'k8': 'v92'}
+            ],
+            'k17': [
+                {'k9': 'v100', 'k10': 'v110', 'k11': 'v120'},
+                {'k9': 'v101', 'k10': 'v111', 'k11': 'v121'},
+                {'k9': 'v102', 'k10': 'v112', 'k11': 'v122'}
+            ]
+        }
+    }
+
+    output_map = {
+        'k12': {
+            'k13': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2'},
+            'k14': {'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}
+        },
+        'k15': {
+            'k16': {'k6': 'o6', 'k7': 'o7', 'k8': 'o8'},
+            'k17': {'k9': 'o9', 'k10': 'o10', 'k11': 'o11'}
+        }
+    }
+
+    result = pick(output_map, _input, PickType.ACCUMULATE)
+
+    # result == [
+    #     {
+    #         'o0': ['v10', 'v11', 'v12'],
+    #         'o1': ['v20', 'v21', 'v22'],
+    #         'o2': ['v30', 'v31', 'v32'],
+    #         'o3': ['v40', 'v41', 'v42'],
+    #         'o4': ['v50', 'v51', 'v52'],
+    #         'o5': ['v60', 'v61', 'v62'],
+    #         'o6': ['v70', 'v71', 'v72'],
+    #         'o7': ['v80', 'v81', 'v82'],
+    #         'o8': ['v90', 'v91', 'v92'],
+    #         'o9': ['v100', 'v101', 'v102'],
+    #         'o10': ['v110', 'v111', 'v112'],
+    #         'o11': ['v120', 'v121', 'v122']
+    #     }
+    # ]
+
+.. _instruction-label:
+
+Pick Instructions
+----------------------------------------------------------------------------------------------------
+There are multiple special special instructions available which can be used to modify how data is
+parsed. These instructions can be included in ``output_map`` by replacing a value with a list
+composed of the string representation of the PickInstruction followed by the value, which may either
+be further paths, or may specify the end of a path. Parsing instructions available include
+:ref:`JSON <json-label>`, :ref:`JSONL <jsonl-label>,
+:ref:`JSON_SINGLE_QUOTE <json_single_quote-label>`,
+
+
+.. _json-label:
+
+JSON Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the `PickInstruction.JSON`` parsing type, :func:`pick` expects a JSON string, and will
+attempt to interpret the current value as such before continuing to follow any further paths. This
+instruction has a string representation of ``'json'``.
+
+.. _jsonl-label:
+
+JSONL Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.JSONL`` parsing type, :func:`pick` expects a JSONL string, and will
+attempt to interpret the current value as such before continuing to follow any further paths. This
+instruction has a string representation of ``'jsonl'``.
+
+.. _json_single_quote-label:
+
+JSON Single Quote Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.JSON_SINGLE_QUOTE`` parsing type, :func:`pick` expects a JSON
+string using single quotes in place of double quotes, and will attempt to interpret the current
+value as such before continuing to follow any further paths. This instruction has a string
+representation of ``'json\''``.
+
+.. warning::
+
+    ``PickInstruction.JSON_SINGLE_QUOTE`` is not heavily tested, so take care to make sure it is
+    working as intended when using it.
+
+.. _xml-label:
+
+XML Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.XML`` parsing type,:func:`pick` expects an XML string, and will
+attempt to interpret the current value as such before continuing to follow any further paths. This
+instruction has a string representation of ``'xml'``.
