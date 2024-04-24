@@ -397,7 +397,12 @@ def csv_to_json(data: str) -> list:
 
 def xml_to_json(data: str, sans_attributes: bool = False):
     """
-    Converts XML data to a JSON representation
+    Converts XML data to a JSON representation. Attributes will be interpreted as keys of a dict, as
+    will tags within elements. If there are multiple of a tag within one element, the values inside
+    of those tags will be treated as individual items and added to a list under that tag as a key.
+    Genuine text values of elements will be included in dicts under the key ``'text'``. If
+    sans_attributes is ``True``, then attributes will not be considered as keys unless there are
+    no internal elements and no text, in which case they will be included.
 
     :param data: The XML data to parse.
     :param sans_attributes: Whether to exclude attributes from the JSON output.
