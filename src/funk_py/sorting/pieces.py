@@ -2,12 +2,13 @@ import io
 import xml.etree.ElementTree as ET
 import json
 import csv
-from enum import IntEnum
+from enum import Enum
 from typing import Mapping, Any, Literal, Union, List, Dict, Tuple, Optional, Iterator, Generator, \
     Callable
 
 import yaml
 
+from funk_py.modularity.decoration.enum_modifiers import converts_enums
 from funk_py.modularity.logging import make_logger
 
 
@@ -20,16 +21,37 @@ OutputMapSpecifier = Literal['json', 'jsonl', 'json\'',
                              'csv',
                              'yaml',
                              'combinatorial', 'tandem', 'reduce', 'accumulate']
-OutputMapType = Union[Mapping, List[Union[str, Mapping, OutputMapSpecifier]]]
 PickProcessFunc = Callable[[list, list, dict], None]
 PickFinalFunc = Callable[[list, dict], None]
 
 
-class PickType(IntEnum):
-    COMBINATORIAL = 0
-    TANDEM = 1
-    REDUCE = 2
-    ACCUMULATE = 3
+class PickType(Enum):
+    """``PickType`` is an enum containing the valid pick types for :func:`pick`."""
+    COMBINATORIAL = 'combinatorial'
+    TANDEM = 'tandem'
+    REDUCE = 'reduce'
+    ACCUMULATE = 'accumulate'
+
+
+class PickInstruction(Enum):
+    JSON = 'json'
+    JSONL = 'jsonl'
+    JSON_SINGLE_QUOTE = 'json\''
+    XML = 'xml'
+    XMLSA = 'xml-sa'
+    ELIST = 'e-list'
+    LIST = 'list'
+    CSV = 'csv'
+    YAML = 'yaml'
+
+    COMBINATORIAL = 'combinatorial'
+    TANDEM = 'tandem'
+    REDUCE = 'reduce'
+    ACCUMULATE = 'accumulate'
+
+
+OutputMapType = Union[Mapping[str, Union[str, Mapping, PickInstruction]],
+                      List[Union[str, Mapping, PickInstruction]]]
 
 
 main_logger.info('Finished setting up simple types.')
@@ -337,37 +359,23 @@ def _pick(
     return builder
 
 
-def parse_type_as(_type: OutputMapSpecifier, data: Any) -> Union[dict, list]:
-    match _type:
-        case 'json':
-            return json.loads(data)
+@converts_enums
+def parse_type_as(_type: PickInstruction, data: Any) -> Union[dict, list]:
+    switch = {
+        PickInstruction.JSON: lambda x: json.loads(x),
+        PickInstruction.JSONL: jsonl_to_json,
+        PickInstruction.JSON_SINGLE_QUOTE: wonky_json_to_json,
+        PickInstruction.XML: xml_to_json,
+        PickInstruction.XMLSA: lambda x: xml_to_json(x, True),
+        PickInstruction.ELIST: lambda x: x if isinstance(x, list) else [x],
+        PickInstruction.CSV: csv_to_json,
+        PickInstruction.LIST: lambda x: x.split(','),
+        PickInstruction.YAML: yaml.safe_load,
+    }
+    if _type in switch:
+        return switch[_type](data)
 
-        case 'jsonl':
-            return jsonl_to_json(data)
-
-        case 'json\'':
-            return wonky_json_to_json(data)
-
-        case 'xml':
-            return xml_to_json(data)
-
-        case 'xml-sa':
-            return xml_to_json(data, True)
-
-        case 'e-list':
-            return data if isinstance(data, list) else [data]
-
-        case 'csv':
-            return csv_to_json(data)
-
-        case 'list':
-            return data.split(',')
-
-        case 'yaml':
-            return yaml.safe_load(data)
-
-        case _:
-            raise ValueError('Invalid type specified.')
+    raise ValueError('Invalid type specified.')
 
 
 def csv_to_json(data: str) -> list:
