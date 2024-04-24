@@ -676,7 +676,7 @@ Examples:
         }
     }
 
-    result = pick(output_map, _input, PickType.COMBINATORIAL)
+    result = pick(output_map, _input, PickType.TANDEM)
 
     # result == [
     #     {'o0': 'v10', 'o1': 'v20', 'o2': 'v30', 'o3': 'v40', 'o4': 'v50', 'o5': 'v60',
@@ -762,7 +762,7 @@ Examples:
 
     output_map = {'k6': {'k0': 'o0', 'k1': 'o1', 'k2': 'o2', 'k3': 'o3', 'k4': 'o4', 'k5': 'o5'}}
 
-    result = pick(output_map, _input, PickType.TANDEM)
+    result = pick(output_map, _input, PickType.REDUCE)
 
     # result == [{'o0': 'v12', 'o1': 'v22', 'o2': 'v32', 'o3': 'v42', 'o4': 'v52', 'o5': 'v62'}]
 
