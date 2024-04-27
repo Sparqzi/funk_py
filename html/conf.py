@@ -5,13 +5,6 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-
-project = 'funk_py'
-copyright = '2024, Erich Kopp'
-author = 'Erich Kopp'
-release = '0.2'
-add_module_names = False
-
 # -- Path setup --------------------------------------------------------------
 
 import os
