@@ -8,6 +8,7 @@ import yaml
 from funk_py.modularity.decoration.enum_modifiers import converts_enums
 from funk_py.modularity.logging import make_logger
 from funk_py.sorting.converters import csv_to_json, xml_to_json, wonky_json_to_json, jsonl_to_json
+from funk_py.sorting.dict_manip import convert_tuplish_dict
 
 main_logger = make_logger('pieces', 'PIECES_LOG_LEVEL', default_level='warning')
 
@@ -40,6 +41,7 @@ class PickInstruction(Enum):
     LIST = 'list'
     CSV = 'csv'
     YAML = 'yaml'
+    TUPLE_DICT = 'tuple-dict'
 
     COMBINATORIAL = 'combinatorial'
     TANDEM = 'tandem'
@@ -199,16 +201,16 @@ def _pick_setup(
                 if (t := output_map[0]) in _PICK_TYPE_NAMES:
                     # This should handle cases where the user specifies changing modes during
                     # parsing.
-                    return output_map[1], _input, [], False, _PICK_TYPE_NAMES[t]
+                    return output_map[-1], _input, [], False, _PICK_TYPE_NAMES[t]
 
-                worker = parse_type_as(output_map[0], _input)
+                worker = parse_type_as(output_map[0], _input, output_map[1:-1])
 
             except Exception as e:
                 main_logger.warning(f'User\'s expected parsing method failed. Exception raised: '
                                     f'{e}')
                 return None, None, [], True, None
 
-            return output_map[1], worker, [], False, None
+            return output_map[-1], worker, [], False, None
 
     elif isinstance(output_map, str):
         # Theoretically, we should never get here, but just in case, this line should catch
@@ -357,7 +359,7 @@ def _pick(
 
 
 @converts_enums
-def parse_type_as(_type: PickInstruction, data: Any) -> Union[dict, list]:
+def parse_type_as(_type: PickInstruction, data: Any, args: list) -> Union[dict, list]:
     switch = {
         PickInstruction.JSON: lambda x: json.loads(x),
         PickInstruction.JSONL: jsonl_to_json,
@@ -369,7 +371,26 @@ def parse_type_as(_type: PickInstruction, data: Any) -> Union[dict, list]:
         PickInstruction.LIST: lambda x: x.split(','),
         PickInstruction.YAML: yaml.safe_load,
     }
+
+    arg_switch = {
+        PickInstruction.TUPLE_DICT: _parse_and_execute_tuplish,
+    }
+
     if _type in switch:
         return switch[_type](data)
 
+    elif _type in arg_switch:
+        return switch[_type](data, args)
+
     raise ValueError('Invalid type specified.')
+
+
+def _parse_and_execute_tuplish(data: Union[dict, list], args: list) -> dict:
+    if len(args):
+        args = args[0]
+        if isinstance(args, dict):
+            return convert_tuplish_dict(data, args.get('pair_name'),
+                                        args.get('key_name'), args.get('val_name'))
+
+        else:
+            raise ValueError('TUPLE_DICT given an invalid argument format.')
