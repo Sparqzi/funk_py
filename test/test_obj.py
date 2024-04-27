@@ -4,7 +4,7 @@ from collections import namedtuple
 import pytest
 
 from t_support import cov, cov_counter
-from funk_py.simplicity import Obj, ObjAttributeError
+from funk_py.modularity.simplicity import Obj, ObjAttributeError
 
 
 # The following manages whether the generated coverage instance from t_support should report. This
