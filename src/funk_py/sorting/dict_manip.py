@@ -1,4 +1,4 @@
-from typing import Generator, Optional, Union, Any
+from typing import Generator, Optional, Union, Any, Callable
 
 from funk_py.modularity.logging import make_logger
 
