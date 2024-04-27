@@ -1215,5 +1215,22 @@ representation of ``'json\''``.
 XML Instruction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When using the ``PickInstruction.XML`` parsing type,:func:`pick` expects an XML string, and will
-attempt to interpret the current value as such before continuing to follow any further paths. This
-instruction has a string representation of ``'xml'``.
+attempt to interpret the current value as such before continuing to follow any further paths. It
+converts XML data to a JSON representation. Attributes will be interpreted as keys of a dict, as
+will tags within elements. If there are multiple of a tag within one element, the values inside
+of those tags will be treated as individual items and added to a list under that tag as a key.
+Genuine text values of elements will be included in dicts under the key ``'text'``. This instruction
+has a string representation of ``'xml'``.
+
+.. _xml-sa-label:
+
+XML Sans Attributes Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.XMLSA`` parsing type,:func:`pick` expects an XML string, and will
+attempt to interpret the current value as such before continuing to follow any further paths. It
+converts XML data to a JSON representation. Tags within elements will be interpreted as keys. If
+there are multiple of a tag within one element, the values inside of those tags will be treated as
+individual items and added to a list under that tag as a key. Genuine text values of elements will
+be used as a value under tags, unless for some reason there is no text value or internal tag, in
+which case, attribute-value pairs will be used as the key-value pairs. This instruction has a string
+representation of ``'xml-sa'``.
