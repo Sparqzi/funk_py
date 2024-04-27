@@ -3,16 +3,16 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to funk_py's documentation!
+Sorting
 ===================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   sorting/index
-
-
+   pick_docs
+   converters
+   dict_manip
 
 
 Indices and tables
