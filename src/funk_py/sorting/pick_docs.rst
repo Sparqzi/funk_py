@@ -1176,8 +1176,8 @@ There are multiple special special instructions available which can be used to m
 parsed. These instructions can be included in ``output_map`` by replacing a value with a list
 composed of the string representation of the PickInstruction followed by the value, which may either
 be further paths, or may specify the end of a path. Parsing instructions available include
-:ref:`JSON <json-label>`, :ref:`JSONL <jsonl-label>,
-:ref:`JSON_SINGLE_QUOTE <json_single_quote-label>`,
+:ref:`JSON <json-label>`, :ref:`JSONL <jsonl-label>`,
+:ref:`JSON_SINGLE_QUOTE <json-single-quote-label>`,
 
 
 .. _json-label:
@@ -1196,7 +1196,7 @@ When using the ``PickInstruction.JSONL`` parsing type, :func:`pick` expects a JS
 attempt to interpret the current value as such before continuing to follow any further paths. This
 instruction has a string representation of ``'jsonl'``.
 
-.. _json_single_quote-label:
+.. _json-single-quote-label:
 
 JSON Single Quote Instruction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
