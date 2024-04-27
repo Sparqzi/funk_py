@@ -11,7 +11,7 @@ def csv_to_json(data: str) -> list:
     rows.
 
     :param data: The ``str`` to be converted.
-    :return: A list of the rows as dictionaries.
+    :return: A ``list`` of the rows as ``dict`` items.
     """
     builder = []
     csv_reader = csv.reader(io.StringIO(data))
@@ -30,6 +30,81 @@ def xml_to_json(data: str, sans_attributes: bool = False):
     Genuine text values of elements will be included in dicts under the key ``'text'``. If
     sans_attributes is ``True``, then attributes will not be considered as keys unless there are
     no internal elements and no text, in which case they will be included.
+
+    Example:
+
+    .. code-block:: python
+
+        data = '''<a>
+            <b>
+                <c d="e" f="g"/>
+                <h>i</h>
+            </b>
+            <j>
+                <k>
+                    <l m="o" n="r"/>
+                    <l m="p" n="s">t</l>
+                    <l m="q">u</l>
+                    <l m="v">w</l>
+                    <x z="aa">
+                        <y>ab</y>
+                        <y>ac</y>
+                    </x>
+                </k>
+            </j>
+        </a>'''
+
+        xml = xml_to_json(data)
+
+        # xml == {
+        #     'a': {
+        #         'b': {
+        #             'c': {'d': 'e', 'f': 'g', 'text': None},
+        #             'h': {'text': 'i'},
+        #             'text': str
+        #         },
+        #         'j': {
+        #             'k': {
+        #                 'l': [
+        #                     {'m': 'o', 'n': 'r', 'text': None},
+        #                     {'m': 'p', 'n': 's', 'text': 't'},
+        #                     {'m': 'q', 'text': 'u'},
+        #                     {'m': 'v', 'text': 'w'}
+        #                 ],
+        #                 'x': {
+        #                     'y': [
+        #                         {'text': 'ab'},
+        #                         {'text': 'ac'}
+        #                     ],
+        #                     'z': 'aa',
+        #                     'text': str
+        #                 },
+        #                 'text': str
+        #             },
+        #             'text': str
+        #         },
+        #         'text': str
+        #     }
+        # }
+
+        xml_sa = xml_to_json(data, True)
+
+        # xml_sa == {
+        #     'a': {
+        #         'b': {
+        #             'c': {'d': 'e', 'f': 'g'},
+        #             'h': 'i'
+        #         },
+        #         'j': {
+        #             'k': {
+        #                 'l': [{'m': 'o', 'n':'r'}, 't', 'u', 'w'],
+        #                 'x': {
+        #                     'y': ['ab', 'ac']
+        #                 }
+        #             }
+        #         }
+        #     }
+        # }
 
     :param data: The XML data to parse.
     :param sans_attributes: Whether to exclude attributes from the JSON output.
@@ -80,8 +155,7 @@ def _get_xml_element_internal_names(element: ET.Element) -> Dict[str, int]:
     Counts the occurrences of each tag among the children of an XML element.
 
     :param element: The XML element.
-    :return: A ``dict`` containing tag names as keys and the count of their
-        occurrences as values.
+    :return: A ``dict`` containing tag names as keys and the count of their occurrences as values.
     """
     builder = {}
     for ele in element:
@@ -92,6 +166,14 @@ def _get_xml_element_internal_names(element: ET.Element) -> Dict[str, int]:
 
 
 def wonky_json_to_json(data: str, different_quote: str = '\''):
+    """
+    Converts a JSON-like string that uses a non-standard quote character into valid JSON. At least,
+    it tries to.
+
+    :param data: The JSON-like string to be converted to a ``dict`` or ``list``.
+    :param different_quote: The different quote that was used for the string.
+    :return: The string converted to a ``dict`` or ``list``, depending on what was encoded.
+    """
     if len(different_quote) > 1:
         raise ValueError('You cannot use a multi-character quote (yet).')
 
@@ -114,5 +196,11 @@ def wonky_json_to_json(data: str, different_quote: str = '\''):
     return json.loads(data)
 
 
-def jsonl_to_json(data: str):
+def jsonl_to_json(data: str) -> list:
+    """
+    Converts a JSONL string to a list of objects.
+
+    :param data: The JSONL string to convert.
+    :return: A ``list`` containing the ``dict`` and ``list`` items stored in the JSONL string.
+    """
     return [json.loads(p) for p in data.split('\n')]
