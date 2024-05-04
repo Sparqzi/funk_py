@@ -483,7 +483,7 @@ UNKNOWN_RECURSION_MSG = ('Encountered a value which exhibits recursion, but is n
                          'recursive type. Failed to handle recursion.')
 
 
-def rec_lists_checker(recursion_points1, recursion_points2):
+def _rec_lists_checker(recursion_points1, recursion_points2):
     _rec_tester = simple_trinomial(lambda x, y: recursion_points1[y] is x,
                                    lambda x, y: recursion_points2[y] is x)
 
@@ -766,7 +766,7 @@ def _recursive_check_list_equality(list1: Union[list, tuple], list2: Union[list,
                                    recursion_points1: list, recursion_points2: list,
                                    rec_lists_check: Callable = None, strict: bool = False):
     if rec_lists_check is None:
-        rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
+        rec_lists_check = _rec_lists_checker(recursion_points1, recursion_points2)
 
     # If we get here, we shouldn't need to check list lengths or tuple lengths.
     for i in range(len(list1)):
@@ -838,7 +838,7 @@ def _recursive_check_dict_equality(dict1: dict, dict2: dict, recursion_points1: 
                                    recursion_points2: list, rec_lists_check: Callable = None,
                                    strict: bool = False):
     if rec_lists_check is None:
-        rec_lists_check = rec_lists_checker(recursion_points1, recursion_points2)
+        rec_lists_check = _rec_lists_checker(recursion_points1, recursion_points2)
 
     keys1 = list(dict1.keys())
 
