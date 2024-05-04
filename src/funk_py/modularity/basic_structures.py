@@ -9,6 +9,10 @@ Args = ParamSpec("Args")
 
 
 class Singleton:
+    """
+    A simple Singleton structure which when inherited from, will make a class follow the singleton
+    pattern.
+    """
     def __init_subclass__(cls, **kwargs):
         def __new__(cls_):
             if not hasattr(cls_, 'instance'):
@@ -33,16 +37,39 @@ class Shareable:
     __slots__ = ('v',)
 
     def __init__(self, v):
+        """This class is really just a node with no concept of its relationship to other nodes."""
         self.v = v
 
 
 def pass_(x: Any) -> Any:
+    """Return ``x``."""
     return x
 
 
 def simple_trinomial(check_func: Callable[[Any, Args], bool],
                      check_func2: Callable[[Any, Args], bool] = None) \
         -> Callable[[Any, Any, Args], Optional[bool]]:
+    """
+    Generates a callable which accepts two arguments and compares them via ``check_func`` or - if
+    both are specified - ``check_func`` **and** ``check_func2``.
+    - If only the first or only the second returns ``True``, the function will return ``False``.
+    - If both return ``True``, the function will return ``True``.
+    - If both return False, the function will return ``...`` (ellipsis).
+
+
+
+    :param check_func: This is the first function used to check inputs. If ``check_func2`` is also
+        specified, this will only be used to check the first input to the generated function. If
+        ``check_func2`` is not specified, this will be used to check both inputs to the generated
+        function. This may have varargs used, but if ``check_func2`` is specified, its signature
+        should match.
+    :param check_func2: This is the second function used to check inputs. If not specified, then
+        ``check_func`` will be used to check both inputs to the generated function. This may have
+        varargs used, but should only do so if ``check_func`` accepts them.
+    :return: A function which can be used to check two values against ``check_func`` (and
+        ``check_func2``) to verify if they both pass criteria, only one passes criteria, or neither
+        passes criteria. Useful for checking for instances of classes.
+    """
     if check_func2 is None:
         def check_it(val1, val2, *args) -> Optional[bool]:
             if check_func(val1, *args):
