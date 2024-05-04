@@ -1,6 +1,6 @@
 import pytest
 
-from t_support import build_nest, too_slow_func, cov, cov_counter
+from t_support import build_nest, too_slow_func_two_arg, cov, cov_counter
 from funk_py.modularity.type_matching import check_dict_equality, strict_check_dict_equality
 
 
@@ -21,7 +21,7 @@ def c():
         cov.html_report()
 
 
-too_slow = too_slow_func('dict')
+too_slow = too_slow_func_two_arg('dict')
 
 
 G_STR1 = 'a'
