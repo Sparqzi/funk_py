@@ -148,10 +148,9 @@ def make_yaml_list(keys: List[str], *val_sets: list) -> str:
     return yaml.dump(make_json_list(keys, *val_sets))
 
 
-SimpleDirection = namedtuple('SimpleDirection', ('func', 'output_map'))
-ListSet = namedtuple('ListSet', ('list1', 'list2', 'output_map', 'result_set'))
-ListBase = namedtuple('ListCommand', ('func', 'output_map', 'keys', 'vals'))
-DictSet = namedtuple('DictSet', ('dict', 'output_map', 'result_set'))
+ListSet = namedtuple('ListSet',
+                     ('list1', 'list2', 'output_map', 'result_set', 'number', 'duration', 'name'))
+DictSet = namedtuple('DictSet', ('dict', 'output_map', 'result_set', 'number', 'duration'))
 
 TstDef = namedtuple('TstDef', {'func', 'output_map', 'result_set'})
 
