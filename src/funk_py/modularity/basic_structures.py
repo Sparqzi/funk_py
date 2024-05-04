@@ -46,6 +46,66 @@ def pass_(x: Any) -> Any:
     return x
 
 
+class Speed:
+    """
+    A simple structure which holds a number of times to do something and a time in seconds during
+    which to do it.
+    """
+    def __init__(self, number: int, duration: float):
+        self._number = number
+        self._duration = duration
+
+    @property
+    def number(self) -> int:
+        """The number of times to do the thing."""
+        return self._number
+
+    @property
+    def duration(self) -> float:
+        """The time in seconds to do it during."""
+        return self._duration
+
+    @property
+    def rate(self):
+        """The rate at which it would be done."""
+        return self._number / self._duration
+
+    def __eq__(self, other) -> bool: return self._comp(operator.eq, other, 'compared')
+
+    def __lt__(self, other) -> bool: return self._comp(operator.lt, other, 'compared')
+
+    def __le__(self, other) -> bool: return self._comp(operator.le, other, 'compared')
+
+    def __gt__(self, other) -> bool: return self._comp(operator.gt, other, 'compared')
+
+    def __ge__(self, other) -> bool: return self._comp(operator.ge, other, 'compared')
+
+    def __ne__(self, other) -> bool: return self._comp(operator.ne, other, 'compared')
+
+    def _comp(self, _operator, other, msg):
+        if isinstance(other, Speed):
+            return _operator(self._number / self._duration, other)
+
+        elif (t := type(other)) is int:
+            return _operator(self._number // self._duration, other)
+
+        elif t is float:
+            return _operator(self._number / self._duration, other)
+
+        else:
+            raise TypeError(f'{type(other)} cannot be {msg} to a Speed.')
+
+    def __neg__(self): raise TypeError('Speed is not allowed to be negative.')
+
+    def __repr__(self): return f'<Speed number={self._number}, duration={self._duration}>'
+
+    def __str__(self):
+        return (f'{self._number} time{"" if self._number == 1 else "s"} per {self._duration} '
+                f'second{"" if self._duration == 1 else "s"}')
+
+    def __abs__(self): return self._number / self._duration
+
+
 def simple_trinomial(check_func: Callable[[Any, Args], bool],
                      check_func2: Callable[[Any, Args], bool] = None) \
         -> Callable[[Any, Any, Args], Optional[bool]]:
