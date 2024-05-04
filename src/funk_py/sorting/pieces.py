@@ -2,7 +2,7 @@ import json
 from enum import Enum
 from typing import Mapping, Any, Literal, Union, List, Tuple, Optional, Iterator, Generator, \
     Callable
-
+from urllib.parse import parse_qs
 import yaml
 
 from funk_py.modularity.decoration.enum_modifiers import converts_enums
@@ -18,6 +18,8 @@ OutputMapSpecifier = Literal['json', 'jsonl', 'json\'',
                              'e-list', 'list',
                              'csv',
                              'yaml',
+                             'tuple-dict',
+                             'form-urlencoded',
                              'combinatorial', 'tandem', 'reduce', 'accumulate']
 PickProcessFunc = Callable[[list, list, dict], None]
 PickFinalFunc = Callable[[list, dict], None]
@@ -42,6 +44,7 @@ class PickInstruction(Enum):
     CSV = 'csv'
     YAML = 'yaml'
     TUPLE_DICT = 'tuple-dict'
+    FORM = 'form-urlencoded'
 
     COMBINATORIAL = 'combinatorial'
     TANDEM = 'tandem'
@@ -370,6 +373,7 @@ def parse_type_as(_type: PickInstruction, data: Any, args: list) -> Union[dict, 
         PickInstruction.CSV: csv_to_json,
         PickInstruction.LIST: lambda x: x.split(','),
         PickInstruction.YAML: yaml.safe_load,
+        PickInstruction.FORM: parse_qs,
     }
 
     arg_switch = {
