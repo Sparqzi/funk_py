@@ -1,7 +1,7 @@
 import inspect
 from types import FunctionType
 from typing import Union, Any, AnyStr, Callable, Mapping, MutableMapping, \
-    get_args, get_origin, Sequence, Literal, Tuple, List
+    get_args, get_origin, Sequence, Literal, Tuple, List, Dict
 
 from collections.abc import Iterable
 
@@ -36,16 +36,22 @@ class TypeMatcher:
 
     # *DISREGARD python:S1144*
     # This might trigger a warning for python:S1144, that is because some linters do not check the
-    # __new__ method properly. This does not violate
-    # python:S1144.
+    # __new__ method properly. This does not violate python:S1144.
     def __true_init(self, type_: Union[type, tuple, None]):  # noqa
-        # This serves as a hidden init so that instances are never re-initialized. This is important
-        # to prevent eating up too much memory. It can also decrease other resource usage.
+        """
+        This serves as a hidden init so that instances are never re-initialized. This is important
+        to prevent eating up too much memory when a user wants MANY instances of ``TypeMatcher``. It
+        can also decrease other resource usage.
+        """
         self._type = type_
         self._function = self.__get_new_function(type_)
 
     def __init__(self, type_: Union[type, tuple, None]):
-        """Returns a TypeMatcher used to check a variable."""
+        """
+        A ``TypeMatcher`` used to check whether a variable is a specific type. This class is
+        callable, and can be called with a value to return a boolean representing whether the value
+        is the type of the ``TypeMatcher``.
+        """
         # This exists to ensure correct documentation appears in IDEs.
         pass
 
@@ -297,6 +303,8 @@ class TypeMatcher:
 
     def __repr__(self) -> str: return f'<TypeMatcher: {repr(self._type)}>'
 
+    # Because of how Typematcher only creates one instance of a matcher for each type, we MUST treat
+    # its type as immutable or suffer the consequences.
     @property
     def type(self):
         """What type is the TypeMatcher checking for?"""
@@ -304,9 +312,34 @@ class TypeMatcher:
 
 
 class TransformerFilter:
-    def __init__(self, input_rules: Union[dict, list], raise_on_fail: bool = True):
+    def __init__(self, input_rules: Dict[type, callable], raise_on_fail: bool = True):
         """
         A filter with rules and methods to transform values put through it based on their type.
+        There are two ways to use this class:
+
+        1. An instance of this class can be used as a property in another class. It can be declared
+        outside the class, and re-used in multiple classes. When this property is set, the type of
+        the value being set will be checked against each type specified in the ``input_rules``, and
+        if it matches any of them, the function at that key within ``input_rules`` will be called
+        with that value as its sole argument, then will store the result as the property.
+
+        2. An instance of this class can be used as a function itself, being called on a value to
+        attempt to transform it in the same way it would as a property.
+
+        .. note::
+
+            In the case that the value received by a ``TransformerFilter`` does not match any type
+            in ``input_rules`` it will store or return ``...`` unless ``raise_on_fail`` is set to
+            ``True``.
+
+        :param input_rules: A dictionary using types as keys and functions as the values. Each
+            function should correspond with its key's type, and should be built to appropriately
+            convert that type.
+        :type input_rules: Dict[type, callable]
+        :param raise_on_fail: Whether the ``TransformerFilter`` should raise an error when
+            attempting to set a value to a type it doesn't have a converter for. If ``False``, then
+            any invalid types will result in ``...``.
+        :type raise_on_fail: bool
         """
         self.__rules = []
         self.__outputs = []
@@ -323,6 +356,12 @@ class TransformerFilter:
     @classmethod
     def __from_existing(cls, rules: list, outputs: list,
                         raise_on_fail: bool):
+        """
+        This is used to silently generate a new instance of the class when a duplicate of a
+        ``TransformerFilter`` exists within a single class. This is necessary since __set__ doesn't
+        tell us the name of the ``TransformerFilter`` being set and prevents duplicates from
+        overwriting each other.
+        """
         new_cls = cls.__new__(cls, [], blank=True)
         new_cls._accept_args(rules, outputs, raise_on_fail)
         return new_cls
@@ -340,7 +379,7 @@ class TransformerFilter:
     def __call__(self, value: Any, *, inst: Any = None) -> Any:
         """
         Check the type of the value and perform a specified transformation on it based on
-            predetermined instructions.
+        predetermined instructions.
 
         :param value: The value to transform.
         :param inst: The class instance from which the method should be called (if applicable).
@@ -388,7 +427,8 @@ class TransformerFilter:
             setattr(owner, name, new)
 
         else:
-            # Go ahead and set the public name and the
+            # Go ahead and set the public name and the private name. Make sure the private name is
+            # impossible to access without directly using getattr().
             self.pun[owner] = name
             self.pn[owner] = '_    \\' + name
 
@@ -407,16 +447,29 @@ class TransformerFilter:
             return ...
 
     def __set__(self, inst, value):
+        # inst is the class instance where the instance of TransformerFilter is being set. We want
+        # to check if this instance of TransformerFilter already knows it's a member of this class,
+        # so we do that here by checking in this instance's private names dictionary for the class.
+        # This is needed in case a class using an instance of TransformerFilter is inherited from.
         if inst.__class__ not in self.pn:
+            # If this instance of TransformerFilter doesn't know about the class its being called
+            # from, we check through the method resolution order of the calling instance to see if a
+            # class we recognize is present.
             for c in inst.__class__.mro():
                 if c in self.pn:
+                    # When we find that class, we get the correct private and public names of
+                    # the TransformerFilter from the internal data and put them under the new class
+                    # in the TransformerFilter's lookup.
                     self.pn[inst.__class__] = self.pn[c]
                     self.pun[inst.__class__] = self.pun[c]
                     break
 
+        # By now, we should have the correct class in our private and public name lookups even if we
+        # didn't before. We can proceed to actually set the value in inst.
         inst.__setattr__(self.pn[inst.__class__], self(value, inst=inst))
 
     def copy(self) -> 'TransformerFilter':
+        """Creates a copy of a ``TransformerFilter``."""
         new = self.__from_existing(self.__rules, self.__outputs, self._raise_on_fail)
         return new
 
@@ -561,14 +614,12 @@ def _get_argument_data(func: FunctionType) \
 def hash_function(func: FunctionType):
     """
     This can *hash* a function insofar as its static image at the time of hashing. Since functions
-        are technically mutable, it is heavily advised that use of this is avoided unless a function
-        is truly going to be treated as immutable. This means:
+    are technically mutable, it is heavily advised that use of this is avoided unless a function
+    is truly going to be treated as immutable. This means:
 
-        1 - **No attributes may be set on a function** after hashing.
-
-        2 - The function **should not use *global* variables** that are **changed after hashing**.
-
-        3 - The function should have **no internal constants which change**.
+    1. **No attributes may be set on a function** after hashing.
+    2. The function **should not use *global* variables** that are **changed after hashing**.
+    3. The function should have **no internal constants which change**.
 
     This should not be used on decorated functions.
     """
@@ -578,12 +629,12 @@ def hash_function(func: FunctionType):
 def check_function_equality(func1: FunctionType, func2: Any):
     """
     Checks for equality of two functions. This equality is not standard equality, but is closer to
-        how a human would interpret similarity of functions. It is intended to be location-agnostic
-        as far as is possible, and is tested for functions nested within other functions and static
-        methods in classes.
+    how a human would interpret similarity of functions. It is intended to be location-agnostic
+    as far as is possible, and is tested for functions nested within other functions and static
+    methods in classes.
 
-        .. warning::
-            Decorated functions will generally fail to compare equal.
+    .. warning::
+        Decorated functions will generally fail to compare equal.
     """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
@@ -603,8 +654,8 @@ def _recursive_check_function_equality(func1: FunctionType, func2: FunctionType,
                                        recursion_points1: list,
                                        recursion_points2: list):
     """
-    *check_function_equality*, but for use when a likely self-containing object
-        is contained within the constant pool or is a default value.
+    ``check_function_equality``, but for use when a likely self-containing object is contained
+    within the constant pool or is a default value.
     """
     args1 = _get_argument_data(func1)
     args2 = _get_argument_data(func2)
@@ -670,6 +721,7 @@ def _strict_has_no_issues(obj1, obj2):
 
 
 def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
+    """Checks for list equality regardless of whether the lists are recursive or not."""
     try:
         return list1 == list2
 
@@ -682,8 +734,11 @@ def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
             raise RecursionError(DOUBLE_FAILED_RECURSION_MSG.format(fill), e)
 
 
-def strict_check_list_equality(list1: Union[list, tuple],
-                               list2: Union[list, tuple]):
+def strict_check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
+    """
+    Checks for list equality regardless of whether the lists are recursive or not. Also makes the
+    distinction of ``True is not 1`` and ``False is not 0``.
+    """
     try:
         ans = list1 == list2
         if not ans:
@@ -739,6 +794,9 @@ def _recursive_check_list_equality(list1: Union[list, tuple], list2: Union[list,
 
 
 def check_dict_equality(dict1: dict, dict2: dict):
+    """
+    Checks for dictionary equality regardless of whether the dictionaries are recursive or not.
+    """
     try:
         return dict1 == dict2
 
@@ -751,6 +809,10 @@ def check_dict_equality(dict1: dict, dict2: dict):
 
 
 def strict_check_dict_equality(dict1: dict, dict2: dict):
+    """
+    Checks for dictionary equality regardless of whether the dictionaries are recursive or not. Also
+    makes the distinction of ``True is not 1`` and ``False is not 0``.
+    """
     try:
         ans = dict1 == dict2
         if not ans:
