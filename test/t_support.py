@@ -16,20 +16,18 @@ cov_counter = Object()
 cov_counter.value = 0
 
 
-def too_slow_func(desc: str):
-    def too_slow(number: int, max_duration: float, t1, t2, func: callable):
+def too_slow_func_two_arg(desc: str):
+    def too_slow(number: int, max_duration: float, t1, t2, func: callable = None):
         cov.stop()
         duration = timeit(lambda: func(t1, t2), number=number)
         cov.start()
         assert duration < max_duration, \
-            (f'{func.__name__} worked for two {desc}, but did not perform'
-             f' adequately with regards to speed. {desc.title()} compared'
-             f' were:\n'
+            (f'{func.__name__} worked for {desc}, but did not perform adequately with regards to '
+             f'speed. {desc.title()} compared were:\n'
              f'{repr(t1)}\n'
              f'{repr(t2)}\n'
              f'{number} iterations were performed.\n'
-             f'Expected rate was {number / max_duration} executions per'
-             f' second.\n'
+             f'Expected rate was {number / max_duration} executions per second.\n'
              f'Actual rate was {number / duration} executions per second.')
 
     return too_slow
