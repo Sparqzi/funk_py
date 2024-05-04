@@ -385,3 +385,26 @@ def _get_val_if_only_one_key(data: dict) -> Any:
         return next(iter(data.values()))
 
     return None
+
+
+def align_into_list(order: Union[list, dict], to_align: dict, default: Any = None) -> list:
+    """
+    Realigns the values from a dictionary to the order specified by ``order``. It does not require
+    all expected keys to be in ``to_align``.
+
+    :param order: The order that keys should go in. If this is a list, it will be used as-is. If it
+        is a dictionary, its keys will be converted to a list which will be used in its place.
+    :param to_align: The dictionary to align to order.
+    :param default: The default value that should be used at a position if no value is specified for
+        it in ``to_align``.
+    :return: A list of the values from ``to_align`` in the order specified by ``order``.
+    """
+    if type(order) is dict:
+        order = list(order.keys())
+
+    output = [default] * len(order)
+    for k, v in to_align.items():
+        if k in order:
+            output[order.index(k)] = v
+
+    return output
