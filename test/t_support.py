@@ -3,6 +3,7 @@ from typing import Dict, Set, Union, Tuple, Any, Iterable
 
 import coverage
 
+from funk_py.modularity.basic_structures import Speed
 
 cov = coverage.Coverage()
 cov.start()
@@ -23,12 +24,45 @@ def too_slow_func_two_arg(desc: str):
         cov.start()
         assert duration < max_duration, \
             (f'{func.__name__} worked for {desc}, but did not perform adequately with regards to '
-             f'speed. {desc.title()} compared were:\n'
+             f'speed. {desc.title()} tested were:\n'
              f'{repr(t1)}\n'
              f'{repr(t2)}\n'
              f'{number} iterations were performed.\n'
              f'Expected rate was {number / max_duration} executions per second.\n'
              f'Actual rate was {number / duration} executions per second.')
+
+    return too_slow
+
+
+def too_slow_func_two_arg_updated(desc: str):
+    def too_slow(speed: Speed, t1, t2, func: callable = None):
+        cov.stop()
+        duration = timeit(lambda: func(t1, t2), number=speed.number)
+        cov.start()
+        assert duration < speed.duration, \
+            (f'{func.__name__} worked for {desc}, but did not perform adequately with regards to '
+             f'speed. {desc.title()} tested were:\n'
+             f'{repr(t1)}\n'
+             f'{repr(t2)}\n'
+             f'{speed.number} iterations were performed.\n'
+             f'Expected rate was {speed.rate} executions per second.\n'
+             f'Actual rate was {speed.number / duration} executions per second.')
+
+    return too_slow
+
+
+def too_slow_func_one_arg(desc: str):
+    def too_slow(speed: Speed, t1, func: callable):
+        cov.stop()
+        duration = timeit(lambda: func(t1), number=speed.number)
+        cov.start()
+        assert duration < speed.duration, \
+            (f'{func.__name__} worked for {desc}, but did not perform adequately with regards to '
+             f'speed. {desc.title()} tested was:\n'
+             f'{repr(t1)}\n'
+             f'{speed.number} iterations were performed.\n'
+             f'Expected rate was {speed.rate} executions per second.\n'
+             f'Actual rate was {speed.number / duration} executions per second.')
 
     return too_slow
 
