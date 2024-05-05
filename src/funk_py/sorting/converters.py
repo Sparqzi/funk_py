@@ -4,7 +4,7 @@ import json
 from typing import Union, Dict, List, Tuple, Optional, Any
 from xml.etree import ElementTree as ET
 
-from funk_py.sorting.dict_manip import align_into_list, acc_
+from funk_py.sorting.dict_manip import align_to_list, acc_
 
 TEXT = 'text'
 
@@ -49,7 +49,7 @@ def json_to_csv(data: List[dict]) -> str:
             writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
             writer.writerow(headers)
             for row in data:
-                writer.writerow(align_into_list(headers, row))
+                writer.writerow(align_to_list(headers, row))
 
             return output.getvalue()
 
@@ -177,11 +177,17 @@ def _parse_xml_internal(element: ET.Element, sans_attributes: bool) -> Union[dic
             if (t := element.text) is None:
                 return element.attrib.copy()
 
-            return t
+            return str(t)
 
     else:
         builder.update(element.attrib)
-        builder['text'] = element.text
+        if element.text is None:
+            return builder
+
+        else:
+            builder['text'] = str(element.text)
+            if len(builder) == 1:
+                builder = builder['text']
 
     return builder
 

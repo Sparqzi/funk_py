@@ -51,8 +51,7 @@ class TestXmlToJson:
     def xml_builder(self):
         return ET.Element(ROOT)
 
-    ROOT_OF_NONE_NA = {ROOT: {}}
-    ROOT_OF_NONE_A = {ROOT: {TEXT: None}}
+    ROOT_OF_NONE = {ROOT: {}}
 
     @pytest.fixture(params=((False, PS_40_000), (True, PS_40_000)),
                     ids=('with attributes', 'sans attributes'))
@@ -61,7 +60,7 @@ class TestXmlToJson:
 
         _input = ET.tostring(xml_builder, encoding='utf8')
 
-        output = self.ROOT_OF_NONE_NA if sans_attributes else self.ROOT_OF_NONE_A
+        output = self.ROOT_OF_NONE if sans_attributes else self.ROOT_OF_NONE
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -70,8 +69,7 @@ class TestXmlToJson:
         self.too_slow(empty_xml.speed, empty_xml.input, empty_xml.sans_attributes, xml_to_json)
 
     V1 = VALS[0]
-    ROOT_OF_VAL_NA = {ROOT: V1}
-    ROOT_OF_VAL_A = {ROOT: {TEXT: V1}}
+    ROOT_OF_VAL = {ROOT: V1}
 
     @pytest.fixture(params=((False, PS_40_000), (True, PS_40_000)),
                     ids=('with attributes', 'sans attributes'))
@@ -83,10 +81,10 @@ class TestXmlToJson:
         _input = ET.tostring(xml_builder, encoding='utf8')
 
         if sans_attributes:
-            output = self.ROOT_OF_VAL_NA
+            output = self.ROOT_OF_VAL
 
         else:
-            output = self.ROOT_OF_VAL_A
+            output = self.ROOT_OF_VAL
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -114,9 +112,6 @@ class TestXmlToJson:
 
         _input = ET.tostring(sa_xml_builder, encoding='utf8')
 
-        if not sans_attributes:
-            basic_attributes[TEXT] = None
-
         output = {ROOT: basic_attributes}
 
         return XmlTDef(sans_attributes, _input, output, speed)
@@ -143,8 +138,8 @@ class TestXmlToJson:
 
         else:
             output = {}
-            _builder = output[ROOT] = {TEXT: None}
-            _builder.update({k: {TEXT: v} for k, v in self.KV1.items()})
+            _builder = output[ROOT] = {}
+            _builder.update(self.KV1)
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -170,8 +165,7 @@ class TestXmlToJson:
             output = {ROOT: self.KV2}
 
         else:
-            basic_attributes[TEXT] = None
-            basic_attributes.update({k: {TEXT: v} for k, v in self.KV2.items()})
+            basic_attributes.update(self.KV2)
             output = {ROOT: basic_attributes}
 
         return XmlTDef(sans_attributes, _input, output, speed)
@@ -194,11 +188,7 @@ class TestXmlToJson:
 
         _input = ET.tostring(xml_builder, encoding='utf8')
 
-        if sans_attributes:
-            output = {ROOT: {self.K1: self.L1}}
-
-        else:
-            output = {ROOT: {TEXT: None, self.K1: [{TEXT: v} for v in self.L1]}}
+        output = {ROOT: {self.K1: self.L1}}
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -219,16 +209,7 @@ class TestXmlToJson:
 
         _input = ET.tostring(xml_builder, encoding='utf8')
 
-        if sans_attributes:
-            output = {ROOT: {KEYS[1]: self.L2}}
-
-        else:
-            output = {
-                ROOT: {
-                    TEXT: None,
-                    self.K1: [dict(text=None, **v) for v in self.L2]
-                }
-            }
+        output = {ROOT: {self.K1: self.L2}}
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -257,7 +238,7 @@ class TestXmlToJson:
             output = {ROOT: {self.K1: [v[TEXT] for v in self.L3]}}
 
         else:
-            output = {ROOT: {TEXT: None, self.K1: self.L3}}
+            output = {ROOT: {self.K1: self.L3}}
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
@@ -284,8 +265,7 @@ class TestXmlToJson:
             output = {ROOT: {self.K3: self.L4}}
 
         else:
-            basic_attributes[TEXT] = None
-            basic_attributes[self.K3] = [{TEXT: v} for v in self.L4]
+            basic_attributes[self.K3] = self.L4
             output = {ROOT: basic_attributes}
 
         return XmlTDef(sans_attributes, _input, output, speed)
@@ -311,8 +291,7 @@ class TestXmlToJson:
             output = {ROOT: {self.K3: self.L5}}
 
         else:
-            basic_attributes[TEXT] = None
-            basic_attributes[self.K3] = [dict(text=None, **v) for v in self.L5]
+            basic_attributes[self.K3] = self.L5
             output = {ROOT: basic_attributes}
 
         return XmlTDef(sans_attributes, _input, output, speed)
@@ -342,7 +321,6 @@ class TestXmlToJson:
             output = {ROOT: {self.K3: [v[TEXT] for v in self.L6]}}
 
         else:
-            basic_attributes[TEXT] = None
             basic_attributes[self.K3] = self.L6
             output = {ROOT: basic_attributes}
 
