@@ -1,4 +1,4 @@
-from typing import Generator, Optional, Union, Any, Callable
+from typing import Generator, Optional, Union, Any, Callable, Dict
 
 from funk_py.modularity.logging import make_logger
 
@@ -408,3 +408,11 @@ def align_into_list(order: Union[list, dict], to_align: dict, default: Any = Non
             output[order.index(k)] = v
 
     return output
+
+
+def acc_(builder: Dict[str, list], key: Any, val: Any):
+    if key in builder:
+        builder[str(key)].append(str(val))
+
+    else:
+        builder[str(key)] = [str(val)]
