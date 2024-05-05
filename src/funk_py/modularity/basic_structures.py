@@ -70,19 +70,19 @@ class Speed:
         """The rate at which it would be done."""
         return self._number / self._duration
 
-    def __eq__(self, other) -> bool: return self._comp(operator.eq, other, 'compared')
+    def __eq__(self, other) -> bool: return self._comp(operator.eq, other)
 
-    def __lt__(self, other) -> bool: return self._comp(operator.lt, other, 'compared')
+    def __lt__(self, other) -> bool: return self._comp(operator.lt, other)
 
-    def __le__(self, other) -> bool: return self._comp(operator.le, other, 'compared')
+    def __le__(self, other) -> bool: return self._comp(operator.le, other)
 
-    def __gt__(self, other) -> bool: return self._comp(operator.gt, other, 'compared')
+    def __gt__(self, other) -> bool: return self._comp(operator.gt, other)
 
-    def __ge__(self, other) -> bool: return self._comp(operator.ge, other, 'compared')
+    def __ge__(self, other) -> bool: return self._comp(operator.ge, other)
 
-    def __ne__(self, other) -> bool: return self._comp(operator.ne, other, 'compared')
+    def __ne__(self, other) -> bool: return self._comp(operator.ne, other)
 
-    def _comp(self, _operator, other, msg):
+    def _comp(self, _operator, other):
         if isinstance(other, Speed):
             return _operator(self._number / self._duration, other)
 
@@ -93,7 +93,56 @@ class Speed:
             return _operator(self._number / self._duration, other)
 
         else:
-            raise TypeError(f'{type(other)} cannot be {msg} to a Speed.')
+            raise TypeError(f'{type(other)} cannot be compared to a Speed.')
+
+    def __add__(self, other) -> Union['Speed', int, float]:
+        if isinstance(other, Speed):
+            return Speed(self._number + other.number, self._duration + other.duration)
+
+        elif (t := type(other)) is int:
+            return self._number // self._duration + other
+
+        elif t is float:
+            return self.number / self.duration + other
+
+        else:
+            raise TypeError(f'{type(other)} cannot be added to a Speed.')
+
+    def __sub__(self, other) -> Union['Speed', int, float]:
+        if isinstance(other, Speed):
+            return Speed(self._number - other.number, self._duration - other.duration)
+
+        elif (t := type(other)) is int:
+            return self._number // self._duration - other
+
+        elif t is float:
+            return self.number / self.duration - other
+
+        else:
+            raise TypeError(f'{type(other)} cannot be subtracted from a Speed.')
+
+    def __truediv__(self, other) -> 'Speed':
+        if isinstance(other, Speed):
+            return Speed(self._number // other.number, self._duration / other.duration)
+
+        elif (t := type(other)) is int:
+            return Speed(self._number // other, self._duration)
+
+        elif t is float:
+            return Speed(self._number / other, self._duration)
+
+        else:
+            raise TypeError(f'{type(other)} cannot be subtracted from a Speed.')
+
+    def __mul__(self, other) -> 'Speed':
+        if isinstance(other, Speed):
+            return Speed(self._number * other.number, self._duration * other.duration)
+
+        elif (t := type(other)) in (int, float):
+            return Speed(self._number * other, self._duration)
+
+        else:
+            raise TypeError(f'{type(other)} cannot be subtracted from a Speed.')
 
     def __neg__(self): raise TypeError('Speed is not allowed to be negative.')
 
