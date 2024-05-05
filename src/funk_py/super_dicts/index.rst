@@ -3,16 +3,18 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to funk_py's documentation!
+Super Dicts
 ===================================
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   sorting/index
-   modularity/index
-   super_dicts/index
+.. autoclass:: funk_py.super_dicts.drop_none_dict.DropNoneDict
+   :members:
+
+.. autoclass:: funk_py.super_dicts.list_dict.ListDict
+   :members:
 
 
 Indices and tables
