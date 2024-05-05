@@ -39,6 +39,7 @@ TEXT = 'text'
 PS_55_000 = Speed(27_500, 0.5)
 PS_45_000 = Speed(9_000, 0.2)
 PS_40_000 = Speed(10_000, 0.25)
+PS_35_000 = Speed(15_000, 0.5)
 PS_5_000 = Speed(2_500, 0.5)
 PS_6_000 = Speed(3_000, 0.5)
 PS_8_000 = Speed(4_000, 0.5)
@@ -372,7 +373,7 @@ class TestCsvToJson:
             _input += '\n' + ','.join(f'"{_v}"' for _v in v)
             output.append({_k: _v for _k, _v in zip(k, v)})
             
-        return OTDef(_input, output, PS_45_000)
+        return OTDef(_input, output, PS_35_000)
     
     def test_quoted_csv_commas_inside(self, quoted_csv_commas_inside):
         assert csv_to_json(quoted_csv_commas_inside.input) == quoted_csv_commas_inside.output
