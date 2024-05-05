@@ -11,6 +11,7 @@ copyright = '2024, Erich Kopp'
 author = 'Erich Kopp'
 release = '0.2'
 add_module_names = False
+autoclass_content = 'both'
 
 # -- Path setup --------------------------------------------------------------
 
