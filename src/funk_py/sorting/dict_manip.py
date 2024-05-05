@@ -416,3 +416,11 @@ def acc_(builder: Dict[str, list], key: Any, val: Any):
 
     else:
         builder[str(key)] = [str(val)]
+
+
+def nest_under_keys(data: Any, *keys) -> dict:
+    worker = data
+    for key in reversed(keys):
+        worker = {key: worker}
+
+    return worker
