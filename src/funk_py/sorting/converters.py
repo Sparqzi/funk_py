@@ -578,3 +578,8 @@ def jsonl_to_json(data: str) -> list:
     :return: A ``list`` containing the ``dict`` and ``list`` items stored in the JSONL string.
     """
     return [json.loads(p) for p in data.split('\n')]
+
+
+def json_to_jsonl(data: List[Union[list, dict]]) -> str:
+    return '\n'.join(json.dumps(line) for line in data)
+
