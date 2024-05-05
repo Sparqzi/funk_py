@@ -362,10 +362,16 @@ def json_to_xml(data: dict, favor_attributes: bool = False,
             if text:
                 root.text = text
 
-            return ET.tostring(root)
-
         elif t is list:
-            raise ValueError('No lists as root to generate XML data.')
+            for v in data[key]:
+                _, elements, _ = _json_dict_to_element(v, favor_attributes, avoid_text_and_elements)
+                for element in elements:
+                    root.append(element)
+
+        else:
+            root.text = str(data[key])
+
+        return ET.tostring(root).decode()
 
     elif len(data) > 1:
         raise ValueError('The root dictionary should only have one key to generate XML data.')
@@ -465,7 +471,19 @@ def _parse_list_in_list_to_elements(tag: Any, val: list, fa, ave):
     if __text is not None:
         current.text = str(__text)
 
-    return current
+    else:
+        output = []
+        for v in val:
+            if isinstance(v, dict):
+                attributes, elements, text = _json_dict_to_element(v, fa, ave)
+                if len(attributes) or len(elements):
+                    output.append(current := ET.Element(str(tag), attributes))
+                    for element in elements:
+                        current.append(element)
+
+        return output
+
+    return [current]
 
 
 def _parse_dict_in_list_to_elements(tag: Any, val: dict, fa, ave):
@@ -499,7 +517,7 @@ def _parse_pair_to_elements(elements: list, attributes: dict, key: Any, val: Any
                     default(key, v)
 
             elif isinstance(v, list):
-                elements.append(_parse_list_in_list_to_elements(key, v, fa, ave))
+                elements.extend(_parse_list_in_list_to_elements(key, v, fa, ave))
 
             else:
                 acc_(list_handler, key, v)
