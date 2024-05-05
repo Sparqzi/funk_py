@@ -1177,7 +1177,9 @@ parsed. These instructions can be included in ``output_map`` by replacing a valu
 composed of the string representation of the PickInstruction followed by the value, which may either
 be further paths, or may specify the end of a path. Parsing instructions available include
 :ref:`JSON <json-label>`, :ref:`JSONL <jsonl-label>`,
-:ref:`JSON_SINGLE_QUOTE <json-single-quote-label>`,
+:ref:`JSON_SINGLE_QUOTE <json-single-quote-label>`, :ref:`XML <xml-label>`,
+:ref:`XML_SA <xml-sa-label>`, :ref:`CSV <csv-label>`, :ref:`E_LIST <e-list-label>`,
+:ref:`LIST <list-label>`, :ref:`YAML <yaml-label>`, and :ref:`TUPLE_DICT <tuple-dict-label>`.
 
 
 .. _json-label:
@@ -1214,7 +1216,7 @@ representation of ``'json\''``.
 
 XML Instruction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When using the ``PickInstruction.XML`` parsing type,:func:`pick` expects an XML string, and will
+When using the ``PickInstruction.XML`` parsing type, :func:`pick` expects an XML string, and will
 attempt to interpret the current value as such before continuing to follow any further paths. It
 converts XML data to a JSON representation. Attributes will be interpreted as keys of a dict, as
 will tags within elements. If there are multiple of a tag within one element, the values inside
@@ -1226,7 +1228,7 @@ has a string representation of ``'xml'``.
 
 XML Sans Attributes Instruction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When using the ``PickInstruction.XMLSA`` parsing type,:func:`pick` expects an XML string, and will
+When using the ``PickInstruction.XMLSA`` parsing type, :func:`pick` expects an XML string, and will
 attempt to interpret the current value as such before continuing to follow any further paths. It
 converts XML data to a JSON representation. Tags within elements will be interpreted as keys. If
 there are multiple of a tag within one element, the values inside of those tags will be treated as
@@ -1234,3 +1236,46 @@ individual items and added to a list under that tag as a key. Genuine text value
 be used as a value under tags, unless for some reason there is no text value or internal tag, in
 which case, attribute-value pairs will be used as the key-value pairs. This instruction has a string
 representation of ``'xml-sa'``.
+
+.. _csv-label:
+
+CSV Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.CSV`` parsing type, :func:`pick` expects a CSV string, and will
+attempt to interpret the current value as such before continuing to follow any further paths. It
+converts CSV data to a list of dicts, using the first line as the keys for all following rows. This
+instruction has a string representation of ``'csv'``.
+
+.. _e-list-label:
+
+Expected List Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.ELIST`` parsing type, :func:`pick` does not expect a specific
+object, but will check if the current values is already a list. If the current values is a list, it
+will follow further paths on that list, but if it is not, the current value will be added to a list
+as an element. The string representation of this instruction is ``'e-list'``.
+
+.. _list-label:
+
+List Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.LIST`` parsing type, :func:`pick` expects a comma-separated string,
+and will interpret the current value as a list separated by commas. This instruction has a string
+representation of ``'list'``.
+
+.. _yaml-label:
+
+YAML Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``PickInstruction.YAML`` parsing type, :func:`pick` expects a YAML string and will
+interpret the current value as such. It will then follow further paths on the generated object. This
+instruction has a string representation of ``'yaml'``.
+
+.. _tuple-dict-label:
+
+Tuple Dict Instruction
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When using the ``Pickinstruction.TUPLE_DICT`` parsing type, :func:`pick` expects either a list or a
+dictionary. It will attempt to generate a dictionary from key-val pairs found within the current
+value following the rules of :ref:`convert-tuplish-dict-label`. This instruction has a string
+representation of ``'tuple-dict'``.
