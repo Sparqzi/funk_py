@@ -1,13 +1,36 @@
-import json
 from collections import namedtuple
-
+from copy import deepcopy
+import csv
+import io
+import json
+from typing import List, Any, Union, Tuple, Dict, Optional, Callable
 import yaml
-from typing import List, Any, Union
-from xml.etree import ElementTree as ET
 
 import pytest
 
+from funk_py.modularity.basic_structures import pass_, Speed
+from funk_py.sorting.dict_manip import align_to_list, nest_under_keys
+from t_support import too_slow_func_one_arg, cov, cov_counter
 from funk_py.sorting.pieces import pick, PickType
+from funk_py.sorting.converters import json_to_xml, json_to_csv, json_to_jsonl, xml_to_json
+
+
+# The following manages whether the generated coverage instance from t_support should report. This
+# method of coverage is used so that coverage can be turned off to not interfere in timed tests.
+@pytest.fixture(scope='session', autouse=True)
+def c():
+    cov_counter.value += 1
+
+    yield cov
+
+    cov_counter.value -= 1
+
+    # We don't want to report till all test modules are completed...
+    if not cov_counter.value:
+        cov.stop()
+        cov.save()
+        cov.html_report()
+
 
 COM = 'combinatorial'
 TAN = 'tandem'
@@ -21,8 +44,8 @@ VALS1 = ['llama', 'horse', 'bear']
 VALS2 = ['Hope', 'Jeffrey', 'Maldo']
 VALS3 = ['funny', 'scary', 'happy']
 VALS4 = ['puppy', 'cow', 'hippo']
-VALS5 = ['Caleb', 'Sidney', 'Constantine']
-VALS6 = ['lovely', 'strange', 'terrifying']
+VALS5 = ['"Caleb', 'Sidney', 'Constan,tine']
+VALS6 = ['lovely"', 'strange', 'terrifying']
 VALS7 = ['snake', 'capy"bara', 'mon"key']
 VALS8 = ['Gerald Hempphry', 'Castlin', 'Al']
 VALS9 = ['sil"ly', 'jer\'kish', 'tense, irritating']
@@ -31,138 +54,90 @@ VALS11 = ['Clance', 'Jerry', 'Calvin']
 VALS12 = ['crazy', 'level-headed', 'observant']
 DATA_KEY1 = 'data'
 DATA_KEY2 = 'group'
+GEN_XML_MOD = (DATA_KEY1, DATA_KEY2)
 TEXT = 'text'
 
 
-def compare_lists_of_dicts_unordered(list1, list2):
+def compare_lists_of_dicts_unordered(list1, list2) -> bool:
     sorted1 = sorted(list1, key=lambda d: sorted(d.items()))
     sorted2 = sorted(list2, key=lambda d: sorted(d.items()))
     assert sorted1 == sorted2
 
 
-def make_csv(keys: List[str], *val_sets: list) -> str:
-    builder = ','.join(key if ',' not in key else f'"{key}"' for key in keys)
-    for vals in zip(*val_sets):
-        builder += '\n'
-        builder += ','.join(val if ',' not in val else f'"{val}"' for val in vals)
-
-    return builder
-
-
-def make_spacy_csv(keys: List[str], *val_sets: list) -> str:
-    builder = ', '.join(key if ',' not in key else f'"{key}"' for key in keys)
-    for vals in zip(*val_sets):
-        builder += '\n'
-        builder += ','.join(f' {val}' if ',' not in val else f'"{val}"' for val in vals)
-
-    return builder
-
-
-def make_json_dict(keys: List[str], *vals: Any) -> dict:
+def make_dict(keys: List[str], vals: list) -> dict:
     return dict(zip(keys, vals))
 
 
-def make_json_list(keys: List[str], *val_sets: list) -> list:
-    builder = []
-    val_sets = zip(*val_sets)
-    for vals in val_sets:
-        builder.append(dict(zip(keys, vals)))
-
-    return builder
+def make_list(keys: List[str], *val_sets: list) -> list:
+    return [make_dict(keys, val_set) for val_set in zip(*val_sets)]
 
 
-def make_json_dict_str(keys: List[str], *vals: Any) -> str:
-    return json.dumps(dict(zip(keys, vals)))
+def json_to_spacy_csv(data: List[dict]) -> str:
+    headers = set()
+    for line in data:
+        headers.update(line.keys())
+
+    headers = list(headers)
+    str_headers = [str(h).center(20) for h in headers]
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(str_headers)
+    for row in data:
+        writer.writerow([str(v).center(20) for v in align_to_list(headers, row, '')])
+
+    return output.getvalue()
 
 
-def make_json_list_str(keys: List[str], *val_sets: list) -> str:
-    return json.dumps(make_json_list(keys, *val_sets))
+def json_to_xml_sa_list(data: List[dict]) -> str:
+    return json_to_xml({DATA_KEY1: {DATA_KEY2: data}})
 
 
-def make_jsonl_list(keys: List[str], *val_sets: list) -> str:
-    source = make_json_list(keys, *val_sets)
-    return '\n'.join(json.dumps(group) for group in source)
+def json_to_xml_list(data: List[dict]) -> str:
+    return json_to_xml({DATA_KEY1: {DATA_KEY2: data}}, True)
 
 
-def safe_json(value):
-    if isinstance(value, list) or isinstance(value, dict):
-        return json.dumps(value)
-
-    return str(value)
+def json_to_xml_sa_dict(data) -> str:
+    return json_to_xml({DATA_KEY1: data})
 
 
-def make_xml_dict_no_attr(keys: List[str], *vals: Any) -> str:
-    builder = ET.Element(DATA_KEY2)
-    for i in range(len(keys)):
-        cur = ET.SubElement(builder, keys[i])
-        xmlify_no_attr(cur, vals[i])
-
-    return ET.tostring(builder, 'unicode')
+def json_to_xml_dict(data) -> str:
+    return json_to_xml({DATA_KEY1: data}, True)
 
 
-def xmlify_no_attr(builder: ET.Element, _input: Union[dict, list, str]):
-    if (t := type(_input)) is dict:
-        for key, val in _input.items():
-            cur = ET.SubElement(builder, key)
-            xmlify_no_attr(cur, val)
-
-    elif t is list:
-        for val in _input:
-            cur = ET.SubElement(builder, DATA_KEY1)
-            xmlify_no_attr(cur, val)
-
-    else:
-        builder.text = _input
-
-
-def make_xml_list_no_attr(keys: List[str], *val_sets: list) -> str:
-    builder = ET.Element(DATA_KEY1)
-    for i in range(len(val_sets[0])):
-        cur = ET.SubElement(builder, DATA_KEY2)
-        for j in range(len(keys)):
-            _cur = ET.SubElement(cur, keys[j])
-            _cur.text = val_sets[j][i]
-
-    return ET.tostring(builder, 'unicode')
-
-
-def make_xml_dict_attr(keys: List[str], *vals: Any) -> str:
-    builder = ET.Element(DATA_KEY2, make_json_dict(keys, *[safe_json(v) for v in vals]))
-    return ET.tostring(builder, 'unicode')
-
-
-def make_xml_list_attr(keys: List[str], *val_sets: list) -> str:
-    builder = ET.Element(DATA_KEY1)
-    for vals in zip(*val_sets):
-        ET.SubElement(builder, DATA_KEY2, dict(zip(keys, vals)))
-
-    return ET.tostring(builder, 'unicode')
-
-
-def make_yaml_dict(keys: List[str], *vals: Any) -> str:
-    return yaml.dump(make_json_dict(keys, *vals))
-
-
-def make_yaml_list(keys: List[str], *val_sets: list) -> str:
-    return yaml.dump(make_json_list(keys, *val_sets))
-
-
+TBase = namedtuple('TBase', {'func', 'name', 'speed', 'output_modifier'})
 ListSet = namedtuple('ListSet',
-                     ('list1', 'list2', 'output_map', 'result_set', 'number', 'duration', 'name'))
-DictSet = namedtuple('DictSet', ('dict', 'output_map', 'result_set', 'number', 'duration'))
-
+                     ('source1', 'source2', 'list1', 'list2', 'output_map1', 'output_map2',
+                      'result_set', 'speed', 'name'))
+DictSet = namedtuple('DictSet', ('source', 'dict', 'output_map', 'result_set', 'speed', 'name'))
 TstDef = namedtuple('TstDef', {'func', 'output_map', 'result_set'})
 
 
+PS_80_000 = Speed(40_000, 0.5)
+PS_50_000 = Speed(25_000, 0.5)
+PS_30_000 = Speed(15_000, 0.5)
+PS_20_000 = Speed(10_000, 0.5)
+PS_18_000 = Speed(9_000, 0.5)
+PS_14_000 = Speed(7_000, 0.5)
+PS_10_000 = Speed(5_000, 0.5)
+PS_6_666__ = Speed(5_000, 0.75)
+PS_6_000 = Speed(4_500, 0.75)
+PS_4_000 = Speed(2_000, 0.5)
+PS_2_500 = Speed(1_250, 0.5)
+PS_1_000 = Speed(500, 0.5)
+PS_800 = Speed(400, 0.5)
+PS_500 = Speed(250, 0.5)
+PS_250 = Speed(500, 2)
+
+
 list_fixture = pytest.fixture(params=(
-    (make_json_list, None),
-    (make_json_list_str, 'json'),
-    (make_jsonl_list, 'jsonl'),
-    (make_xml_list_attr, 'xml'),
-    (make_xml_list_no_attr, 'xml-sa'),
-    (make_csv, 'csv'),
-    (make_spacy_csv, 'csv'),
-    (make_yaml_list, 'yaml'),
+    TBase(func=pass_, name=None, speed=PS_50_000, output_modifier=None),
+    TBase(func=json.dumps, name='json', speed=PS_14_000, output_modifier=None),
+    TBase(func=json_to_jsonl, name='jsonl', speed=PS_20_000, output_modifier=None),
+    TBase(func=json_to_xml_list, name='xml', speed=PS_10_000, output_modifier=GEN_XML_MOD),
+    TBase(func=json_to_xml_sa_list, name='xml-sa', speed=PS_10_000, output_modifier=GEN_XML_MOD),
+    TBase(func=json_to_csv, name='csv', speed=PS_20_000, output_modifier=None),
+    TBase(func=json_to_spacy_csv, name='csv', speed=PS_20_000, output_modifier=None),
+    TBase(func=yaml.dump, name='yaml', speed=PS_800, output_modifier=None),
 ), ids=(
     'regular lists',
     'json string lists',
@@ -175,12 +150,46 @@ list_fixture = pytest.fixture(params=(
 ))
 
 
+def make_two_lists(case: TBase, list1_def: list, list2_def: list, result1_def: list,
+                   result2_def: list, output_map: Union[dict, list],
+                   o_output_map: Union[dict, list] = None) -> ListSet:
+    list1 = case.func(make_list(*list1_def))
+    list2 = case.func(make_list(*list2_def))
+    result1 = make_list(*result1_def)
+    result2 = make_list(*result2_def)
+
+    # Set up the accumulator results, since they're different.
+    keys, *vals = result1_def
+    acc1 = make_dict(keys, vals)
+    keys, *vals = result2_def
+    acc2 = make_dict(keys, vals)
+
+    # If o_output_map is not specified, desired behavior is to duplicate output_map.
+    if o_output_map is None:
+        o_output_map = deepcopy(output_map)
+
+    # Mutate output_map appropriately.
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
+        o_output_map = nest_under_keys(o_output_map, *output_modifier)
+
+    if (name := case.name) is not None:
+        output_map = [name, output_map]
+        o_output_map = [name, o_output_map]
+
+    return ListSet(list1_def, list2_def, list1, list2, output_map, o_output_map, {
+        COM: [result1, result2],
+        TAN: [result1, result2],
+        RED: [[result1[2]], [result2[2]]],
+        ACC: [[acc1], [acc2]],
+    }, case.speed, name)
+
 @list_fixture
 def similar_lists(request):
     """
     .. code-block:: python
 
-        input = [
+        _input = [
             {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
             {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
             {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
@@ -205,29 +214,12 @@ def similar_lists(request):
             }
         ]
     """
-    func, output_map = request.param
-    list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
-    list2 = func(KEYS[:3], VALS4, VALS5, VALS6)
-    _output_map = dict(zip(KEYS[:3], OUT_KEYS[:3]))
-    if output_map is not None:
-        if output_map in ('xml', 'xml-sa'):
-            _output_map = [output_map, {DATA_KEY1: {DATA_KEY2: _output_map}}]
-
-        else:
-            _output_map = [output_map, _output_map]
-
-    result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
-    result2 = make_json_list(OUT_KEYS[:3], VALS4, VALS5, VALS6)
-
-    return ListSet(list1, list2, _output_map, {
-        COM: [result1, result2],
-        TAN: [result1, result2],
-        RED: [[result1[2]], [result2[2]]],
-        ACC: [
-            [dict(zip(OUT_KEYS[:3], [VALS1, VALS2, VALS3]))],
-            [dict(zip(OUT_KEYS[:3], [VALS4, VALS5, VALS6]))],
-        ],
-    })
+    return make_two_lists(request.param,
+                          [KEYS[:3], VALS1, VALS2, VALS3],
+                          [KEYS[:3], VALS4, VALS5, VALS6],
+                          [OUT_KEYS[:3], VALS1, VALS2, VALS3],
+                          [OUT_KEYS[:3], VALS4, VALS5, VALS6],
+                          make_dict(KEYS[:3], OUT_KEYS[:3]))
 
 
 @list_fixture
@@ -235,7 +227,7 @@ def dissimilar_lists(request):
     """
     .. code-block:: python
 
-        input = [
+        _input = [
             {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
             {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
             {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
@@ -260,34 +252,13 @@ def dissimilar_lists(request):
             }
         ]
     """
-    func, output_map = request.param
-    list1 = func(KEYS[:3], VALS1, VALS2, VALS3)
-    list2 = func(KEYS[3:6], VALS4, VALS5, VALS6)
-    _output_map1 = dict(zip(KEYS[:3], OUT_KEYS[:3]))
-    _output_map2 = dict(zip(KEYS[3:6], OUT_KEYS[3:6]))
-    if output_map is not None:
-        if output_map in ('xml', 'xml-sa'):
-            _output_map1 = [output_map, {DATA_KEY1: {DATA_KEY2: _output_map1}}]
-            _output_map2 = [output_map, {DATA_KEY1: {DATA_KEY2: _output_map2}}]
-
-        else:
-            _output_map1 = [output_map, _output_map1]
-            _output_map2 = [output_map, _output_map2]
-
-    _output_map = [_output_map1, _output_map2]
-
-    result1 = make_json_list(OUT_KEYS[:3], VALS1, VALS2, VALS3)
-    result2 = make_json_list(OUT_KEYS[3:6], VALS4, VALS5, VALS6)
-
-    return ListSet(list1, list2, _output_map, {
-        COM: [result1, result2],
-        TAN: [result1, result2],
-        RED: [[result1[2]], [result2[2]]],
-        ACC: [
-            [dict(zip(OUT_KEYS[:3], [VALS1, VALS2, VALS3]))],
-            [dict(zip(OUT_KEYS[3:6], [VALS4, VALS5, VALS6]))],
-        ],
-    })
+    return make_two_lists(request.param,
+                          [KEYS[:3], VALS1, VALS2, VALS3],
+                          [KEYS[3:6], VALS4, VALS5, VALS6],
+                          [OUT_KEYS[:3], VALS1, VALS2, VALS3],
+                          [OUT_KEYS[3:6], VALS4, VALS5, VALS6],
+                          make_dict(KEYS[:3], OUT_KEYS[:3]),
+                          make_dict(KEYS[3:6], OUT_KEYS[3:6]))
 
 
 @list_fixture
@@ -295,7 +266,7 @@ def more_dissimilar_lists(request):
     """
     .. code-block:: python
 
-        input = [
+        _input = [
             {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
             {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
             {'k0': 'v12', 'k1': 'v22', 'k2': 'v32'}
@@ -320,42 +291,21 @@ def more_dissimilar_lists(request):
             }
         ]
     """
-    func, output_map = request.param
-    list1 = func(KEYS[6:9], VALS7, VALS8, VALS9)
-    list2 = func(KEYS[9:12], VALS10, VALS11, VALS12)
-    _output_map1 = dict(zip(KEYS[6:9], OUT_KEYS[6:9]))
-    _output_map2 = dict(zip(KEYS[9:12], OUT_KEYS[9:12]))
-    if output_map is not None:
-        if output_map in ('xml', 'xml-sa'):
-            _output_map1 = [output_map, {DATA_KEY1: {DATA_KEY2: _output_map1}}]
-            _output_map2 = [output_map, {DATA_KEY1: {DATA_KEY2: _output_map2}}]
-
-        else:
-            _output_map1 = [output_map, _output_map1]
-            _output_map2 = [output_map, _output_map2]
-
-    _output_map = [_output_map1, _output_map2]
-
-    result1 = make_json_list(OUT_KEYS[6:9], VALS7, VALS8, VALS9)
-    result2 = make_json_list(OUT_KEYS[9:12], VALS10, VALS11, VALS12)
-
-    return ListSet(list1, list2, _output_map, {
-        COM: [result1, result2],
-        TAN: [result1, result2],
-        RED: [[result1[2]], [result2[2]]],
-        ACC: [
-            [dict(zip(OUT_KEYS[6:9], [VALS7, VALS8, VALS9]))],
-            [dict(zip(OUT_KEYS[9:12], [VALS10, VALS11, VALS12]))],
-        ],
-    })
+    return make_two_lists(request.param,
+                          [KEYS[6:9], VALS7, VALS8, VALS9],
+                          [KEYS[9:12], VALS10, VALS11, VALS12],
+                          [OUT_KEYS[6:9], VALS7, VALS8, VALS9],
+                          [OUT_KEYS[9:12], VALS10, VALS11, VALS12],
+                          make_dict(KEYS[6:9], OUT_KEYS[6:9]),
+                          make_dict(KEYS[9:12], OUT_KEYS[9:12]))
 
 
 dict_fixture = pytest.fixture(params=(
-    (make_json_dict, None),
-    (make_json_dict_str, 'json'),
-    (make_xml_dict_attr, 'xml'),
-    (make_xml_dict_no_attr, 'xml-sa'),
-    (make_yaml_dict, 'yaml'),
+    TBase(func=pass_, name=None, speed=PS_80_000, output_modifier=None),
+    TBase(func=json.dumps, name='json', speed=PS_18_000, output_modifier=None),
+    TBase(func=json_to_xml_dict, name='xml', speed=PS_6_000, output_modifier=(DATA_KEY1,)),
+    TBase(func=json_to_xml_sa_dict, name='xml-sa', speed=PS_6_666__, output_modifier=(DATA_KEY1,)),
+    TBase(func=yaml.dump, name='yaml', speed=PS_1_000, output_modifier=None),
 ), ids=(
     'regular dict',
     'json string dict',
@@ -365,12 +315,55 @@ dict_fixture = pytest.fixture(params=(
 ))
 
 
+def correct_speed(overrides: Dict[tuple, Speed], outer_overrides: Dict[Optional[str], Speed],
+                  outer_name: Optional[str], outer: Speed,
+                  inner_name: Union[str, Tuple[str, ...]] = None,
+                  inner: Union[Speed, Tuple[Speed, ...]] = None,
+                  inner_modifier: Union[int, float] = 1,
+                  calc: Callable[[Speed, Speed], Speed] = None):
+    if (speed := overrides.get((outer_name, inner_name))) is not None:
+        # Overrides should be taken as strictly-correct, they are mapped directly to combinations,
+        # and should be used when the calculation for a particular combo is wrong.
+        return speed
+
+    if (speed := outer_overrides.get(outer_name)) is not None:
+        # outer_overrides only apply to the outer speed, and should not result in early return.
+        # They are to be used when a fixture's speeds generally cover a case, but do not fully cover
+        # it (one name for outer experiences abnormally-slow tests).
+        outer = speed
+
+    if inner is None:
+        # If inner speed does not exist, just return outer_speed.
+        return outer
+
+    # Apply the modifier to inner speed.
+    if (t := type(inner)) is tuple:
+        inner = (inn * inner_modifier for inn in inner)
+
+    else:
+        inner = inner * inner_modifier
+
+    if calc is not None:
+        # Run the given calculation on the values.
+        # We assume that the user accounted for inner being a tuple if it is.
+        return calc(outer, inner)
+
+    elif t is tuple:
+        # No calculation was given. We just assume the slowest speed controls the test.
+        # In this case, the tuple must be unpacked lest we have unintended errors.
+        return min(outer, *inner)
+
+    # No calculation was given. We just assume the slowest speed controls the test.
+    # In this case, inner does not have to be unpacked.
+    return min(outer, inner)
+
+
 @dict_fixture
 def dicts_with_one_nested_list(request, similar_lists):
     """
     .. code-block:: python
 
-        input = {
+        _input = {
             'k3': [
                 {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
                 {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
@@ -397,37 +390,32 @@ def dicts_with_one_nested_list(request, similar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    dict1 = func([KEYS[3]], similar_lists.list1)
-    dict2 = func([KEYS[3]], similar_lists.list2)
-    _output_map = similar_lists.output_map
-    if output_map is not None:
-        if output_map == 'xml':
-            if type(similar_lists.output_map) is dict:
-                _output_map = ['json', _output_map]
+    case = request.param
+    speed = correct_speed({
+        ('json', 'csv'): PS_14_000,
+        ('yaml', None): PS_500
+    }, {}, name := case.name, case.speed, similar_lists.name, similar_lists.speed)
 
-            _output_map = {DATA_KEY2: {KEYS[3]: _output_map}}
+    dict1 = case.func(s1 := make_dict([KEYS[3]], [similar_lists.list1]))
+    dict2 = case.func(s2 := make_dict([KEYS[3]], [similar_lists.list2]))
 
-        elif output_map == 'xml-sa':
-            if type(similar_lists.output_map) is dict:
-                _output_map = {DATA_KEY1: _output_map}
+    output_map1 = {KEYS[3]: similar_lists.output_map1}
+    output_map2 = {KEYS[3]: similar_lists.output_map2}
+    if (output_modifier := case.output_modifier) is not None:
+        output_map1 = nest_under_keys(output_map1, *output_modifier)
+        output_map2 = nest_under_keys(output_map2, *output_modifier)
 
-            _output_map = {DATA_KEY2: {KEYS[3]: _output_map}}
+    if name is not None:
+        output_map1 = [name, output_map1]
+        output_map2 = [name, output_map2]
 
-        else:
-            _output_map = {KEYS[3]: _output_map}
-
-        _output_map = [output_map, _output_map]
-
-    else:
-        _output_map = {KEYS[3]: _output_map}
-
-    return ListSet(dict1, dict2, _output_map, {
+    # Build results:
+    return ListSet(s1, s2, dict1, dict2, output_map1, output_map2, {
         COM: similar_lists.result_set[COM],
         TAN: similar_lists.result_set[TAN],
         RED: similar_lists.result_set[RED],
         ACC: similar_lists.result_set[ACC],
-    })
+    }, speed, (name, similar_lists.name))
 
 
 @dict_fixture
@@ -435,7 +423,7 @@ def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
     """
     .. code-block:: python
 
-        input = {
+        _input = {
             'k6': [
                 [
                     {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
@@ -475,37 +463,33 @@ def dict_with_two_nested_similar_lists_in_list(request, similar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    _dict = func([KEYS[6]], [similar_lists.list1, similar_lists.list2])
-    _output_map = similar_lists.output_map
-    if output_map is not None:
-        if output_map == 'xml-sa':
-            if type(similar_lists.output_map) is dict:
-                _output_map = {DATA_KEY1: _output_map}
+    case = request.param
+    speed = correct_speed({
+        ('yaml', None): PS_500,
+        ('xml', 'xml'): PS_4_000,
+        ('xml', 'xml-sa'): PS_4_000,
+        ('json', 'csv'): PS_6_666__,
+        ('yaml', 'yaml'): PS_250
+    }, {}, name := case.name, case.speed, similar_lists.name, similar_lists.speed, 0.5)
 
-            _output_map = {DATA_KEY1: _output_map}
+    _dict = case.func(source := make_dict([KEYS[6]], [[similar_lists.list1, similar_lists.list2]]))
 
-        elif output_map == 'xml':
-            _output_map = ['json', _output_map]
+    output_map = make_dict([KEYS[6]], [similar_lists.output_map1])
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
 
-        _output_map = {KEYS[6]: _output_map}
+    if name is not None:
+        output_map = [name, output_map]
 
-        if 'xml' in output_map:
-            _output_map = {DATA_KEY2: _output_map}
-
-        _output_map = [output_map, _output_map]
-
-    else:
-        _output_map = {KEYS[6]: _output_map}
-
+    # Build results:
     res = similar_lists.result_set[COM]
 
-    return DictSet(_dict, _output_map, {
+    return DictSet(source, _dict, output_map, {
         COM: res[0] + res[1],
         TAN: res[0] + res[1],
         RED: [res[1][2]],
-        ACC: [dict(zip(OUT_KEYS[:3], [VALS1 + VALS4, VALS2 + VALS5, VALS3 + VALS6]))],
-    })
+        ACC: [make_dict(OUT_KEYS[:3], [VALS1 + VALS4, VALS2 + VALS5, VALS3 + VALS6])],
+    }, speed, (name, similar_lists.name))
 
 
 @dict_fixture
@@ -513,7 +497,7 @@ def dict_with_two_nested_dissimilar_lists_in_list(request, dissimilar_lists):
     """
     .. code-block:: python
 
-        input = {
+        _input = {
             'k6': [
                 [
                     {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
@@ -560,48 +544,52 @@ def dict_with_two_nested_dissimilar_lists_in_list(request, dissimilar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    _dict = func([KEYS[6]], [dissimilar_lists.list1, dissimilar_lists.list2])
-    _output_map = make_json_dict(KEYS[:6], *OUT_KEYS[:6])
-    if isinstance(dissimilar_lists.output_map[0], list):
-        if (t := dissimilar_lists.output_map[0][0]) in ('xml', 'xml-sa'):
-            _output_map = [t, {DATA_KEY1: {DATA_KEY2: _output_map}}]
+    case = request.param
+    speed = correct_speed({
+        ('yaml', None): PS_500,
+        ('yaml', 'yaml'): PS_250,
+        ('json', 'csv'): PS_10_000
+    }, {
+        'xml-sa': PS_2_500
+    }, name := case.name, case.speed, dissimilar_lists.name, dissimilar_lists.speed, 0.5)
+
+    _dict = case.func(
+        source := make_dict([KEYS[6]], [[dissimilar_lists.list1, dissimilar_lists.list2]]))
+
+    if (_name := dissimilar_lists.name) is not None:
+        output_map = dissimilar_lists.output_map1[1]
+        if 'xml' in _name:
+            output_map[DATA_KEY1][DATA_KEY2].update(
+                dissimilar_lists.output_map2[1][DATA_KEY1][DATA_KEY2])
 
         else:
-            _output_map = [t, _output_map]
+            output_map.update(dissimilar_lists.output_map2[1])
 
-    if output_map is not None:
-        if output_map == 'xml-sa':
-            if type(dissimilar_lists.output_map[0]) is dict:
-                _output_map = {DATA_KEY1: _output_map}
-
-            _output_map = {DATA_KEY1: _output_map}
-
-        elif output_map == 'xml':
-            _output_map = ['json', _output_map]
-
-        _output_map = {KEYS[6]: _output_map}
-
-        if 'xml' in output_map:
-            _output_map = {DATA_KEY2: _output_map}
-
-        _output_map = [output_map, _output_map]
+        output_map = [_name, output_map]
 
     else:
-        _output_map = {KEYS[6]: _output_map}
+        output_map = dissimilar_lists.output_map1
+        output_map.update(dissimilar_lists.output_map2)
 
+    output_map = {KEYS[6]: output_map}
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
+
+    if name is not None:
+        output_map = [name, output_map]
+
+    # Build results:
     res = dissimilar_lists.result_set[COM]
-
     copier = res[0][2].copy()
     copier.update(res[1][2])
     red_result = [copier]
 
-    return DictSet(_dict, _output_map, {
+    return DictSet(source, _dict, output_map, {
         COM: res[0] + res[1],
         TAN: res[0] + res[1],
         RED: red_result,
-        ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
-    })
+        ACC: [make_dict(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6])],
+    }, speed, (name, dissimilar_lists.name))
 
 
 @dict_fixture
@@ -609,7 +597,7 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
     """
     .. code-block:: python
 
-        input = {
+        _input = {
             'k6': [
                 {'k0': 'v10', 'k1': 'v20', 'k2': 'v30'},
                 {'k0': 'v11', 'k1': 'v21', 'k2': 'v31'},
@@ -655,29 +643,22 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    _dict = func(KEYS[6:8], dissimilar_lists.list1, dissimilar_lists.list2)
-    _output_map1, _output_map2 = dissimilar_lists.output_map
-    if output_map is not None:
-        if output_map == 'xml-sa':
-            if type(_output_map1) is dict:
-                _output_map1 = {DATA_KEY1: _output_map1}
-                _output_map2 = {DATA_KEY1: _output_map2}
+    case = request.param
+    speed = correct_speed({
+        ('yaml', None): PS_500
+    }, {}, name := case.name, case.speed, dissimilar_lists.name, dissimilar_lists.speed, 1 / 3)
 
-        elif output_map == 'xml' and type(_output_map1) is dict:
-            _output_map1 = ['json', _output_map1]
-            _output_map2 = ['json', _output_map2]
+    _dict = case.func(
+        source := make_dict(KEYS[6:8], [dissimilar_lists.list1, dissimilar_lists.list2]))
 
-        _output_map = {KEYS[6]: _output_map1, KEYS[7]: _output_map2}
+    output_map = {KEYS[6]: dissimilar_lists.output_map1, KEYS[7]: dissimilar_lists.output_map2}
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
 
-        if 'xml' in output_map:
-            _output_map = {DATA_KEY2: _output_map}
+    if name is not None:
+        output_map = [name, output_map]
 
-        _output_map = [output_map, _output_map]
-
-    else:
-        _output_map = {KEYS[6]: _output_map1, KEYS[7]: _output_map2}
-
+    # Build results:
     mul_result = []
     res = dissimilar_lists.result_set[COM]
     for result1 in res[0]:
@@ -696,12 +677,12 @@ def two_nested_lists_under_keys(request, dissimilar_lists):
     copier.update(res[1][2])
     red_result = [copier]
 
-    return DictSet(_dict, _output_map, {
+    return DictSet(source, _dict, output_map, {
         COM: mul_result,
         TAN: tan_result,
         RED: red_result,
-        ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
-    })
+        ACC: [make_dict(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6])],
+    }, speed, (name, dissimilar_lists.name))
 
 
 @dict_fixture
@@ -709,7 +690,7 @@ def dict_with_list_of_dicts(request):
     """
     .. code-block:: python
 
-        input = {
+        _input = {
             'k0': {
                 'k1': [
                     {'k2': {'k3': 'v10'}},
@@ -744,20 +725,29 @@ def dict_with_list_of_dicts(request):
             }
         ]
     """
-    func, output_map = request.param
-    _input = {KEYS[0]: {KEYS[1]: []}}
+    case = request.param
+    speed = correct_speed({}, {
+        None: PS_20_000,
+        'json': PS_14_000,
+        'yaml': PS_500
+    }, name := case.name, case.speed)
 
-    output_map = {KEYS[0]: {KEYS[1]: {KEYS[2]: dict(zip(KEYS[3:9], OUT_KEYS[3:9]))}}}
-    if output_map in ('xml', 'xml-sa'):
-        output_map = {DATA_KEY1: {DATA_KEY2: output_map}}
+    output_map = {KEYS[0]: {KEYS[1]: {KEYS[2]: make_dict(KEYS[3:9], OUT_KEYS[3:9])}}}
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
 
-    _list = _input[KEYS[0]][KEYS[1]]
+    if name is not None:
+        output_map = [name, output_map]
+
+    # Build results AND input:
     mul_result = []
     tan_result = []
     red_result = [dict(zip(OUT_KEYS[3:6], VALS1))]
     red_result[0].update(dict(zip(OUT_KEYS[6:9], VALS2)))
     acc_result = [{k: [v] for k, v in red_result[0].items()}]
 
+    source = {KEYS[0]: {KEYS[1]: []}}
+    _list = source[KEYS[0]][KEYS[1]]
     for i in range(3):
         _list.append({KEYS[2]: {KEYS[3 + i]: VALS1[i]}})
         _list.append({KEYS[2]: {KEYS[6 + i]: VALS2[i]}})
@@ -766,12 +756,14 @@ def dict_with_list_of_dicts(request):
         tan_result.append({OUT_KEYS[3 + i]: VALS1[i]})
         tan_result.append({OUT_KEYS[6 + i]: VALS2[i]})
 
-    return DictSet(_input, output_map, {
+    _dict = case.func(source)
+
+    return DictSet(source, _dict, output_map, {
         COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: acc_result,
-    })
+    }, speed, name)
 
 
 @dict_fixture
@@ -829,31 +821,27 @@ def two_nested_lists_under_double_keys(request, dissimilar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    _dict = func(KEYS[6:8], {KEYS[8]: dissimilar_lists.list1}, {KEYS[9]: dissimilar_lists.list2})
-    _output_map1, _output_map2 = dissimilar_lists.output_map
-    if output_map is not None:
-        if output_map == 'xml-sa' and type(_output_map1) is dict:
-            _output_map1 = {DATA_KEY1: _output_map1}
-            _output_map2 = {DATA_KEY1: _output_map2}
+    case = request.param
+    speed = correct_speed({
+        ('json', None): PS_14_000,
+        ('yaml', None): PS_250
+    }, {
+        'yaml': PS_800
+    }, name := case.name, case.speed, dissimilar_lists.name, dissimilar_lists.speed, 1 / 3)
 
-        _output_map1 = {KEYS[8]: _output_map1}
-        _output_map2 = {KEYS[9]: _output_map2}
+    _dict = case.func(source := make_dict(KEYS[6:8],
+                                          [{KEYS[8]: dissimilar_lists.list1},
+                                           {KEYS[9]: dissimilar_lists.list2}]))
 
-        if output_map == 'xml':
-            _output_map1 = ['json', _output_map1]
-            _output_map2 = ['json', _output_map2]
+    output_map = {KEYS[6]: {KEYS[8]: dissimilar_lists.output_map1},
+                  KEYS[7]: {KEYS[9]: dissimilar_lists.output_map2}}
+    if (output_modifier := case.output_modifier) is not None:
+        output_map = nest_under_keys(output_map, *output_modifier)
 
-        _output_map = {KEYS[6]: _output_map1, KEYS[7]: _output_map2}
+    if name is not None:
+        output_map = [name, output_map]
 
-        if 'xml' in output_map:
-            _output_map = {DATA_KEY2: _output_map}
-
-        _output_map = [output_map, _output_map]
-
-    else:
-        _output_map = {KEYS[6]: {KEYS[8]: _output_map1}, KEYS[7]: {KEYS[9]: _output_map2}}
-
+    # Build results:
     mul_result = []
     res = dissimilar_lists.result_set[COM]
     for result1 in res[0]:
@@ -872,12 +860,12 @@ def two_nested_lists_under_double_keys(request, dissimilar_lists):
     copier.update(res[1][2])
     red_result = [copier]
 
-    return DictSet(_dict, _output_map, {
+    return DictSet(source, _dict, output_map, {
         COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:6], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6]))],
-    })
+    }, speed, name)
 
 
 @dict_fixture
@@ -1114,42 +1102,42 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
             }
         ]
     """
-    func, output_map = request.param
-    _dict = func([KEYS[12], KEYS[15]],
-                 {KEYS[13]: dissimilar_lists.list1, KEYS[14]: dissimilar_lists.list2},
-                 {KEYS[16]: more_dissimilar_lists.list1, KEYS[17]: more_dissimilar_lists.list2})
-    _output_map1, _output_map2 = dissimilar_lists.output_map
-    _output_map3, _output_map4 = more_dissimilar_lists.output_map
-    if output_map is not None:
-        if output_map == 'xml-sa':
-            if type(_output_map1) is dict:
-                _output_map1 = {DATA_KEY1: _output_map1}
-                _output_map2 = {DATA_KEY1: _output_map2}
+    case = request.param
+    speed = correct_speed({}, {}, name := case.name, case.speed,
+                          (dissimilar_lists.name, more_dissimilar_lists.name),
+                          (dissimilar_lists.speed, more_dissimilar_lists.speed),
+                          calc=lambda x, y: min(x, *y) / 6)
 
-            if type(_output_map3) is dict:
-                _output_map3 = {DATA_KEY1: _output_map3}
-                _output_map4 = {DATA_KEY1: _output_map4}
+    source = make_dict([KEYS[12], KEYS[15]],
+                       [
+                           {
+                               KEYS[13]: dissimilar_lists.list1,
+                               KEYS[14]: dissimilar_lists.list2
+                           },
+                           {
+                               KEYS[16]: more_dissimilar_lists.list1,
+                               KEYS[17]: more_dissimilar_lists.list2
+                           }
+                       ])
+    _dict = case.func(source)
 
-        _output_map1 = {KEYS[13]: _output_map1, KEYS[14]: _output_map2}
-        _output_map2 = {KEYS[16]: _output_map3, KEYS[17]: _output_map4}
-
-        if output_map == 'xml':
-            _output_map1 = ['json', _output_map1]
-            _output_map2 = ['json', _output_map2]
-
-        _output_map = {KEYS[12]: _output_map1, KEYS[15]: _output_map2}
-
-        if 'xml' in output_map:
-            _output_map = {DATA_KEY2: _output_map}
-
-        _output_map = [output_map, _output_map]
-
-    else:
-        _output_map = {
-            KEYS[12]: {KEYS[13]: _output_map1, KEYS[14]: _output_map2},
-            KEYS[15]: {KEYS[16]: _output_map3, KEYS[17]: _output_map4},
+    output_map = {
+        KEYS[12]: {
+            KEYS[13]: dissimilar_lists.output_map1,
+            KEYS[14]: dissimilar_lists.output_map2
+        },
+        KEYS[15]: {
+            KEYS[16]: more_dissimilar_lists.output_map1,
+            KEYS[17]: more_dissimilar_lists.output_map2
         }
+    }
+    if case.output_modifier is not None:
+        output_map = {DATA_KEY1: output_map}
 
+    if name is not None:
+        output_map = [name, output_map]
+
+    # Build results:
     mul_result = []
     res1 = dissimilar_lists.result_set[COM]
     res2 = more_dissimilar_lists.result_set[COM]
@@ -1178,260 +1166,434 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
     copier.update(res2[1][2])
     red_result = [copier]
 
-    return DictSet(_dict, _output_map, {
+    return DictSet(source, _dict, output_map, {
         COM: mul_result,
         TAN: tan_result,
         RED: red_result,
         ACC: [dict(zip(OUT_KEYS[:12], [VALS1, VALS2, VALS3, VALS4, VALS5, VALS6,
                                        VALS7, VALS8, VALS9, VALS10, VALS11, VALS12]))],
-    })
+    }, speed, (name, dissimilar_lists.name, more_dissimilar_lists.name))
 
 
 class TestMultiplicative:
     name = COM
     pick_type = PickType.COMBINATORIAL
+    too_slow = staticmethod(too_slow_func_one_arg(COM))
+
+    def deco_too_slow_func(
+            self,
+            t: Union[ListSet, DictSet]
+    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
+        def gives_func(which=None):
+            def func(x):
+                if which is None:
+                    pick(t.output_map, x, self.pick_type)
+
+                elif which == 1:
+                    pick(t.output_map1, x, self.pick_type)
+
+                elif which == 2:
+                    pick(t.output_map2, x, self.pick_type)
+
+                else:
+                    assert False, 'The given value for which was not reasonable.'
+
+            return func
+
+        return gives_func
 
     def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.output_map, similar_lists.list1, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][0]
+        t = similar_lists
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(similar_lists.output_map, similar_lists.list2, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list1,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
+        t = dicts_with_one_nested_list
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list2,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        ans = pick(dict_with_two_nested_similar_lists_in_list.output_map,
-                   dict_with_two_nested_similar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_similar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
             dict_with_two_nested_dissimilar_lists_in_list
     ):
-        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.output_map,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_dissimilar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        ans = pick(two_nested_lists_under_keys.output_map,
-                   two_nested_lists_under_keys.dict,
-                   self.pick_type)
-        compare_lists_of_dicts_unordered(ans, two_nested_lists_under_keys.result_set[self.name])
+        t = two_nested_lists_under_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        ans = pick(dict_with_list_of_dicts.output_map, dict_with_list_of_dicts.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, dict_with_list_of_dicts.result_set[self.name])
+        t = dict_with_list_of_dicts
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_double_keys(
             self,
             two_nested_lists_under_double_keys
     ):
-        ans = pick(two_nested_lists_under_double_keys.output_map,
-                   two_nested_lists_under_double_keys.dict,
-                   self.pick_type)
-        compare_lists_of_dicts_unordered(ans,
-                                         two_nested_lists_under_double_keys.result_set[self.name])
+        t = two_nested_lists_under_double_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_complicated_dict1(self, complicated_dict1):
-        print(complicated_dict1.output_map)
-        print(complicated_dict1.dict)
-        ans = pick(complicated_dict1.output_map, complicated_dict1.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, complicated_dict1.result_set[self.name])
+        t = complicated_dict1
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
 
 class TestTandem:
     name = TAN
     pick_type = PickType.TANDEM
+    too_slow = staticmethod(too_slow_func_one_arg(TAN))
+
+    def deco_too_slow_func(
+            self,
+            t: Union[ListSet, DictSet]
+    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
+        def gives_func(which=None):
+            def func(x):
+                if which is None:
+                    pick(t.output_map, x, self.pick_type)
+
+                elif which == 1:
+                    pick(t.output_map1, x, self.pick_type)
+
+                elif which == 2:
+                    pick(t.output_map2, x, self.pick_type)
+
+                else:
+                    assert False, 'The given value for which was not reasonable.'
+
+            return func
+
+        return gives_func
 
     def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.output_map, similar_lists.list1, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][0]
+        t = similar_lists
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(similar_lists.output_map, similar_lists.list2, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list1,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
+        t = dicts_with_one_nested_list
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list2,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        ans = pick(dict_with_two_nested_similar_lists_in_list.output_map,
-                   dict_with_two_nested_similar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_similar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
             dict_with_two_nested_dissimilar_lists_in_list
     ):
-        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.output_map,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_dissimilar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        ans = pick(two_nested_lists_under_keys.output_map,
-                   two_nested_lists_under_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_keys.result_set[self.name]
+        t = two_nested_lists_under_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        ans = pick(dict_with_list_of_dicts.output_map, dict_with_list_of_dicts.dict, self.pick_type)
-        assert ans == dict_with_list_of_dicts.result_set[self.name]
+        t = dict_with_list_of_dicts
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_double_keys(
             self,
             two_nested_lists_under_double_keys
     ):
-        ans = pick(two_nested_lists_under_double_keys.output_map,
-                   two_nested_lists_under_double_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_double_keys.result_set[self.name]
+        t = two_nested_lists_under_double_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_complicated_dict1(self, complicated_dict1):
-        ans = pick(complicated_dict1.output_map, complicated_dict1.dict, self.pick_type)
-        assert ans == complicated_dict1.result_set[self.name]
+        t = complicated_dict1
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
 
 class TestReduce:
     name = RED
     pick_type = PickType.REDUCE
+    too_slow = staticmethod(too_slow_func_one_arg(RED))
+
+    def deco_too_slow_func(
+            self,
+            t: Union[ListSet, DictSet]
+    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
+        def gives_func(which=None):
+            def func(x):
+                if which is None:
+                    pick(t.output_map, x, self.pick_type)
+
+                elif which == 1:
+                    pick(t.output_map1, x, self.pick_type)
+
+                elif which == 2:
+                    pick(t.output_map2, x, self.pick_type)
+
+                else:
+                    assert False, 'The given value for which was not reasonable.'
+
+            return func
+
+        return gives_func
 
     def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.output_map, similar_lists.list1, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][0]
+        t = similar_lists
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(similar_lists.output_map, similar_lists.list2, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list1,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
+        t = dicts_with_one_nested_list
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list2,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        ans = pick(dict_with_two_nested_similar_lists_in_list.output_map,
-                   dict_with_two_nested_similar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_similar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
             dict_with_two_nested_dissimilar_lists_in_list
     ):
-        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.output_map,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_dissimilar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        ans = pick(two_nested_lists_under_keys.output_map,
-                   two_nested_lists_under_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_keys.result_set[self.name]
+        t = two_nested_lists_under_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        ans = pick(dict_with_list_of_dicts.output_map, dict_with_list_of_dicts.dict, self.pick_type)
-        assert ans == dict_with_list_of_dicts.result_set[self.name]
+        t = dict_with_list_of_dicts
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_double_keys(
             self,
             two_nested_lists_under_double_keys
     ):
-        ans = pick(two_nested_lists_under_double_keys.output_map,
-                   two_nested_lists_under_double_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_double_keys.result_set[self.name]
+        t = two_nested_lists_under_double_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_complicated_dict1(self, complicated_dict1):
-        ans = pick(complicated_dict1.output_map, complicated_dict1.dict, self.pick_type)
-        assert ans == complicated_dict1.result_set[self.name]
+        t = complicated_dict1
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
 
 class TestAccumulate:
     name = ACC
     pick_type = PickType.ACCUMULATE
+    too_slow = staticmethod(too_slow_func_one_arg(ACC))
+
+    def deco_too_slow_func(
+            self,
+            t: Union[ListSet, DictSet]
+    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
+        def gives_func(which=None):
+            def func(x):
+                if which is None:
+                    pick(t.output_map, x, self.pick_type)
+
+                elif which == 1:
+                    pick(t.output_map1, x, self.pick_type)
+
+                elif which == 2:
+                    pick(t.output_map2, x, self.pick_type)
+
+                else:
+                    assert False, 'The given value for which was not reasonable.'
+
+            return func
+
+        return gives_func
 
     def test_simple_lists(self, similar_lists):
-        ans = pick(similar_lists.output_map, similar_lists.list1, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][0]
+        t = similar_lists
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(similar_lists.output_map, similar_lists.list2, self.pick_type)
-        assert ans == similar_lists.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list1,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][0]
+        t = dicts_with_one_nested_list
+        ans = pick(t.output_map1, t.list1, self.pick_type)
+        assert ans == t.result_set[self.name][0]
 
-        ans = pick(dicts_with_one_nested_list.output_map,
-                   dicts_with_one_nested_list.list2,
-                   self.pick_type)
-        assert ans == dicts_with_one_nested_list.result_set[self.name][1]
+        ans = pick(t.output_map2, t.list2, self.pick_type)
+        assert ans == t.result_set[self.name][1]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.list1, t_func(1))
+        self.too_slow(t.speed, t.list2, t_func(2))
 
     def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        ans = pick(dict_with_two_nested_similar_lists_in_list.output_map,
-                   dict_with_two_nested_similar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_similar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_similar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_in_list(
             self,
             dict_with_two_nested_dissimilar_lists_in_list
     ):
-        ans = pick(dict_with_two_nested_dissimilar_lists_in_list.output_map,
-                   dict_with_two_nested_dissimilar_lists_in_list.dict,
-                   self.pick_type)
-        assert ans == dict_with_two_nested_dissimilar_lists_in_list.result_set[self.name]
+        t = dict_with_two_nested_dissimilar_lists_in_list
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        assert ans == t.result_set[self.name]
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        ans = pick(two_nested_lists_under_keys.output_map,
-                   two_nested_lists_under_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_keys.result_set[self.name]
+        t = two_nested_lists_under_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        ans = pick(dict_with_list_of_dicts.output_map, dict_with_list_of_dicts.dict, self.pick_type)
-        assert ans == dict_with_list_of_dicts.result_set[self.name]
+        t = dict_with_list_of_dicts
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_dict_nested_dissimilar_lists_under_double_keys(
             self,
             two_nested_lists_under_double_keys
     ):
-        ans = pick(two_nested_lists_under_double_keys.output_map,
-                   two_nested_lists_under_double_keys.dict,
-                   self.pick_type)
-        assert ans == two_nested_lists_under_double_keys.result_set[self.name]
+        t = two_nested_lists_under_double_keys
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
 
     def test_complicated_dict1(self, complicated_dict1):
-        ans = pick(complicated_dict1.output_map, complicated_dict1.dict, self.pick_type)
-        assert ans == complicated_dict1.result_set[self.name]
+        t = complicated_dict1
+        ans = pick(t.output_map, t.dict, self.pick_type)
+        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
 
-
-
+        t_func = self.deco_too_slow_func(t)
+        self.too_slow(t.speed, t.dict, t_func())
