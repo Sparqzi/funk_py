@@ -138,8 +138,8 @@ class Speed:
         if isinstance(other, Speed):
             return Speed(self._number * other.number, self._duration * other.duration)
 
-        elif (t := type(other)) in (int, float):
-            return Speed(self._number * other, self._duration)
+        elif type(other) in (int, float):
+            return Speed(int(self._number * other), self._duration)
 
         else:
             raise TypeError(f'{type(other)} cannot be subtracted from a Speed.')
