@@ -8,7 +8,7 @@ import yaml
 from funk_py.modularity.decoration.enum_modifiers import converts_enums
 from funk_py.modularity.logging import make_logger
 from funk_py.sorting.converters import csv_to_json, xml_to_json, wonky_json_to_json, jsonl_to_json
-from funk_py.sorting.dict_manip import convert_tuplish_dict
+from funk_py.sorting.dict_manip import convert_tuplish_dict, get_subset_values, get_subset
 
 main_logger = make_logger('pieces', 'PIECES_LOG_LEVEL', default_level='warning')
 
@@ -398,3 +398,27 @@ def _parse_and_execute_tuplish(data: Union[dict, list], args: list) -> dict:
 
         else:
             raise ValueError('TUPLE_DICT given an invalid argument format.')
+
+
+def fracture(data: List[dict], *keys: str) -> Generator[Tuple[dict, List[dict]], None, None]:
+    calc = [None] * len(data)
+    done = [False] * len(data)
+    for i, val in enumerate(data):
+        if not done[i]:
+            builder = []
+            def1 = get_subset_values(val, *keys) if calc[i] is None else calc[i]
+            mark = get_subset(val, *keys)
+            builder.append(val)
+            for j, _val in enumerate(data)[i + 1:]:
+                if calc[j] is None:
+                    def2 = get_subset_values(_val, *keys) if calc[j] is None else calc[j]
+                    calc[j] = def2
+
+                else:
+                    def2 = calc[j]
+
+                if def1 == def2:
+                    builder.append(val)
+                    done[j] = True
+
+            yield mark, builder
