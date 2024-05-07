@@ -424,3 +424,19 @@ def nest_under_keys(data: Any, *keys) -> dict:
         worker = {key: worker}
 
     return worker
+
+
+def get_subset(data: dict, *keys) -> dict:
+    """
+    Retrieves a subset of keys from a dictionary in the format of a dictionary. Any keys that do not
+    exist will simply be omitted.
+    """
+    return {key: data[key] for key in keys if key in data}
+
+
+def get_subset_values(data: dict, *keys) -> tuple:
+    """
+    Retireves a subset values (based on ``keys``) from a dictionary in the format of a tuple. Any
+    keys that do not exist will have ``None`` as their value.
+    """
+    return tuple(data.get(key, None) for key in keys)
