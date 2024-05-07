@@ -419,6 +419,7 @@ def acc_(builder: Dict[str, list], key: Any, val: Any):
 
 
 def nest_under_keys(data: Any, *keys) -> dict:
+    """Generates a nested dictionary using ``keys`` as the nesting keys."""
     worker = data
     for key in reversed(keys):
         worker = {key: worker}
