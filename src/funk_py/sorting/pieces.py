@@ -401,6 +401,9 @@ def _parse_and_execute_tuplish(data: Union[dict, list], args: list) -> dict:
         else:
             raise ValueError('TUPLE_DICT given an invalid argument format.')
 
+    else:
+        return convert_tuplish_dict(data)
+
 
 def fracture(
         data: List[dict],
