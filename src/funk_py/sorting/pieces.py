@@ -1,8 +1,10 @@
 import json
+from copy import deepcopy
 from enum import Enum
 from typing import Mapping, Any, Literal, Union, List, Tuple, Optional, Iterator, Generator, \
     Callable
 from urllib.parse import parse_qs
+
 import yaml
 
 from funk_py.modularity.decoration.enum_modifiers import converts_enums
@@ -400,15 +402,56 @@ def _parse_and_execute_tuplish(data: Union[dict, list], args: list) -> dict:
             raise ValueError('TUPLE_DICT given an invalid argument format.')
 
 
-def fracture(data: List[dict], *keys: str) -> Generator[Tuple[dict, List[dict]], None, None]:
+def fracture(
+        data: List[dict],
+        *keys: str,
+        inplace: bool = True
+) -> Generator[Tuple[dict, List[dict]], None, None]:
+    """
+    Separates a list of dictionaries into sets based on the values of a subset of keys and returns
+    each set one at a time.
+
+    :param data: The List to fracture.
+    :type data: List[dict]
+    :param keys: The subset of keys which should be used to differentiate between items in ``data``.
+    :type keys: str
+    :param inplace: Whether values returned should literally be the original values from the list or
+        should be copies of those values, set to ``False`` if you wish to avoid mutating the
+        original values in ``data``.
+    :type inplace: bool
+    :return: A ``Generator`` which iterates through each subset of ``data`` one at a time, basing
+        the subsets off of ``keys``.
+    """
+    # Choose the function we use to append values based on inplace.
+    # Choose it early since checking inplace inside the loop adds up on time.
+    if inplace:
+        def app_func(builder: List[dict], val: dict):
+            return builder.append(val)
+
+    else:
+        def app_func(builder: List[dict], val: dict):
+            return builder.append(deepcopy(val))
+
+    # Then just generate.
+    for subset in _iter_fracture(data, keys, app_func):
+        yield subset
+
+
+def _iter_fracture(
+        data: List[dict],
+        keys: Tuple[str, ...],
+        app_func: Callable[[List[dict], dict], None]
+) -> Generator[Tuple[dict, List[dict]], None, None]:
+    # The following two objects will be used to reduce repetitive calculations.
     calc = [None] * len(data)
     done = [False] * len(data)
     for i, val in enumerate(data):
+        # Quite simply, don't generate a new list for something already included in a list.
         if not done[i]:
             builder = []
             def1 = get_subset_values(val, *keys) if calc[i] is None else calc[i]
             mark = get_subset(val, *keys)
-            builder.append(val)
+            app_func(builder, val)
             for j, _val in enumerate(data)[i + 1:]:
                 if calc[j] is None:
                     def2 = get_subset_values(_val, *keys) if calc[j] is None else calc[j]
@@ -418,7 +461,7 @@ def fracture(data: List[dict], *keys: str) -> Generator[Tuple[dict, List[dict]],
                     def2 = calc[j]
 
                 if def1 == def2:
-                    builder.append(val)
+                    app_func(builder, val)
                     done[j] = True
 
             yield mark, builder
