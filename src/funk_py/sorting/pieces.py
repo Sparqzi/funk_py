@@ -465,3 +465,45 @@ def _iter_fracture(
                     done[j] = True
 
             yield mark, builder
+
+
+def translate(data: List[dict], translators: Mapping[Any, Callable[[dict], Any]],
+              default: Any = ..., inplace: bool = True) -> List[dict]:
+    """
+    Translate values in data based on given translators.
+
+    :param data: Dictionaries to translate.
+    :type data: List[dict]
+    :param translators: A dictionary of keys and functions used to translate values at those keys.
+    :type translators: Mapping[Any, Callable[[dict], Any]]
+    :param default: A default value to use for keys that don't exist. If this is not specified,
+        missing keys will simply be ignored.
+    :type default: Any
+    :param inplace: Whether to mutate ``data`` or not. Defaults to ``True``.
+    :type inplace: bool
+    :return: A list of the dictionaries in ``data`` mutated based on the functions in
+        ``translators``.
+    """
+    # Much more efficient to check inplace outside the loop.
+    if inplace:
+        for v in data:
+            for k, trans in translators.items():
+                if k in v:
+                    v[k] = trans(v[k])
+
+                elif default is not ...:
+                    v[k] = default
+
+        return data
+
+    output = []
+    for v in data:
+        output.append(builder := deepcopy(v))
+        for k, trans in translators.items():
+            if k in v:
+                builder[k] = trans(v[k])
+
+            elif default is not ...:
+                builder[k] = default
+
+    return output
