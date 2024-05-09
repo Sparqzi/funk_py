@@ -1,8 +1,11 @@
 from setuptools import setup, find_packages
 
+with open("requirements.txt", "r") as fh:
+    install_requires = fh.read()
+
 setup(
     name='funky_modifiers',
-    version='0.1.5',
+    version='0.1.7',
     description='A package containing tiny bits and bobs to remove boilerplate or just make things simpler.',
     url='https://github.com/Sparqzi/funk_py',
     author='Erich Kopp',
@@ -12,6 +15,8 @@ setup(
     classifiers=[
         'Development Status :: 1 - Planning',
         'Operating System :: POSIX :: Linux',
-        'Programming Language :: Python :: 3.10'
-    ]
+        'Programming Language :: Python :: 3.7'
+    ],
+    python_requires='>3.6',
+    install_requires=install_requires
 )
