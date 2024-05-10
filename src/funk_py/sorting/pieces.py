@@ -386,7 +386,7 @@ def parse_type_as(_type: PickInstruction, data: Any, args: list) -> Union[dict, 
         return switch[_type](data)
 
     elif _type in arg_switch:
-        return switch[_type](data, args)
+        return arg_switch[_type](data, args)
 
     raise ValueError('Invalid type specified.')
 
