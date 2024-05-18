@@ -1,4 +1,5 @@
 from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable
+from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable, Mapping, Type
 
 from funk_py.modularity.logging import make_logger
 
@@ -456,3 +457,61 @@ def tuples_to_dict(*pairs: Tuple[Any, Any], all_pairs: Iterable[Tuple[Any, Any]]
 
     builder.update({k: v for k, v in pairs})
     return builder
+
+
+def get_val_from_path(source: dict, *path: Any, default: Any = None, unsafe: bool = False) -> Any:
+    """
+    Follow a path through a dictionary to find the value at the end.
+
+    :param source: The dictionary to get a value from.
+    :param path: The paht of keys to follow to get to the desired value inside ``source``.
+    :param default: A default value to return if the path ends prematurely. Will be ignored if
+        unsafe is ``True``.
+    :param unsafe: Whether to raise an exception if the path ends early. Overrides ``default``.
+    :return: The value at the end of the desired path in ``source``, if it exists. Otherwise,
+        ``default``.
+    """
+    for key in path:
+        if key in source:
+            source = source[key]
+
+        elif unsafe:
+            raise KeyError(f'Path failed at {key}.')
+
+        else:
+            return default
+
+
+def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) -> Any:
+    """
+    Get the value at one of the keys (or key paths) specified in ``keys`` from ``source``. Will
+    return default if none of the keys/key paths exist in ``source``.
+
+    :param source: The source ``dict`` to get the value from.
+    :type source: dict
+    :param keys: The possible keys or key paths the sought value could be located at.
+    :type keys: Union[Any, list]
+    :param default: The default value to return if the target value cannot be found.
+    :type default: Any
+    :return: The target value, if it is found. Otherwise, ``default``.
+    """
+    for key in keys:
+        if isinstance(key, list):
+            diver = source
+            found = False
+            for k in key:
+                if k in diver:
+                    diver = diver[k]
+                    found = True
+
+                else:
+                    break
+
+            if found:
+                return diver
+
+        else:
+            if key in source:
+                return source[key]
+
+    return default
