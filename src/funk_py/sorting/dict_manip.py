@@ -443,7 +443,7 @@ def get_subset_values(data: dict, *keys) -> tuple:
     return tuple(data.get(key, None) for key in keys)
 
 
-def tuples_to_dict(all_pairs: Iterable[Tuple[Any, Any]] = None, *pairs: Tuple[Any, Any]) -> dict:
+def tuples_to_dict(*pairs: Tuple[Any, Any], all_pairs: Iterable[Tuple[Any, Any]] = None) -> dict:
     """Constructs a dictionary from provided tuples."""
     builder = {}
     if all_pairs is not None:
