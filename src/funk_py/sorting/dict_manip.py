@@ -678,7 +678,13 @@ class DictBuilder:
         else:
             val = other
 
-        if val is ... or not isinstance(val, dict):
+        if val is ...:
+            return self
+
+        if not isinstance(val, dict):
+            if unsafe:
+                raise ValueError('Cannot merge a dict to a value.')
+
             return self
 
         worker = self.__builder
