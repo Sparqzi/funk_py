@@ -482,6 +482,8 @@ def get_val_from_path(source: dict, *path: Any, default: Any = None, unsafe: boo
         else:
             return default
 
+    return source
+
 
 def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) -> Any:
     """
@@ -676,7 +678,7 @@ class DictBuilder:
         else:
             val = other
 
-        if val is ...:
+        if val is ... or not isinstance(val, dict):
             return self
 
         worker = self.__builder
