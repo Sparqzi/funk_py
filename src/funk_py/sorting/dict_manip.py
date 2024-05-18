@@ -160,7 +160,7 @@ def _ctd_pair_search(data: Union[dict, list], pair_name, func: Callable, builder
         func(potential_pair[pair_name], *args, builder)
 
 
-def merge_tuplish_pair(pair: list, builder: dict):
+def merge_tuplish_pair(pair: list, builder: dict, unsafe: bool = False):
     """
     Merges a list representing a key-value pair into a dictionary builder.
 
@@ -174,15 +174,17 @@ def merge_tuplish_pair(pair: list, builder: dict):
     :type pair: list
     :param builder: The dictionary to merge ``pair`` into.
     :type builder: dict
+    :param unsafe: Whether a failure to merge should actually raise an error. Defaults to ``False``.
+    :type unsafe: bool
 
     .. warning::
 
-        If the function encounters a key in the pair list that already exists in the builder and the
-        corresponding value is not a dictionary, but there are more keys involved in the path to the
-        value, it will not attempt to update the value or build the dictionary any deeper, but
-        instead will do nothing to ``builder``. It logs a message under the ``dict_manip`` logger at
-        the info level when this occurs. You can turn on this logger by setting the
-        ``DICT_MANIP_LOG_LEVEL`` environment variable to ``'info'``.
+        Default behavior is if the function encounters a key in the pair list that already exists in
+        the builder and the corresponding value is not a dictionary, but there are more keys
+        involved in the path to the value, it will not attempt to update the value or build the
+        dictionary any deeper, but instead will do nothing to ``builder``. It logs a message under
+        the ``dict_manip`` logger at the info level when this occurs. You can turn on this logger by
+        setting the ``DICT_MANIP_LOG_LEVEL`` environment variable to ``'info'``.
     """
     # Given this function is frequently called at the deepest point on a stack of calls, it is built
     # to NOT be recursive. This helps ensure stack limit is not exceeded.
@@ -193,8 +195,11 @@ def merge_tuplish_pair(pair: list, builder: dict):
                 worker = worker[t]
 
             else:
-                main_logger.info(f'Can\'t merge into dict correctly. Attempted to merge '
-                                 f'{repr(pair[i + 1:])} into {repr(worker[t])}.')
+                msg = (f'Can\'t merge into dict correctly. Attempted to merge '
+                       f'{repr(pair[i + 1:])} into {repr(worker[t])}.')
+                main_logger.info(msg)
+                if unsafe:
+                    raise ValueError(msg)
 
         else:
             if i < len(pair) - 2:
