@@ -540,7 +540,11 @@ class DictBuilder:
         if 'clazz' in kwargs:
             del kwargs['clazz']
 
-        self.__builder = self.__class(_map, **kwargs)
+        if _map is ...:
+            self.__builder = self.__class(**kwargs)
+
+        else:
+            self.__builder = self.__class(_map, **kwargs)
 
 
     @staticmethod
