@@ -1,6 +1,7 @@
-from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable
+from copy import deepcopy
 from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable, Mapping, Type
 
+from funk_py.modularity.basic_structures import pass_
 from funk_py.modularity.logging import make_logger
 
 
@@ -515,3 +516,251 @@ def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) 
                 return source[key]
 
     return default
+
+
+class DictBuilder:
+    def __new__(cls, *args, clazz: Type = dict, **kwargs):
+        inst = super().__new__(cls)
+        inst.__class = clazz
+        return inst
+
+    def __init__(self, _map: Mapping = ..., *, clazz: Type = dict, **kwargs):
+        """
+        A builder for dictionaries that has a few helpful methods for merging in data from other
+        dictionaries.
+
+        :param _map: The ``Mapping`` to start the builder out with. Works like it does for ``dict``.
+        :type _map: Mapping
+        :param clazz: A ``dictionary class to inherit from. Used to make sure the builder is the
+            desired type of dictionary.
+        :type clazz: Type
+        :param kwargs: The ``kwargs`` to construct the starting builder with. Works like it does for
+            ``dict``.
+        """
+        if 'clazz' in kwargs:
+            del kwargs['clazz']
+
+        self.__builder = self.__class(_map, **kwargs)
+
+
+    @staticmethod
+    def _check_dict(other: dict):
+        if not isinstance(other, dict):
+            raise TypeError('Invalid type for other.')
+
+    @staticmethod
+    def _pathify_as(_as: Union[Any, list], val: Any):
+        if isinstance(_as, list):
+            (path := list(_as)).append(val)
+
+        else:
+            path = _as, val
+
+        return path
+
+    def pull_from_other(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
+                        transformer: Callable = pass_) -> 'DictBuilder':
+        """
+        Get a value from another dictionary at a given key, and insert it at the key specified in
+        ``_as``. Using this will raise an error if the key doesn't exist in ``other`` or if it
+        cannot safely be added to the ``DictBuilder``.
+
+        :param other: The dictionary to grab the key from.
+        :type other: dict
+        :param key: The key at which to find a value in ``other``.
+        :type key: Union[Any, list]
+        :param _as: The key at which to place the found value from ``other``.
+        :type _as: Union[Any, list]
+        :param transformer: A transformer that should be called on a value if found.
+        :type transformer: Callable
+        :return: The current ``DictBuilder`` for chaining.
+        """
+        self._check_dict(other)
+        if key not in other:
+            return self
+
+        # Get the value.
+        if isinstance(key, list):
+            val = transformer(get_val_from_path(other, *key, unsafe=True))
+
+        else:
+            val = transformer(other[key])
+
+        path = self._pathify_as(_as, val)
+        merge_tuplish_pair(path, self.__builder, unsafe=True)
+
+        return self
+
+    def get_from_other(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
+                       transformer: Callable = pass_, default: Any = ...) -> 'DictBuilder':
+        """
+        Get a value from another dictionary at a given key, and insert it at the key specified in
+        ``_as``. If ``key`` cannot be found in other or ``the value cannot be added to this
+        ``DictBuilder``, then the value simply won't be added.
+
+        :param other: The dictionary to grab the key from.
+        :type other: dict
+        :param key: The key at which to find a value in ``other``.
+        :type key: Union[Any, list]
+        :param _as: The key at which to place the found value from ``other``.
+        :type _as: Union[Any, list]
+        :param transformer: A transformer that should be called on a value if found.
+        :type transformer: Callable
+        :param default: The default value to use if a value cannot be found. If omitted, and the
+            value is not found, then the value simply won't be added.
+        :return: The current ``DictBuilder`` for chaining.
+        """
+        self._check_dict(other)
+        if key not in other:
+            return self
+
+        # Get the value.
+        if isinstance(key, list):
+            val = get_val_from_path(other, *key, default=...)
+
+        else:
+            val = other.get(key, ...)
+
+        if val is ...:
+            if default is ...:
+                return self
+
+            val = default
+
+        else:
+            val = transformer(val)
+
+        path = self._pathify_as(_as, val)
+        merge_tuplish_pair(path, self.__builder)
+
+        return self
+
+    def update_from_other(self, other: dict, key: Union[Any, None, list] = None,
+                          _as: Union[Any, None, list] = None, transformer: Callable = pass_,
+                          unsafe: bool = False) -> 'DictBuilder':
+        """
+        Update this ``DictBuilder`` from another dict.
+
+        :param other: The dictionary to update with.
+        :type other: dict
+        :param key: The key at which the source dictionary should be in ``other``. If not specified
+            ``other`` will be used as-is.
+        :type key: Union[Any, None, list]
+        :param _as: The key at which to place update with the found value from ``other``. If not
+            specified, will simply update the entire ``DictBuilder``.
+        :type _as: Union[Any, None, list]
+        :param transformer: A transformer that should be called on the value being used to update
+            the ``DictBuilder``.
+        :type transformer: Callable
+        :param unsafe: Whether an error should be raised if the desired operation cannot be
+            completed.
+        :type unsafe: bool
+        :return: The current ``DictBuilder`` for chaining.
+        """
+        self._check_dict(other)
+        if key not in other:
+            return self
+
+        # Get the value.
+        if key is not None:
+            if isinstance(key, list):
+                val = get_val_from_path(other, *key, unsafe=unsafe, default=...)
+
+            elif unsafe:
+                val = other[key]
+
+            else:
+                val = other.get(key, ...)
+
+        else:
+            val = other
+
+        if val is ...:
+            return self
+
+        worker = self.__builder
+        worker = self._update_seek(_as, worker, unsafe)
+        worker.update(transformer(val))
+
+        return self
+
+    def _update_seek(self, _as: Any, worker: dict, unsafe: bool):
+        if _as is not None:
+            if isinstance(_as, list):
+                for val in _as:
+                    worker = self._update_seek_next(val, worker, unsafe)
+
+            else:
+                worker = self._update_seek_next(_as, worker, unsafe)
+
+        return worker
+
+    def _update_seek_next(self, val: Any, worker: dict, unsafe: bool):
+        if val in worker:
+            if isinstance(worker[val], dict):
+                worker = worker[val]
+
+            elif unsafe:
+                raise ValueError('An invalid path was encountered.')
+
+            else:
+                worker[val] = worker = self.clazz()
+
+        else:
+            worker[val] = worker = self.clazz()
+
+        return worker
+
+    def get_one_of_keys_from_other(self, other: dict, _as: Union[Any, list],
+                                   *keys: Union[Any, list], transformer: Callable = pass_,
+                                   default: Any = ...) -> 'DictBuilder':
+        """
+        Get the value at one of the keys (or key paths) specified in ``keys`` from ``other`` and
+        adds it at ``_as`` within the ``DictBuilder``.
+
+        :param other: The source ``dict`` to get the value from.
+        :type other: dict
+        :param _as: The key or key path to add a found value at.
+        :type _as: Union[Any, list]
+        :param keys: The possible keys or key paths the sought value could be located at.
+        :type keys: Union[Any, list]
+        :param default: The default value to return if the target value cannot be found. If this is
+            not specified, then should no value be found, a value simply won't be added.
+        :type default: Any
+        :return: The current ``DictBuilder`` for chaining.
+        """
+        val = get_one_of_keys(other, *keys, ...)
+        if val is ...:
+            if default is ...:
+                return self
+
+            val = default
+
+        else:
+            val = transformer(val)
+
+        path = self._pathify_as(_as, val)
+        merge_tuplish_pair(path, self.__builder)
+
+        return self
+
+    def update(self, _map: Mapping = ..., **kwargs) -> 'DictBuilder':
+        self.__builder.update(_map, **kwargs)
+        return self
+
+    def __delitem__(self, key) -> 'DictBuilder':
+        del self.__builder[key]
+        return self
+
+    def __getitem__(self, key):
+        return self.__builder[key]
+
+    def get(self, key: Any, default=...):
+        return self.__builder.get(key, default)
+
+    def __setitem__(self, key, value) -> 'DictBuilder':
+        self.__builder[key] = value
+        return self
+
+    def build(self) -> dict:
+        return deepcopy(self.__builder)
