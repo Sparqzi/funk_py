@@ -759,7 +759,7 @@ class DictBuilder:
     def __getitem__(self, key):
         return self.__builder[key]
 
-    def get(self, key: Any, default=...):
+    def get(self, key: Any, default: Any = None):
         return self.__builder.get(key, default)
 
     def __setitem__(self, key, value) -> 'DictBuilder':
