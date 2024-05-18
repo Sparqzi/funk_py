@@ -662,9 +662,6 @@ class DictBuilder:
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
-        if key not in other:
-            return self
-
         # Get the value.
         if key is not None:
             if isinstance(key, list):
