@@ -437,13 +437,14 @@ def get_subset(data: dict, *keys) -> dict:
 
 def get_subset_values(data: dict, *keys) -> tuple:
     """
-    Retireves a subset values (based on ``keys``) from a dictionary in the format of a tuple. Any
+    Retrieves a subset values (based on ``keys``) from a dictionary in the format of a tuple. Any
     keys that do not exist will have ``None`` as their value.
     """
     return tuple(data.get(key, None) for key in keys)
 
 
 def tuples_to_dict(all_pairs: Iterable[Tuple[Any, Any]] = None, *pairs: Tuple[Any, Any]) -> dict:
+    """Constructs a dictionary from provided tuples."""
     builder = {}
     if all_pairs is not None:
         builder.update({k: v for k, v in all_pairs})
