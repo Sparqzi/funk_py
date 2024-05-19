@@ -229,14 +229,6 @@ REG_VAL = 'regular val'
 DICT = 'dict'
 
 
-def gen_desc(origin, target, new_val_type, old_val_type=None):
-    builder = f'{origin} to {target} | {new_val_type}'
-    if old_val_type is not None:
-        builder += f' to {old_val_type}'
-
-    return builder
-
-
 def from_desc(lvl, _type):
     return f'from {lvl} - {_type} '
 
