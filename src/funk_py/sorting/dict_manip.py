@@ -196,6 +196,10 @@ def merge_tuplish_pair(pair: list, builder: dict, unsafe: bool = False):
             if isinstance(worker[t], dict) and i < len(pair) - 2:
                 worker = worker[t]
 
+            elif i == len(pair) - 2:
+                worker[t] = pair[-1]
+                break
+
             else:
                 msg = (f'Can\'t merge into dict correctly. Attempted to merge '
                        f'{repr(pair[i + 1:])} into {repr(worker[t])}.')
