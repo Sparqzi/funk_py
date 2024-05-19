@@ -586,8 +586,6 @@ class DictBuilder:
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
-        if key not in other:
-            return self
 
         # Get the value.
         if isinstance(key, list):
@@ -621,8 +619,6 @@ class DictBuilder:
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
-        if key not in other:
-            return self
 
         # Get the value.
         if isinstance(key, list):
