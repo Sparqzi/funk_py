@@ -8,9 +8,9 @@ import yaml
 
 import pytest
 
+from t_support import too_slow_func_one_arg, cov, cov_counter
 from funk_py.modularity.basic_structures import pass_, Speed
 from funk_py.sorting.dict_manip import align_to_list, nest_under_keys
-from t_support import too_slow_func_one_arg, cov, cov_counter
 from funk_py.sorting.pieces import pick, PickType
 from funk_py.sorting.converters import json_to_xml, json_to_csv, json_to_jsonl, xml_to_json
 

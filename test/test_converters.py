@@ -3,8 +3,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from funk_py.modularity.basic_structures import Speed
 from t_support import too_slow_func_two_arg_updated, too_slow_func_one_arg, cov, cov_counter
+from funk_py.modularity.basic_structures import Speed
 from funk_py.sorting.converters import csv_to_json, xml_to_json, wonky_json_to_json, jsonl_to_json
 
 

@@ -3,10 +3,10 @@ from typing import Dict, Set, Union, Tuple, Any, Iterable
 
 import coverage
 
-from funk_py.modularity.basic_structures import Speed
-
 cov = coverage.Coverage()
 cov.start()
+
+from funk_py.modularity.basic_structures import Speed
 
 
 class Object(object):
