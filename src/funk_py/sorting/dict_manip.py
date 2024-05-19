@@ -536,7 +536,7 @@ class DictBuilder:
 
         :param _map: The ``Mapping`` to start the builder out with. Works like it does for ``dict``.
         :type _map: Mapping
-        :param clazz: A ``dictionary class to inherit from. Used to make sure the builder is the
+        :param clazz: A dictionary class to inherit from. Used to make sure the builder is the
             desired type of dictionary.
         :type clazz: Type
         :param kwargs: The ``kwargs`` to construct the starting builder with. Works like it does for
@@ -792,4 +792,5 @@ class DictBuilder:
         return self
 
     def build(self) -> dict:
+        """Build the dictionary from the DictBuilder."""
         return deepcopy(self.__builder)
