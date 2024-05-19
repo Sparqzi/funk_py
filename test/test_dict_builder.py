@@ -377,3 +377,25 @@ def test_get_from_other(get_from_other_params, higher_dict1, higher_dict2):
     testy = DictBuilder(higher_dict2)
     testy.get_from_other(higher_dict1, get_from_other_params[0], get_from_other_params[1])
     assert testy.build() == get_from_other_params[2]
+
+
+@pytest.fixture(params=(
+        ((KB,),(K6,)),
+        ((), (K6,)),
+        (([K6, K5],), (K7,)),
+        ((KB, [K6, K7], K8), ()),
+), ids=(
+        'bad key before, good key after',
+        'no key before, good key after',
+        'partly-good key before, bad key after',
+        'bad keys and partly good key before, no key after',
+))
+def get_one_key_params(request, get_from_other_params):
+    before, after = request.param
+    return (*before, get_from_other_params[0], *after), *get_from_other_params[1:]
+
+
+def test_get_one_key_from_other(get_one_key_params, higher_dict1, higher_dict2):
+    testy = DictBuilder(higher_dict2)
+    testy.get_one_of_keys_from_other(higher_dict1, get_one_key_params[1], *get_one_key_params[0])
+    assert testy.build() == get_one_key_params[2]
