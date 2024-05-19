@@ -2,8 +2,7 @@ from copy import deepcopy
 from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable, Mapping, Type
 
 from funk_py.modularity.basic_structures import pass_
-from funk_py.modularity.logging import make_logger
-
+from funk_py.modularity.logging import make_logger, logs_vars
 
 main_logger = make_logger('dict_manip', env_var='DICT_MANIP_LOG_LEVEL', default_level='warning')
 
@@ -489,6 +488,7 @@ def get_val_from_path(source: dict, *path: Any, default: Any = None, unsafe: boo
     return source
 
 
+@logs_vars(main_logger)
 def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) -> Any:
     """
     Get the value at one of the keys (or key paths) specified in ``keys`` from ``source``. Will
@@ -552,7 +552,6 @@ class DictBuilder:
         else:
             self.__builder = self.__class(_map, **kwargs)
 
-
     @staticmethod
     def _check_dict(other: dict):
         if not isinstance(other, dict):
@@ -568,6 +567,10 @@ class DictBuilder:
 
         return path
 
+    @logs_vars(main_logger, start_message='Getting a value from another dictionary...',
+               start_message_level='info',
+               end_message='Finished attempt to get a value from another dictionary.',
+               end_message_level='info')
     def pull_from_other(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
                         transformer: Callable = pass_) -> 'DictBuilder':
         """
@@ -599,6 +602,10 @@ class DictBuilder:
 
         return self
 
+    @logs_vars(main_logger, start_message='Getting a value from another dictionary...',
+               start_message_level='info',
+               end_message='Finished attempt to get a value from another dictionary.',
+               end_message_level='info')
     def get_from_other(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
                        transformer: Callable = pass_, default: Any = ...) -> 'DictBuilder':
         """
@@ -641,6 +648,10 @@ class DictBuilder:
 
         return self
 
+    @logs_vars(main_logger, start_message='Updating from another dictionary...',
+               start_message_level='info',
+               end_message='Finished attempt to update from another dictionary.',
+               end_message_level='info')
     def update_from_other(self, other: dict, key: Union[Any, None, list] = None,
                           _as: Union[Any, None, list] = None, transformer: Callable = pass_,
                           unsafe: bool = False) -> 'DictBuilder':
@@ -683,7 +694,9 @@ class DictBuilder:
 
         if not isinstance(val, dict):
             if unsafe:
-                raise ValueError('Cannot merge a dict to a value.')
+                msg = 'Cannot merge a dict to a value.'
+                main_logger.error(msg)
+                raise ValueError(msg)
 
             return self
 
@@ -710,7 +723,9 @@ class DictBuilder:
                 worker = worker[val]
 
             elif unsafe:
-                raise ValueError('An invalid path was encountered.')
+                msg = 'An invalid path was encountered'
+                main_logger.error(msg + ' while updating from another dictionary.')
+                raise ValueError(msg + '.')
 
             else:
                 worker[val] = worker = self.clazz()
@@ -720,11 +735,15 @@ class DictBuilder:
 
         return worker
 
+    @logs_vars(main_logger, start_message='Getting one of the keys from another dictionary...',
+               start_message_level='info',
+               end_message='Finished attempt to get one of the keys from another dictionary.',
+               end_message_level='info')
     def get_one_of_keys_from_other(self, other: dict, _as: Union[Any, list],
                                    *keys: Union[Any, list], transformer: Callable = pass_,
                                    default: Any = ...) -> 'DictBuilder':
         """
-        Get the value at one of the keys (or key paths) specified in ``keys`` from ``other`` and
+        Gets the value at one of the keys (or key paths) specified in ``keys`` from ``other`` and
         adds it at ``_as`` within the ``DictBuilder``.
 
         :param other: The source ``dict`` to get the value from.
@@ -753,6 +772,8 @@ class DictBuilder:
 
         return self
 
+    @logs_vars(main_logger, start_message='Updating dictionary...', start_message_level='info',
+               end_message='Finished updating.', end_message_level='info')
     def update(self, _map: Mapping = ..., **kwargs) -> 'DictBuilder':
         self.__builder.update(_map, **kwargs)
         return self
