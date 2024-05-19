@@ -505,21 +505,20 @@ def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) 
     for key in keys:
         if isinstance(key, list):
             diver = source
-            found = False
+            found = True
             for k in key:
                 if k in diver:
                     diver = diver[k]
-                    found = True
 
                 else:
+                    found = False
                     break
 
             if found:
                 return diver
 
-        else:
-            if key in source:
-                return source[key]
+        elif key in source:
+            return source[key]
 
     return default
 
