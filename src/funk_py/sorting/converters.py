@@ -583,3 +583,24 @@ def jsonl_to_json(data: str) -> list:
 def json_to_jsonl(data: List[Union[list, dict]]) -> str:
     return '\n'.join(json.dumps(line) for line in data)
 
+
+def list_to_string_list(data: list) -> str:
+    """
+    Generates a string representation of a list in proper sentence form. Uses the Oxford comma.
+
+    :param data: The list to convert.
+    :type data: list
+    :return: A string containing the list converted to proper sentence form.
+    """
+    if (t := len(data)) == 0:
+        return ''
+
+    elif t == 1:
+        return str(data[0])
+
+    elif t == 2:
+        return f'{data[0]} and {data[1]}'
+
+    else:
+        return ', '.join(str(d) for d in data[:-1]) + f', and {data[-1]}'
+
