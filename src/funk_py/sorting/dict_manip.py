@@ -481,7 +481,9 @@ def get_val_from_path(source: dict, *path: Any, default: Any = None, unsafe: boo
             source = source[key]
 
         elif unsafe:
-            raise KeyError(f'Path failed at {key}.')
+            msg = f'Path failed at {key}'
+            main_logger.error(msg)
+            raise KeyError(msg)
 
         else:
             return default
