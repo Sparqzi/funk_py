@@ -13,7 +13,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     classifiers=[
-        'Development Status :: 5 - Stable',
+        'Development Status :: 5 - Production/Stable',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3.7'
     ],
