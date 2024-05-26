@@ -526,6 +526,9 @@ def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) 
     return default
 
 
+_NO_MERGE = 'Cannot merge a non-dict to a dict.'
+
+
 class DictBuilder:
     def __new__(cls, *args, clazz: Type = dict, **kwargs):
         if clazz is None:
@@ -663,6 +666,59 @@ class DictBuilder:
         merge_tuplish_pair(path, self.__builder)
 
         return self
+    
+    @logs_vars(main_logger, start_message='Updating from a list...',
+               start_message_level='info',
+               end_message='Finished attempt to update from list.',
+               end_message_level='info')
+    def update_from_list(self, other: List[dict],
+                          _as: Union[Any, None, list] = None,
+                          transformer: Callable = pass_,
+                          unsafe: bool = False,
+                          classes: Union[List[Type[dict]], Type[dict]] = None) -> 'DictBuilder':
+        """
+        Update this ``DictBuilder`` from another dict.
+
+        :param other: The dictionary to update with.
+        :type other: dict
+        :param _as: The key at which to place update with the found value from ``other``. If not
+            specified, will simply update the entire ``DictBuilder``.
+        :type _as: Union[Any, None, list]
+        :param transformer: A transformer that should be called on the value being used to update
+            the ``DictBuilder``.
+        :type transformer: Callable
+        :param unsafe: Whether an error should be raised if the desired operation cannot be
+            completed.
+        :type unsafe: bool
+        :param classes: The types of internal dictionaries to generate if parts of paths do not
+            exist. Will override what type of dictionary is used at each point in the path until
+            the end of ``_as``. There are different behaviors based on how this is specified (or not
+            specified).
+
+            - If this is a ``list``, each class will be used in succession while following the path
+              specified by ``_as``. If the end is reached before ``_as`` is over, new dictionaries
+              will be of the same type as the ``DictBuilder.clazz``. If this longer than ``_as``, it
+              will only be used for needed locations.
+            - If this is a single type, any new dicts generated when following the path described by
+              ``_as`` will be of the type specified.
+            - If this is not specified, each generated dictionary will be of the same type as the
+              ``DictBuilder.clazz``.
+        :type classes: Optional[Union[List[Type[dict]], Type[dict]]]
+        :return: The current ``DictBuilder`` for chaining.
+        """
+        worker = self.__builder
+        worker = self._update_seek(_as, worker, unsafe, classes)
+        for val in dive_to_dicts(other):
+            if not isinstance(t := transformer(val), dict):
+                if unsafe:
+                    main_logger.error(_NO_MERGE)
+                    raise ValueError(_NO_MERGE)
+
+                continue
+
+            worker.update(t)
+
+        return self
 
     @logs_vars(main_logger, start_message='Updating from another dictionary...',
                start_message_level='info',
@@ -673,7 +729,8 @@ class DictBuilder:
                           _as: Union[Any, None, list] = None,
                           transformer: Callable = pass_,
                           unsafe: bool = False,
-                          classes: Union[List[Type[dict]], Type[dict]] = None) -> 'DictBuilder':
+                          classes: Union[List[Type[dict]], Type[dict]] = None,
+                          val_is_list: bool = False) -> 'DictBuilder':
         """
         Update this ``DictBuilder`` from another dict.
 
@@ -705,40 +762,58 @@ class DictBuilder:
             - If this is not specified, each generated dictionary will be of the same type as the
               ``DictBuilder.clazz``.
         :type classes: Optional[Union[List[Type[dict]], Type[dict]]]
+        :param val_is_list: Whether the value at ``key`` in ``other`` should be considered as a list
+            and its values iterated over and individually used to update the ``DictBuilder``.
+            Defaults to ``False``.
+        :type val_is_list: bool
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
-        # Get the value.
-        if key is not None:
-            if isinstance(key, list):
-                val = get_val_from_path(other, *key, unsafe=unsafe, default=...)
-
-            elif unsafe:
-                val = other[key]
-
-            else:
-                val = other.get(key, ...)
-
-        else:
-            val = other
+        val = self._update_find_in_other(other, key, unsafe)
 
         if val is ...:
             main_logger.info('Target value could not be located.')
             return self
 
-        if not isinstance(val, dict):
+        if not ((val_is_list and type(val) is list) or isinstance(transformer(val), dict)):
             if unsafe:
-                msg = 'Cannot merge a dict to a value.'
-                main_logger.error(msg)
-                raise ValueError(msg)
+                main_logger.error(_NO_MERGE)
+                raise ValueError(_NO_MERGE)
 
             return self
 
         worker = self.__builder
         worker = self._update_seek(_as, worker, unsafe, classes)
-        worker.update(transformer(val))
+        if val_is_list:
+            for _val in dive_to_dicts(val):
+                if not isinstance(t := transformer(_val), dict):
+                    if unsafe:
+                        main_logger.error(_NO_MERGE)
+                        raise ValueError(_NO_MERGE)
+
+                    continue
+
+                worker.update(t)
+
+        else:
+            worker.update(transformer(val))
 
         return self
+
+    @staticmethod
+    def _update_find_in_other(other: dict,
+                              key: Union[Any, None, list] = None,
+                              unsafe: bool = False):
+        if key is not None:
+            if isinstance(key, list):
+                return get_val_from_path(other, *key, unsafe=unsafe, default=...)
+
+            elif unsafe:
+                return other[key]
+
+            return other.get(key, ...)
+
+        return other
 
     @logs_vars(main_logger, start_message='Attempting to locate target to update...')
     def _update_seek(self, _as: Any,

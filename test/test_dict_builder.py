@@ -473,3 +473,31 @@ def test_get_one_key_from_other(get_one_key_params, higher_dict1, higher_dict2):
     testy = DictBuilder(higher_dict2)
     testy.get_one_of_keys_from_other(higher_dict1, get_one_key_params[1], *get_one_key_params[0])
     assert testy.build() == get_one_key_params[2]
+
+
+SIMP_DICT = {K8: V1}
+
+
+def test_update_from_list(base_dict1, high_dict1, higher_dict1):
+    testy = DictBuilder()
+    testy.update_from_list([deepcopy(base_dict1), deepcopy(high_dict1), deepcopy(higher_dict1)])
+    result = {}
+    result.update(deepcopy(base_dict1))
+    result.update(deepcopy(high_dict1))
+    result.update(deepcopy(higher_dict1))
+    assert testy.build() == result, 'Failed for a simple list!'
+
+    testy = DictBuilder()
+    testy.update_from_list([[deepcopy(base_dict1)], [deepcopy(high_dict1)],
+                            [deepcopy(higher_dict1)]])
+    assert testy.build() == result, 'Failed for list containing one item in each list!'
+
+    testy = DictBuilder()
+    testy.update_from_list([deepcopy(base_dict1), deepcopy(high_dict1),
+                            {K8: deepcopy(higher_dict1)}])
+    result = {}
+    result.update(deepcopy(base_dict1))
+    result.update(deepcopy(high_dict1))
+    result.update({K8: deepcopy(higher_dict1)})
+    assert testy.build() == result, ('Failed for a list with one item in a dictionary with only one'
+                                     ' key.')
