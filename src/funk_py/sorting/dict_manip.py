@@ -787,7 +787,7 @@ class DictBuilder:
 
             return self
 
-        if not ((val_is_list and type(val) is list) or isinstance(transformer(val), dict)):
+        if not (val_is_list or isinstance(transformer(val), dict)):
             if unsafe:
                 main_logger.error(_NO_MERGE)
                 raise ValueError(_NO_MERGE)
@@ -797,15 +797,27 @@ class DictBuilder:
         worker = self.__builder
         worker = self._update_seek(_as, worker, unsafe, classes)
         if val_is_list:
-            for _val in dive_to_dicts(val):
-                if not isinstance(t := transformer(_val), dict):
-                    if unsafe:
-                        main_logger.error(_NO_MERGE)
-                        raise ValueError(_NO_MERGE)
+            if isinstance(val, list):
+                for _val in dive_to_dicts(val):
+                    if not isinstance(t := transformer(_val), dict):
+                        if unsafe:
+                            main_logger.error(_NO_MERGE)
+                            raise ValueError(_NO_MERGE)
 
-                    continue
+                        continue
 
+                    worker.update(t)
+
+            elif not isinstance(t := transformer(val), dict):
+                if unsafe:
+                    main_logger.error(_NO_MERGE)
+                    raise ValueError(_NO_MERGE)
+
+                return self
+
+            else:
                 worker.update(t)
+
 
         else:
             worker.update(transformer(val))
