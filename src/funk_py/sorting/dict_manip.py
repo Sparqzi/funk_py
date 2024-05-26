@@ -527,9 +527,104 @@ def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) 
 
 
 _NO_MERGE = 'Cannot merge a non-dict to a dict.'
+_METHOD = 'method'
+_ARGS = 'args'
+_KWARGS = 'kwargs'
 
 
 class DictBuilder:
+    """
+    A builder for dictionaries that has a few helpful methods for merging in data from other
+    dictionaries.
+    """
+
+    class _Instruction:
+        def __init__(inner_self, method: str, *args, **kwargs):
+            # Construct the base of a chain.
+            inner_self._chain = [{_METHOD: method, _ARGS: args, _KWARGS: kwargs}]
+
+        def __call__(inner_self, *args, **kwargs) -> 'DictBuilder._Instruction':
+            # Update the last instruction in chain with the received args and kwargs. The user
+            # intends to call a function and did not just want a value.
+            inner_self._chain[-1].update({_ARGS: args, _KWARGS: kwargs})
+            # Return self so that the reference doesn't go away.
+            return inner_self
+
+        def __getattr__(inner_self, item: str) -> 'DictBuilder._Instruction':
+            # Add the new method to the chain, but don't assume the arguments. If there are any,
+            # they will be added by __call__.
+            inner_self._chain.append({_METHOD: item})
+            # Return self so that the reference doesn't go away.
+            return inner_self
+
+        def __getitem__(inner_self, key: str):
+            # Add __getitem__ and args/kawrgs to chain.
+            inner_self._chain.append({_METHOD: '__getitem__', _ARGS: (key,), _KWARGS: {}})
+            # Return self so that the reference doesn't go away.
+            return inner_self
+
+        def list(inner_self) -> 'DictBuilder._Instruction':
+            inner_self._chain.append({_METHOD: lambda x: list(x)})
+            return inner_self
+
+        def tuple(inner_self) -> 'DictBuilder._Instruction':
+            inner_self._chain.append({_METHOD: lambda x: tuple(x)})
+            return inner_self
+
+        def _evaluate(inner_self, parent: 'DictBuilder') -> Any:
+            attr = parent
+            for instruction in inner_self._chain:
+                if type(t := instruction[_METHOD]) is not str:
+                    attr = t(attr)
+
+                else:
+                    attr = getattr(attr, t)
+
+                if _ARGS in instruction:
+                    attr = attr(*[a._evaluate()
+                                  if type(a) in (DictBuilder._Cur, DictBuilder._Instruction)
+                                  else a
+                                  for a in instruction[_ARGS]],
+                                **{k: v._evaluate()
+                                   if v in (DictBuilder._Cur, DictBuilder._Instruction)
+                                   else v
+                                   for k, v in instruction[_KWARGS].items()})
+
+            return attr
+
+    class _Cur:
+        def __getitem__(self, key):
+            return DictBuilder._Instruction('__getitem__', key)
+
+        @staticmethod
+        def get(key: Any, default: Any = None):
+            return DictBuilder._Instruction('get', key, default)
+
+        @staticmethod
+        def keys() -> 'DictManip._Instruction':
+            return DictBuilder._Instruction('keys')
+
+        @staticmethod
+        def values() -> 'DictManip._Instruction':
+            return DictBuilder._Instruction('values')
+
+        @staticmethod
+        def items() -> 'DictManip._Instruction':
+            return DictBuilder._Instruction('items')
+
+        @staticmethod
+        def _evaluate(parent: 'DictBuilder') -> Any:
+            return parent
+
+    #: _Cur: A placeholder that can be used to represent the current ``DictBuilder`` inside its own
+    #: methods and allows the use of a few types of getters including __getitem__, get, keys,
+    #: values, and items' methods.
+    #:
+    #: .. warning::
+    #:     Using this can have unintended consequences and can allow recursion. Use at your own
+    #:     risk.
+    CUR = _Cur() 
+
     def __new__(cls, *args, clazz: Type = dict, **kwargs):
         if clazz is None:
             clazz = dict
@@ -547,9 +642,6 @@ class DictBuilder:
     def __init__(self, _map: Mapping = ..., *, clazz: Type = dict, _other: dict = None,
                  _transformer: Callable = pass_, **kwargs):
         """
-        A builder for dictionaries that has a few helpful methods for merging in data from other
-        dictionaries.
-
         :param _map: The ``Mapping`` to start the builder out with. Works like it does for ``dict``.
         :type _map: Mapping
         :param clazz: A dictionary class to inherit from. Used to make sure the builder is the
@@ -631,10 +723,22 @@ class DictBuilder:
             self._check_transformer(transformer)
             self.__transformer = transformer
 
-    @staticmethod
-    def _check_dict(other: dict):
-        if not isinstance(other, dict):
+    def _check_dict(self,
+                    other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction']) -> dict:
+        if type(other) is DictBuilder._Cur:
+            return self.__builder
+
+        elif type(other) is DictBuilder._Instruction:
+            # Evaluate the instruction first to make sure it produces a dictionary.
+            if not isinstance(t := other._evaluate(self), dict):
+                raise TypeError('Invalid type for other.')
+
+            return t
+
+        elif not isinstance(other, dict):
             raise TypeError('Invalid type for other.')
+
+        return other
 
     @staticmethod
     def _check_transformer(transformer: Callable):
@@ -662,11 +766,38 @@ class DictBuilder:
 
         return path
 
+    def _process_key(self, other: dict,
+                     key: Any,
+                     transformer: Callable,
+                     unsafe: bool,
+                     default: Any = ...) -> Any:
+        if type(key) in (DictBuilder._Cur, DictBuilder._Instruction):
+            key = key._evaluate(self)
+
+        if isinstance(key, list):
+            key = [v._evaluate()
+                   if type(v) in (DictBuilder._Cur, DictBuilder._Instruction)
+                   else v
+                   for v in key]
+            val = get_val_from_path(other, *key, unsafe=unsafe, default=...)
+            if val is ...:
+                return default
+
+            return transformer(val)
+
+        val = other.get(key, ...)
+        if val is ...:
+            return default
+
+        return transformer(val)
+
     @logs_vars(main_logger, start_message='Getting a value from another dictionary...',
                start_message_level='info',
                end_message='Finished attempt to get a value from another dictionary.',
                end_message_level='info')
-    def pull_from(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
+    def pull_from(self, other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction'],
+                  key: Any,
+                  _as: Any,
                   transformer: Callable = None) -> 'DictBuilder':
         """
         Get a value from another dictionary at a given key, and insert it at the key specified in
@@ -683,22 +814,18 @@ class DictBuilder:
         :type transformer: Callable
         :return: The current ``DictBuilder`` for chaining.
         """
-        self._check_dict(other)
+        other = self._check_dict(other)
         transformer = self._choose_transformer(transformer)
-
-        # Get the value.
-        if isinstance(key, list):
-            val = transformer(get_val_from_path(other, *key, unsafe=True))
-
-        else:
-            val = transformer(other[key])
+        val = self._process_key(other, key, transformer, True)
+        if val is ...:
+            raise ValueError('An invalid value was used.')
 
         path = self._pathify_as(_as, val)
         merge_tuplish_pair(path, self.__builder, unsafe=True)
-
         return self
 
-    def pull_from_other(self, key: Union[Any, list], _as: Union[Any, list],
+    def pull_from_other(self, key: Any,
+                        _as: Any,
                         transformer: Callable = None) -> 'DictBuilder':
         """
         Get a value from the ``DictBuilder's`` ``other`` at a given key, and insert it at the key
@@ -721,8 +848,11 @@ class DictBuilder:
                start_message_level='info',
                end_message='Finished attempt to get a value from another dictionary.',
                end_message_level='info')
-    def get_from(self, other: dict, key: Union[Any, list], _as: Union[Any, list],
-                 transformer: Callable = None, default: Any = ...) -> 'DictBuilder':
+    def get_from(self, other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction'],
+                 key: Any,
+                 _as: Any,
+                 transformer: Callable = None,
+                 default: Any = ...) -> 'DictBuilder':
         """
         Get a value from another dictionary at a given key, and insert it at the key specified in
         ``_as``. If ``key`` cannot be found in other or ``the value cannot be added to this
@@ -740,32 +870,20 @@ class DictBuilder:
             value is not found, then the value simply won't be added.
         :return: The current ``DictBuilder`` for chaining.
         """
-        self._check_dict(other)
+        other = self._check_dict(other)
         transformer = self._choose_transformer(transformer)
-
-        # Get the value.
-        if isinstance(key, list):
-            val = get_val_from_path(other, *key, default=...)
-
-        else:
-            val = other.get(key, ...)
-
+        val = self._process_key(other, key, transformer, False, default)
         if val is ...:
-            if default is ...:
-                return self
-
-            val = default
-
-        else:
-            val = transformer(val)
+            return self
 
         path = self._pathify_as(_as, val)
         merge_tuplish_pair(path, self.__builder)
-
         return self
 
-    def get_from_other(self, key: Union[Any, list], _as: Union[Any, list],
-                       transformer: Callable = None, default: Any = ...) -> 'DictBuilder':
+    def get_from_other(self, key: Any,
+                       _as: Any,
+                       transformer: Callable = None,
+                       default: Any = ...) -> 'DictBuilder':
         """
         Get a value from the ``DictBuilder's`` ``other`` at a given key, and insert it at the key
         specified in ``_as``. If ``key`` cannot be found in ``other`` or the value cannot be added
@@ -790,7 +908,7 @@ class DictBuilder:
                end_message='Finished attempt to update from list.',
                end_message_level='info')
     def update_from_list(self, other: List[dict],
-                          _as: Union[Any, None, list] = None,
+                          _as: Any = None,
                           transformer: Callable = None,
                           unsafe: bool = False,
                           classes: Union[List[Type[dict]], Type[dict]] = None) -> 'DictBuilder':
@@ -844,10 +962,10 @@ class DictBuilder:
                start_message_level='info',
                end_message='Finished attempt to update from another dictionary.',
                end_message_level='info')
-    def update_from(self, other: dict,
+    def update_from(self, other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction'],
                     key: Any = None,
-                    _as: Union[Any, None, list] = None,
-                    keys: List[Any] = None,
+                    _as: Any = None,
+                    keys: list = None,
                     transformer: Callable = None,
                     unsafe: bool = False,
                     classes: Union[List[Type[dict]], Type[dict]] = None,
@@ -859,7 +977,7 @@ class DictBuilder:
         :type other: dict
         :param key: The key at which the source dictionary should be in ``other``. If not specified
             ``other`` will be used as-is unless ``keys`` is specified.
-        :type key: Optional[Union[Any, None, list]]
+        :type key: Union[Any, None, list]
         :param _as: The key at which to place update with the found value from ``other``. If not
             specified, will simply update the entire ``DictBuilder``.
         :type _as: Union[Any, None, list]
@@ -893,7 +1011,7 @@ class DictBuilder:
         :type val_is_list: bool
         :return: The current ``DictBuilder`` for chaining.
         """
-        self._check_dict(other)
+        other = self._check_dict(other)
         transformer = self._choose_transformer(transformer)
 
         val = self._update_find_in_other(other, key, keys, unsafe)
@@ -1003,11 +1121,24 @@ class DictBuilder:
 
         worker.update(transformer(val))
 
-    @staticmethod
-    def _update_find_in_other(other: dict, key: Any, keys: List[Any], unsafe: bool = False):
+    def _update_process_key(self, key: Any):
+        if type(key) in (DictBuilder._Cur, DictBuilder._Instruction):
+            return key._evaluate(self)
+
+        if isinstance(key, list):
+            return [v._evaluate()
+                    if type(v) in (DictBuilder._Cur, DictBuilder._Instruction)
+                    else v
+                    for v in key]
+
+        return key
+
+    def _update_find_in_other(self, other: dict, key: Any, keys: List[Any], unsafe: bool = False):
         # Find a key in other, if it exists. Return ... if it doesn't.
         if key is not None:
+            key = self._update_process_key(key)
             if keys is not None:
+                keys = [self._update_process_key(k) for k in keys]
                 # If the user specified both key and keys, that is silly, but handle feeding both
                 # into get_one_of_keys for them. No need to raise an exception.
                 return get_one_of_keys(other, key, *keys, default=...)
@@ -1021,6 +1152,7 @@ class DictBuilder:
 
         elif keys is not None:
             # key isn't specified, but keys is. Try to get one of keys.
+            keys = [self._update_process_key(k) for k in keys]
             return get_one_of_keys(other, *keys, default=...)
 
         # If neither keys nor key is specified, assume the user wants the entire dictionary.
@@ -1085,8 +1217,8 @@ class DictBuilder:
                end_message='Finished attempt to get one of the keys from another dictionary.',
                end_message_level='info')
     def get_one_of_keys_from(self, other: dict,
-                             _as: Union[Any, list],
-                             *keys: Union[Any, list],
+                             _as: Any,
+                             *keys: Any,
                              transformer: Callable = None,
                              default: Any = ...) -> 'DictBuilder':
         """
@@ -1104,8 +1236,9 @@ class DictBuilder:
         :type default: Any
         :return: The current ``DictBuilder`` for chaining.
         """
-        self._check_dict(other)
+        other = self._check_dict(other)
         transformer = self._choose_transformer(transformer)
+        keys = [self._update_process_key(k) for k in keys]
 
         val = get_one_of_keys(other, *keys, ...)
         if val is ...:
@@ -1139,9 +1272,8 @@ class DictBuilder:
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_has_other()
-        self.get_one_of_keys_from(self.__other, _as, *keys, transformer=transformer,
-                                  default=default)
-        return self
+        return self.get_one_of_keys_from(self.__other, _as, *keys, transformer=transformer,
+                                         default=default)
 
     @logs_vars(main_logger, start_message='Updating dictionary...', start_message_level='info',
                end_message='Finished updating.', end_message_level='info')
@@ -1163,6 +1295,15 @@ class DictBuilder:
         self.__builder[key] = value
         return self
 
+    def keys(self) -> list:
+        return list(self.__builder.keys())
+
+    def values(self) -> list:
+        return list(self.__builder.values())
+
+    def items(self) -> list:
+        return list(self.__builder.items())
+
     def build(self, strict: bool = True) -> dict:
         """
         Build the dictionary from the DictBuilder.
@@ -1180,6 +1321,7 @@ class DictBuilder:
         return self._convert_all_to_dicts(result)
 
     def _convert_all_to_dicts(self, source: dict) -> dict:
+        # One return statement. Returns worker.
         if type(source) is dict:
             worker = source
 

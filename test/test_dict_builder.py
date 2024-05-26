@@ -4,6 +4,7 @@ from copy import deepcopy
 import pytest
 
 from funk_py.modularity.basic_structures import pass_
+from funk_py.modularity.type_matching import check_dict_equality
 from t_support import cov, cov_counter
 from funk_py.sorting.dict_manip import DictBuilder
 
@@ -416,7 +417,7 @@ def tos(request):
 
 
 @pytest.fixture
-def get_from_other_params(froms, tos, higher_dict1, higher_dict2):
+def get_from_params(froms, tos, higher_dict1, higher_dict2):
     def copies():
         return deepcopy(higher_dict1), deepcopy(higher_dict2)
 
@@ -489,10 +490,10 @@ def get_from_other_params(froms, tos, higher_dict1, higher_dict2):
     return k1, k2, result
 
 
-def test_get_from(get_from_other_params, higher_dict1, higher_dict2):
+def test_get_from(get_from_params, higher_dict1, higher_dict2):
     testy = DictBuilder(higher_dict2)
-    testy.get_from(higher_dict1, get_from_other_params[0], get_from_other_params[1])
-    assert testy.build() == get_from_other_params[2]
+    testy.get_from(higher_dict1, get_from_params[0], get_from_params[1])
+    assert testy.build() == get_from_params[2]
 
 
 @pytest.fixture(params=(
@@ -506,9 +507,9 @@ def test_get_from(get_from_other_params, higher_dict1, higher_dict2):
         'partly-good key before, bad key after',
         'bad keys and partly good key before, no key after',
 ))
-def get_one_key_params(request, get_from_other_params):
+def get_one_key_params(request, get_from_params):
     before, after = request.param
-    return (*before, get_from_other_params[0], *after), *get_from_other_params[1:]
+    return (*before, get_from_params[0], *after), *get_from_params[1:]
 
 
 def test_get_one_key_from(get_one_key_params, higher_dict1, higher_dict2):
@@ -543,3 +544,28 @@ def test_update_from_list(base_dict1, high_dict1, higher_dict1):
     result.update({K8: deepcopy(higher_dict1)})
     assert testy.build() == result, ('Failed for a list with one item in a dictionary with only one'
                                      ' key.')
+
+
+class TestCur:
+    def test_recursive_cur(self, high_dict1):
+        testy = DictBuilder(deepcopy(high_dict1))
+        testy.get_from(DictBuilder.CUR, K4, [K4, K5])
+        result = deepcopy(high_dict1)
+        result[K4][K5] = result[K4]
+        # Special function check_dict_equality can handle comparing two infinitely-recursive
+        # dictionaries.
+        assert check_dict_equality(testy.build(), result)
+
+    def test_value_cur(self, high_dict1):
+        testy = DictBuilder(deepcopy(high_dict1))
+        testy.get_from(DictBuilder.CUR, [K4, K1], K1)
+        result = deepcopy(high_dict1)
+        result[K1] = result[K4][K1]
+        assert testy.build() == result
+
+    def test_key_cur(self, high_dict1, base_dict1):
+        testy = DictBuilder(deepcopy(high_dict1))
+        testy.get_from(base_dict1, DictBuilder.CUR[K4].keys().list()[0], K5)
+        result = deepcopy(high_dict1)
+        result[K5] = high_dict1[K4][K1]
+        assert testy.build() == result
