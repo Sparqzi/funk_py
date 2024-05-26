@@ -3,6 +3,7 @@ from copy import deepcopy
 
 import pytest
 
+from funk_py.modularity.basic_structures import pass_
 from t_support import cov, cov_counter
 from funk_py.sorting.dict_manip import DictBuilder
 
@@ -130,11 +131,24 @@ def test_can_instantiate(instantiation_pattern, type_spec):
         assert testy.clazz is type_spec
         # Don't test build inside the instantiation test.
 
+    assert testy.other is None
+    assert testy.transformer is pass_
+
+
+def test_instantiate_with_defaults(base_dict1):
+    def t_func(x):
+        return {K1: str(x)}
+
+    testy = DictBuilder(_other=base_dict1, _transformer=t_func)
+    assert testy.other is base_dict1, 'Other did not match expected.'
+    assert testy.transformer is t_func, 'Transformer did not match expected.'
+
 
 def test_can_build(instantiation_pattern, type_spec):
     testy = instantiate(*instantiation_pattern[:2], type_spec)
+    t = testy.build()
     if type_spec is not None:
-        assert type(testy.build()) is type_spec
+        assert type(t) is type_spec
 
 
 def test_can_setitem(instantiation_pattern, type_spec):
@@ -181,9 +195,9 @@ def test_can_update(instantiation_pattern, base_dict1, type_spec):
         assert testy.clazz is type_spec
 
 
-def test_can_update_from_other(instantiation_pattern, base_dict1, type_spec):
+def test_can_update_from(instantiation_pattern, base_dict1, type_spec):
     testy = instantiate(*instantiation_pattern[:2], type_spec)
-    testy.update_from_other(base_dict1)
+    testy.update_from(base_dict1)
     result = instantiation_pattern[2]
     result.update(base_dict1)
     assert testy.build() == result
@@ -191,65 +205,65 @@ def test_can_update_from_other(instantiation_pattern, base_dict1, type_spec):
         assert testy.clazz is type_spec
 
 
-def test_nested_can_update_from_nested_other(higher_dict1, higher_dict2):
+def test_nested_can_update_from(higher_dict1, higher_dict2):
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1))
+    testy.update_from(deepcopy(higher_dict1))
     result = deepcopy(higher_dict2)
     result.update(deepcopy(higher_dict1))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), K6)
+    testy.update_from(deepcopy(higher_dict1), K6)
     result = deepcopy(higher_dict2)
     result.update(deepcopy(higher_dict1[K6]))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), [K6, K4])
+    testy.update_from(deepcopy(higher_dict1), [K6, K4])
     result = deepcopy(higher_dict2)
     result.update(deepcopy(higher_dict1[K6][K4]))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), _as=K8)
+    testy.update_from(deepcopy(higher_dict1), _as=K8)
     result = deepcopy(higher_dict2)
     result[K8].update(deepcopy(higher_dict1))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), K6, K8)
+    testy.update_from(deepcopy(higher_dict1), K6, K8)
     result = deepcopy(higher_dict2)
     result[K8].update(deepcopy(higher_dict1[K6]))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), [K6, K4], K8)
+    testy.update_from(deepcopy(higher_dict1), [K6, K4], K8)
     result = deepcopy(higher_dict2)
     result[K8].update(deepcopy(higher_dict1[K6][K4]))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), _as=[K8, K6])
+    testy.update_from(deepcopy(higher_dict1), _as=[K8, K6])
     result = deepcopy(higher_dict2)
     result[K8][K6].update(deepcopy(higher_dict1))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), K6, [K8, K6])
+    testy.update_from(deepcopy(higher_dict1), K6, [K8, K6])
     result = deepcopy(higher_dict2)
     result[K8][K6].update(deepcopy(higher_dict1[K6]))
     assert testy.build() == result
 
     testy = DictBuilder(deepcopy(higher_dict2))
-    testy.update_from_other(deepcopy(higher_dict1), [K6, K4], [K8, K6])
+    testy.update_from(deepcopy(higher_dict1), [K6, K4], [K8, K6])
     result = deepcopy(higher_dict2)
     result[K8][K6].update(deepcopy(higher_dict1[K6][K4]))
     assert testy.build() == result
 
 
-def test_update_from_other_with_classes_generates_correct(base_dict1, base_dict2):
+def test_update_from_with_classes_generates_correct(base_dict1, base_dict2):
     testy = DictBuilder(deepcopy(base_dict2))
-    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
+    testy.update_from(deepcopy(base_dict1), _as=K5, classes=Counter)
     result = deepcopy(base_dict2)
     result[K5] = base_dict1
     built = testy.build()
@@ -258,10 +272,10 @@ def test_update_from_other_with_classes_generates_correct(base_dict1, base_dict2
     assert type(built[K5]) is Counter
 
 
-def test_update_from_other_with_classes_behaves_expected(base_dict1, base_dict2):
+def test_update_from_with_classes_behaves_expected(base_dict1, base_dict2):
     testy = DictBuilder(deepcopy(base_dict2))
-    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
-    testy.update_from_other(deepcopy(base_dict1), _as=K5)
+    testy.update_from(deepcopy(base_dict1), _as=K5, classes=Counter)
+    testy.update_from(deepcopy(base_dict1), _as=K5)
 
     expectation = Counter(base_dict1)
     expectation.update(base_dict1)
@@ -277,9 +291,9 @@ def test_update_from_other_with_classes_behaves_expected(base_dict1, base_dict2)
     assert type(built[K5]) is Counter
 
 
-def test_update_from_other_with_classes_can_be_made_dict(base_dict1, base_dict2):
+def test_update_from_with_classes_can_be_made_dict(base_dict1, base_dict2):
     testy = DictBuilder(deepcopy(base_dict2))
-    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
+    testy.update_from(deepcopy(base_dict1), _as=K5, classes=Counter)
     result = deepcopy(base_dict2)
     result[K5] = base_dict1
     built = testy.build(False)
@@ -287,6 +301,34 @@ def test_update_from_other_with_classes_can_be_made_dict(base_dict1, base_dict2)
     assert type(built) is dict
     assert type(built[K5]) is dict
 
+
+def test_fails_other_when_no_other(base_dict1):
+    testy = DictBuilder()
+    with pytest.raises(TypeError):
+        testy.get_from_other(K1, K2)
+
+    with pytest.raises(TypeError):
+        testy.get_one_of_keys_from_other(K1, K1, K2)
+
+    with pytest.raises(TypeError):
+        testy.update_from_other()
+
+    with pytest.raises(TypeError):
+        testy.pull_from_other(K1, K2)
+
+
+def test_use(base_dict1):
+    def t_func(x):
+        return {K1: str(x)}
+
+    testy = DictBuilder()
+    assert testy.other is None and testy.transformer is pass_, 'Not instantiated correctly.'
+
+    testy.use(other=base_dict1)
+    assert testy.other is base_dict1 and testy.transformer is pass_, 'Setting other failed.'
+
+    testy.use(transformer=t_func)
+    assert testy.other is base_dict1 and testy.transformer is t_func, 'Setting transformer failed.'
 
 TOP_LVL = 'top level'
 TOP_LVL_LST = 'top level (list)'
@@ -447,9 +489,9 @@ def get_from_other_params(froms, tos, higher_dict1, higher_dict2):
     return k1, k2, result
 
 
-def test_get_from_other(get_from_other_params, higher_dict1, higher_dict2):
+def test_get_from(get_from_other_params, higher_dict1, higher_dict2):
     testy = DictBuilder(higher_dict2)
-    testy.get_from_other(higher_dict1, get_from_other_params[0], get_from_other_params[1])
+    testy.get_from(higher_dict1, get_from_other_params[0], get_from_other_params[1])
     assert testy.build() == get_from_other_params[2]
 
 
@@ -469,9 +511,9 @@ def get_one_key_params(request, get_from_other_params):
     return (*before, get_from_other_params[0], *after), *get_from_other_params[1:]
 
 
-def test_get_one_key_from_other(get_one_key_params, higher_dict1, higher_dict2):
+def test_get_one_key_from(get_one_key_params, higher_dict1, higher_dict2):
     testy = DictBuilder(higher_dict2)
-    testy.get_one_of_keys_from_other(higher_dict1, get_one_key_params[1], *get_one_key_params[0])
+    testy.get_one_of_keys_from(higher_dict1, get_one_key_params[1], *get_one_key_params[0])
     assert testy.build() == get_one_key_params[2]
 
 
