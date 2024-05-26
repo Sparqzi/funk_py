@@ -325,11 +325,13 @@ def test_use(base_dict1):
     testy = DictBuilder()
     assert testy.other is None and testy.transformer is pass_, 'Not instantiated correctly.'
 
-    testy.use(other=base_dict1)
+    ans = testy.use(other=base_dict1)
     assert testy.other is base_dict1 and testy.transformer is pass_, 'Setting other failed.'
+    assert ans is testy
 
-    testy.use(transformer=t_func)
+    ans = testy.use(transformer=t_func)
     assert testy.other is base_dict1 and testy.transformer is t_func, 'Setting transformer failed.'
+    assert ans is testy
 
 TOP_LVL = 'top level'
 TOP_LVL_LST = 'top level (list)'

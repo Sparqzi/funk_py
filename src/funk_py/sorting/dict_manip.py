@@ -723,6 +723,8 @@ class DictBuilder:
             self._check_transformer(transformer)
             self.__transformer = transformer
 
+        return self
+
     def _check_dict(self,
                     other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction']) -> dict:
         if type(other) is DictBuilder._Cur:
