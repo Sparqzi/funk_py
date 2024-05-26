@@ -751,8 +751,11 @@ class DictBuilder:
             raise TypeError('Invalid type for transformer.')
 
     def _choose_transformer(self, transformer: Optional[Callable]):
-        if transformer is None:
+        if transformer is ...:
             return self.__transformer
+
+        elif transformer is None:
+            return pass_
 
         self._check_transformer(transformer)
         return transformer
@@ -803,7 +806,7 @@ class DictBuilder:
     def pull_from(self, other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction'],
                   key: Any,
                   _as: Any,
-                  transformer: Callable = None) -> 'DictBuilder':
+                  transformer: Callable = ...) -> 'DictBuilder':
         """
         Get a value from another dictionary at a given key, and insert it at the key specified in
         ``_as``. Using this will raise an error if the key doesn't exist in ``other`` or if it
@@ -831,7 +834,7 @@ class DictBuilder:
 
     def pull_from_other(self, key: Any,
                         _as: Any,
-                        transformer: Callable = None) -> 'DictBuilder':
+                        transformer: Callable = ...) -> 'DictBuilder':
         """
         Get a value from the ``DictBuilder's`` ``other`` at a given key, and insert it at the key
         specified in ``_as``. Using this will raise an error if the key doesn't exist in ``other``
@@ -856,7 +859,7 @@ class DictBuilder:
     def get_from(self, other: Union[dict, 'DictBuilder._Cur', 'DictBuilder._Instruction'],
                  key: Any,
                  _as: Any,
-                 transformer: Callable = None,
+                 transformer: Callable = ...,
                  default: Any = ...) -> 'DictBuilder':
         """
         Get a value from another dictionary at a given key, and insert it at the key specified in
@@ -887,7 +890,7 @@ class DictBuilder:
 
     def get_from_other(self, key: Any,
                        _as: Any,
-                       transformer: Callable = None,
+                       transformer: Callable = ...,
                        default: Any = ...) -> 'DictBuilder':
         """
         Get a value from the ``DictBuilder's`` ``other`` at a given key, and insert it at the key
@@ -914,7 +917,7 @@ class DictBuilder:
                end_message_level='info')
     def update_from_list(self, other: List[dict],
                           _as: Any = None,
-                          transformer: Callable = None,
+                          transformer: Callable = ...,
                           unsafe: bool = False,
                           classes: Union[List[Type[dict]], Type[dict]] = None) -> 'DictBuilder':
         """
@@ -971,7 +974,7 @@ class DictBuilder:
                     key: Any = None,
                     _as: Any = None,
                     keys: list = None,
-                    transformer: Callable = None,
+                    transformer: Callable = ...,
                     unsafe: bool = False,
                     classes: Union[List[Type[dict]], Type[dict]] = None,
                     val_is_list: bool = False) -> 'DictBuilder':
@@ -1044,7 +1047,7 @@ class DictBuilder:
     def update_from_other(self, key: Any = None,
                           _as: Union[Any, None, list] = None,
                           keys: List[Any] = None,
-                          transformer: Callable = None,
+                          transformer: Callable = ...,
                           unsafe: bool = False,
                           classes: Union[List[Type[dict]], Type[dict]] = None,
                           val_is_list: bool = False) -> 'DictBuilder':
@@ -1224,7 +1227,7 @@ class DictBuilder:
     def get_one_of_keys_from(self, other: dict,
                              _as: Any,
                              *keys: Any,
-                             transformer: Callable = None,
+                             transformer: Callable = ...,
                              default: Any = ...) -> 'DictBuilder':
         """
         Gets the value at one of the keys (or key paths) specified in ``keys`` from ``other`` and
@@ -1261,7 +1264,8 @@ class DictBuilder:
         return self
 
     def get_one_of_keys_from_other(self, _as: Union[Any, list],
-                                   *keys: Union[Any, list], transformer: Callable = None,
+                                   *keys: Union[Any, list],
+                                   transformer: Callable = ...,
                                    default: Any = ...) -> 'DictBuilder':
         """
         Gets the value at one of the keys (or key paths) specified in ``keys`` from the
