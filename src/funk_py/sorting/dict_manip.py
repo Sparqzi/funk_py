@@ -1,5 +1,6 @@
 from copy import deepcopy
-from typing import Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable, Mapping, Type
+from typing import (Generator, Optional, Union, Any, Callable, Dict, Tuple, Iterable, Mapping,
+                    Type, List)
 
 from funk_py.modularity.basic_structures import pass_
 from funk_py.modularity.logging import make_logger, logs_vars
@@ -525,9 +526,18 @@ def get_one_of_keys(source: dict, *keys: Union[Any, list], default: Any = None) 
 
 class DictBuilder:
     def __new__(cls, *args, clazz: Type = dict, **kwargs):
+        if clazz is None:
+            clazz = dict
+
         inst = super().__new__(cls)
-        inst.__class = clazz
-        return inst
+        if issubclass(clazz, dict):
+            inst.__class = clazz
+            return inst
+
+        else:
+            msg = f'clazz must inherit from dict, but it does not. Provided {clazz}.'
+            main_logger.error(msg)
+            raise TypeError(msg)
 
     def __init__(self, _map: Mapping = ..., *, clazz: Type = dict, **kwargs):
         """
@@ -550,6 +560,11 @@ class DictBuilder:
 
         else:
             self.__builder = self.__class(_map, **kwargs)
+
+    @property
+    def clazz(self) -> type:
+        """The default class for the ``DictBuilder``."""
+        return self.__class
 
     @staticmethod
     def _check_dict(other: dict):
@@ -651,9 +666,12 @@ class DictBuilder:
                start_message_level='info',
                end_message='Finished attempt to update from another dictionary.',
                end_message_level='info')
-    def update_from_other(self, other: dict, key: Union[Any, None, list] = None,
-                          _as: Union[Any, None, list] = None, transformer: Callable = pass_,
-                          unsafe: bool = False) -> 'DictBuilder':
+    def update_from_other(self, other: dict,
+                          key: Union[Any, None, list] = None,
+                          _as: Union[Any, None, list] = None,
+                          transformer: Callable = pass_,
+                          unsafe: bool = False,
+                          classes: Union[List[Type[dict]], Type[dict]] = None) -> 'DictBuilder':
         """
         Update this ``DictBuilder`` from another dict.
 
@@ -671,6 +689,20 @@ class DictBuilder:
         :param unsafe: Whether an error should be raised if the desired operation cannot be
             completed.
         :type unsafe: bool
+        :param classes: The types of internal dictionaries to generate if parts of paths do not
+            exist. Will override what type of dictionary is used at each point in the path until
+            the end of ``_as``. There are different behaviors based on how this is specified (or not
+            specified).
+
+            - If this is a ``list``, each class will be used in succession while following the path
+              specified by ``_as``. If the end is reached before ``_as`` is over, new dictionaries
+              will be of the same type as the ``DictBuilder.clazz``. If this longer than ``_as``, it
+              will only be used for needed locations.
+            - If this is a single type, any new dicts generated when following the path described by
+              ``_as`` will be of the type specified.
+            - If this is not specified, each generated dictionary will be of the same type as the
+              ``DictBuilder.clazz``.
+        :type classes: Optional[Union[List[Type[dict]], Type[dict]]]
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
@@ -689,6 +721,7 @@ class DictBuilder:
             val = other
 
         if val is ...:
+            main_logger.info('Target value could not be located.')
             return self
 
         if not isinstance(val, dict):
@@ -700,37 +733,62 @@ class DictBuilder:
             return self
 
         worker = self.__builder
-        worker = self._update_seek(_as, worker, unsafe)
+        worker = self._update_seek(_as, worker, unsafe, classes)
         worker.update(transformer(val))
 
         return self
 
-    def _update_seek(self, _as: Any, worker: dict, unsafe: bool):
+    @logs_vars(main_logger, start_message='Attempting to locate target to update...')
+    def _update_seek(self, _as: Any,
+                     worker: dict,
+                     unsafe: bool,
+                     classes: Union[None, List[Type[dict]], Type[dict]]):
         if _as is not None:
-            if isinstance(_as, list):
-                for val in _as:
-                    worker = self._update_seek_next(val, worker, unsafe)
+            needed = len(_as)
+            if type(classes) is list:
+                if (t := len(classes) - needed) < 0:
+                    classes += [self.__class] * -t
+
+            elif classes is None:
+                classes = [self.__class] * needed
 
             else:
-                worker = self._update_seek_next(_as, worker, unsafe)
+                classes = [classes] * needed
 
+            for t in classes:
+                if not issubclass(t, dict):
+                    msg = (f'All used classes must inherit from dict, but it does not. Provided'
+                           f'{classes}.')
+                    main_logger.error(msg)
+                    raise TypeError(msg)
+
+            clazz = iter(classes)
+            if isinstance(_as, list):
+                for val in _as:
+                    worker = self._update_seek_next(val, worker, unsafe, next(clazz))
+
+            else:
+                worker = self._update_seek_next(_as, worker, unsafe, next(clazz))
+
+        main_logger.debug(f'Found the target worker. Value is {worker}.')
         return worker
 
-    def _update_seek_next(self, val: Any, worker: dict, unsafe: bool):
+    @staticmethod
+    def _update_seek_next(val: Any, worker: dict, unsafe: bool, clazz: Type[dict]):
         if val in worker:
             if isinstance(worker[val], dict):
                 worker = worker[val]
 
             elif unsafe:
-                msg = 'An invalid path was encountered'
-                main_logger.error(msg + ' while updating from another dictionary.')
-                raise ValueError(msg + '.')
+                msg = 'An invalid path was encountered while updating from another dictionary.'
+                main_logger.error(msg)
+                raise ValueError(msg)
 
             else:
-                worker[val] = worker = self.clazz()
+                worker[val] = worker = clazz()
 
         else:
-            worker[val] = worker = self.clazz()
+            worker[val] = worker = clazz()
 
         return worker
 
@@ -791,6 +849,34 @@ class DictBuilder:
         self.__builder[key] = value
         return self
 
-    def build(self) -> dict:
-        """Build the dictionary from the DictBuilder."""
-        return deepcopy(self.__builder)
+    def build(self, strict: bool = True) -> dict:
+        """
+        Build the dictionary from the DictBuilder.
+
+        :param strict: Whether to return a strict copy of the dictionary, maintaining all types.
+            ``True`` will result all internal dictionaries being maintained as their original types.
+            ``False`` will result in all internal dictionaries being converted to ``dict``.
+        :type strict: bool
+        :return: The dictionary that was built.
+        """
+        result = deepcopy(self.__builder)
+        if strict:
+            return result
+
+        return self._convert_all_to_dicts(result)
+
+    def _convert_all_to_dicts(self, source: dict) -> dict:
+        if type(source) is dict:
+            worker = source
+
+        else:
+            worker = dict(source)
+
+        for key, val in source.items():
+            if isinstance(val, dict):
+                worker[key] = self._convert_all_to_dicts(val)
+
+            else:
+                worker[key] = val
+
+        return worker

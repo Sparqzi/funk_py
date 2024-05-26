@@ -1,3 +1,4 @@
+from collections import Counter
 from copy import deepcopy
 
 import pytest
@@ -105,57 +106,89 @@ def higher_dict2():
     return {K7: V7, K8: {K5: V5, K6: {K3: V3, K4: V4}}}
 
 
-def instantiate(_map, kwargs) -> DictBuilder:
+@pytest.fixture(params=(None, Counter), ids=('normal', 'specified class at init'))
+def type_spec(request):
+    return request.param
+
+
+def instantiate(_map, kwargs, clazz=None) -> DictBuilder:
     if _map is ...:
-        return DictBuilder(**kwargs)
+        if clazz is None:
+            return DictBuilder(**kwargs)
 
-    return DictBuilder(_map, **kwargs)
+        return DictBuilder(**kwargs, clazz=clazz)
+
+    elif clazz is None:
+        return DictBuilder(_map, **kwargs)
+
+    return DictBuilder(_map, **kwargs, clazz=clazz)
 
 
-def test_can_instantiate(instantiation_pattern):
-    testy = instantiate(*instantiation_pattern[:2])
+def test_can_instantiate(instantiation_pattern, type_spec):
+    testy = instantiate(*instantiation_pattern[:2], type_spec)
+    if type_spec is not None:
+        assert testy.clazz is type_spec
+        # Don't test build inside the instantiation test.
 
 
-def test_can_setitem(instantiation_pattern):
-    testy = instantiate(*instantiation_pattern[:2])
+def test_can_build(instantiation_pattern, type_spec):
+    testy = instantiate(*instantiation_pattern[:2], type_spec)
+    if type_spec is not None:
+        assert type(testy.build()) is type_spec
+
+
+def test_can_setitem(instantiation_pattern, type_spec):
+    testy = instantiate(*instantiation_pattern[:2], type_spec)
     testy[T_KEY] = T_VAL
     result = instantiation_pattern[2]
     result[T_KEY] = T_VAL
 
     assert testy.build() == result
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
-def test_can_getitem(base_dict1):
-    testy = DictBuilder(base_dict1)
+def test_can_getitem(base_dict1, type_spec):
+    testy = DictBuilder(base_dict1, clazz=type_spec)
     assert testy[K1] == V1
     assert testy[K2] == V2
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
-def test_can_get(base_dict1):
-    testy = DictBuilder(base_dict1)
+def test_can_get(base_dict1, type_spec):
+    testy = DictBuilder(base_dict1, clazz=type_spec)
     assert testy.get(K1) == V1
     assert testy.get(K2) == V2
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
-def test_can_get_missing(base_dict1):
-    testy = DictBuilder(base_dict1)
+def test_can_get_missing(base_dict1, type_spec):
+    testy = DictBuilder(base_dict1, clazz=type_spec)
     assert testy.get(KB) is None
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
-def test_can_update(instantiation_pattern, base_dict1):
-    testy = instantiate(*instantiation_pattern[:2])
+def test_can_update(instantiation_pattern, base_dict1, type_spec):
+    testy = instantiate(*instantiation_pattern[:2], type_spec)
     testy.update(base_dict1)
     result = instantiation_pattern[2]
     result.update(base_dict1)
     assert testy.build() == result
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
-def test_can_update_from_other(instantiation_pattern, base_dict1):
-    testy = instantiate(*instantiation_pattern[:2])
+def test_can_update_from_other(instantiation_pattern, base_dict1, type_spec):
+    testy = instantiate(*instantiation_pattern[:2], type_spec)
     testy.update_from_other(base_dict1)
     result = instantiation_pattern[2]
     result.update(base_dict1)
     assert testy.build() == result
+    if type_spec is not None:
+        assert testy.clazz is type_spec
 
 
 def test_nested_can_update_from_nested_other(higher_dict1, higher_dict2):
@@ -212,6 +245,47 @@ def test_nested_can_update_from_nested_other(higher_dict1, higher_dict2):
     result = deepcopy(higher_dict2)
     result[K8][K6].update(deepcopy(higher_dict1[K6][K4]))
     assert testy.build() == result
+
+
+def test_update_from_other_with_classes_generates_correct(base_dict1, base_dict2):
+    testy = DictBuilder(deepcopy(base_dict2))
+    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
+    result = deepcopy(base_dict2)
+    result[K5] = base_dict1
+    built = testy.build()
+    assert built == result
+    assert type(built) is dict
+    assert type(built[K5]) is Counter
+
+
+def test_update_from_other_with_classes_behaves_expected(base_dict1, base_dict2):
+    testy = DictBuilder(deepcopy(base_dict2))
+    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
+    testy.update_from_other(deepcopy(base_dict1), _as=K5)
+
+    expectation = Counter(base_dict1)
+    expectation.update(base_dict1)
+    _known_result = {k: 2*v for k, v in base_dict1.items()}
+    assert _known_result == expectation, ('The behavior of Counter seems to have changed. '
+                                          'This test is no longer valid.')
+
+    result = deepcopy(base_dict2)
+    result[K5] = expectation
+    built = testy.build()
+    assert built == result
+    assert type(built) is dict
+    assert type(built[K5]) is Counter
+
+
+def test_update_from_other_with_classes_can_be_made_dict(base_dict1, base_dict2):
+    testy = DictBuilder(deepcopy(base_dict2))
+    testy.update_from_other(deepcopy(base_dict1), _as=K5, classes=Counter)
+    result = deepcopy(base_dict2)
+    result[K5] = base_dict1
+    built = testy.build(False)
+    assert built == result
+    assert type(built) is dict
+    assert type(built[K5]) is dict
 
 
 TOP_LVL = 'top level'
