@@ -725,8 +725,9 @@ class DictBuilder:
                end_message='Finished attempt to update from another dictionary.',
                end_message_level='info')
     def update_from_other(self, other: dict,
-                          key: Union[Any, None, list] = None,
+                          key: Any = None,
                           _as: Union[Any, None, list] = None,
+                          keys: List[Any] = None,
                           transformer: Callable = pass_,
                           unsafe: bool = False,
                           classes: Union[List[Type[dict]], Type[dict]] = None,
@@ -737,11 +738,15 @@ class DictBuilder:
         :param other: The dictionary to update with.
         :type other: dict
         :param key: The key at which the source dictionary should be in ``other``. If not specified
-            ``other`` will be used as-is.
-        :type key: Union[Any, None, list]
+            ``other`` will be used as-is unless ``keys`` is specified.
+        :type key: Optional[Union[Any, None, list]]
         :param _as: The key at which to place update with the found value from ``other``. If not
             specified, will simply update the entire ``DictBuilder``.
         :type _as: Union[Any, None, list]
+        :param keys: A list of possible keys at which the source dictionary might be located in
+            ``other``. Each key should follow the same rules as ``key``. If ``key`` is specified,
+            ``key`` will be attempted first, then ``keys`` will be attempted.
+        :type keys: Optional[List[Union[Any, None, list]]]
         :param transformer: A transformer that should be called on the value being used to update
             the ``DictBuilder``.
         :type transformer: Callable
@@ -769,10 +774,17 @@ class DictBuilder:
         :return: The current ``DictBuilder`` for chaining.
         """
         self._check_dict(other)
-        val = self._update_find_in_other(other, key, unsafe)
 
+        val = self._update_find_in_other(other, key, keys, unsafe)
         if val is ...:
             main_logger.info('Target value could not be located.')
+            if unsafe:
+                k = [key]
+                if keys is not None:
+                    k.extend(keys)
+
+                raise ValueError(f'Could not find key in other.\nkey={k}')
+
             return self
 
         if not ((val_is_list and type(val) is list) or isinstance(transformer(val), dict)):
@@ -801,17 +813,18 @@ class DictBuilder:
         return self
 
     @staticmethod
-    def _update_find_in_other(other: dict,
-                              key: Union[Any, None, list] = None,
-                              unsafe: bool = False):
+    def _update_find_in_other(other: dict, key: Any, keys: List[Any], unsafe: bool = False):
         if key is not None:
-            if isinstance(key, list):
+            if keys is not None:
+                return get_one_of_keys(other, key, *keys, default=...)
+
+            elif isinstance(key, list):
                 return get_val_from_path(other, *key, unsafe=unsafe, default=...)
 
-            elif unsafe:
-                return other[key]
-
             return other.get(key, ...)
+
+        elif keys is not None:
+            return get_one_of_keys(other, *keys, default=...)
 
         return other
 
