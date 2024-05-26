@@ -720,6 +720,9 @@ class DictBuilder:
             self.__other = other
 
         if transformer is not ...:
+            if transformer is None:
+                transformer = pass_
+
             self._check_transformer(transformer)
             self.__transformer = transformer
 
