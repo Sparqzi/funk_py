@@ -5,7 +5,7 @@ with open("requirements.txt", "r") as fh:
 
 setup(
     name='funky_modifiers',
-    version='0.2.1',
+    version='0.2.2',
     description='A package containing tiny bits and bobs to remove boilerplate or just make things simpler.',
     url='https://github.com/Sparqzi/funk_py',
     author='Erich Kopp',
@@ -13,7 +13,7 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     classifiers=[
-        'Development Status :: 1 - Planning',
+        'Development Status :: 5 - Stable',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3.7'
     ],
