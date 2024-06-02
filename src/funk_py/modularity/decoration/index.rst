@@ -1,14 +1,15 @@
-Modularity
+Decoration
 ===================================
 
 .. toctree::
    :maxdepth: 3
    :caption: Contents:
 
-   type_matching
-   logging
-   basic_structures
-   decoration/index
+   cache_modifiers
+   enum_modifiers
+   init_modifiers
+   method_modifiers
+   transforming_list
 
 
 Indices and tables
