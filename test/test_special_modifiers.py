@@ -584,7 +584,7 @@ class TestWuncDiskCache:
             if name == horse01.output[0]:
                 assert index[name][1] == 3, BAD_USES
 
-            elif name == horse02.output[0]:
+            elif name in (horse02.output[0], horse11.output[0]):
                 assert index[name][1] == 1, BAD_USES
 
             else:
@@ -633,7 +633,7 @@ class TestWuncDiskCache:
                 assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
-            TestLruDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
+            TestWuncDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
 
     class TestMultipleInstances:
         # Scope of the below is not set The goal of this is to ensure a new object is instantiated
@@ -673,4 +673,4 @@ class TestWuncDiskCache:
                 assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
-            TestLruDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
+            TestWuncDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
