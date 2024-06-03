@@ -288,12 +288,12 @@ def horse11_20(request):
     return TDef(horse, (make_horse_str(*horse), Horse(*horse)))
 
 
-@pytest.fixture(params=(HORSE21, HORSE22, HORSE23, HORSE24, HORSE25, HORSE26, HORSE27, HORSE28,
-                        HORSE29, HORSE30),
-                ids=(1, 2, 3, 4, 5, 6, 7, 8, 9, 10))
-def horse21_30(request):
-    horse = request.param
-    return TDef(horse, (make_horse_str(*horse), Horse(*horse)))
+def horse_write_method(horse: Horse, io: TextIO):
+    json.dump(dict(name=horse.name, age=horse.age), io)
+
+
+def horse_read_method(io: TextIO):
+    return Horse(**json.load(io))
 
 
 TARGET_DIR = 'target_dir'
@@ -304,6 +304,48 @@ BAD_USES = 'The incorrect number of uses was stored for a result.'
 SHOULD_BE_PRESENT = 'A name that should already be in the results is not yet present.'
 EXPECTED_PATH = 'The expected path for a file does not exist.'
 WRONG_OVER = 'The wrong value got overwritten.'
+
+
+def check_index(index,
+                ex_len: int,
+                accessor: callable = None,
+                base=None,
+                non_base=None,
+                non_base_names: list = None,
+                others: dict = None,
+                should_contain: list = None,
+                other_asserts: callable = None,
+                file_accessor: callable = lambda x: x[0]):
+    assert len(index) == ex_len, BAD_NUMBER
+    if accessor is not None and base is not None:
+        t = {}
+        if non_base is not None and non_base_names is not None:
+            for name in non_base_names:
+                t[name] = non_base
+
+        if others is not None:
+            for name, val in others.items():
+                t[name] = val
+
+        for name in index:
+            if other_asserts is not None:
+                other_asserts(name, index)
+
+            assert accessor(index[name]) == t.get(name, base)
+            assert os.path.exists(os.path.join(TARGET_DIR, file_accessor(index[name]))), \
+                EXPECTED_PATH
+
+    else:
+        for name in index:
+            if other_asserts is not None:
+                other_asserts(name, index)
+
+            assert os.path.exists(os.path.join(TARGET_DIR, file_accessor(index[name]))), \
+                EXPECTED_PATH
+
+    if should_contain is not None:
+        for name in should_contain:
+            assert name in index, SHOULD_BE_PRESENT
 
 
 class TestLfuDiskCache:
@@ -326,40 +368,16 @@ class TestLfuDiskCache:
         ans = t_func(*horse11.input)
         assert ans == horse11.output[1]
         index = t_func._DiskCache__index
-        assert len(index) == MAX_SIZE, BAD_NUMBER
-        for name in index:
-            if name == horse01.output[0]:
-                assert index[name][1] == 3, BAD_USES
-
-            elif name == horse11.output[0]:
-                assert index[name][1] == 1, BAD_USES
-
-            else:
-                assert index[name][1] == 2, BAD_USES
-
-            assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
-
-        for horse in HORSE01_10[3:]:
-            assert make_horse_str(*horse) in index, WRONG_OVER
-
+        h1_name = horse01.output[0]
+        h11_name = horse11.output[0]
+        o_names = [make_horse_str(*h) for h in HORSE01_10[2:]]
+        check_index(index, MAX_SIZE, lambda x: x[1], 2, others={h1_name: 3, h11_name: 1},
+                    should_contain=[h1_name, h11_name] + o_names)
         ans = t_func(*horse02.input)
         assert ans == horse02.output[1]
-        index = t_func._DiskCache__index
-        assert len(index) == MAX_SIZE, BAD_NUMBER
-        for name in index:
-            if name == horse01.output[0]:
-                assert index[name][1] == 3, BAD_USES
-
-            elif name == horse02.output[0]:
-                assert index[name][1] == 1, BAD_USES
-
-            else:
-                assert index[name][1] == 2, BAD_USES
-
-            assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
-
-        for horse in HORSE01_10[3:]:
-            assert make_horse_str(*horse) in index, WRONG_OVER
+        h2_name = horse02.output[0]
+        check_index(index, MAX_SIZE, lambda x: x[1], 2, others={h1_name: 3, h2_name: 1},
+                    should_contain=[h1_name, h2_name] + o_names)
 
     class TestSingleInstance:
         # Scope of the below is set to class to ensure the built index is never deconstructed.
@@ -377,27 +395,43 @@ class TestLfuDiskCache:
             assert ans == horse01_10.output[1], BAD_RETURN
             ex_index = horse01_10.output[2]
             index = t_func._DiskCache__index
-            assert len(index) == len(ex_index), BAD_NUMBER
-            for name in ex_index:
-                assert name in index, SHOULD_BE_PRESENT
-                assert index[name][1] == 1, BAD_USES
-                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+            check_index(index, len(ex_index), lambda x: x[1], 1, should_contain=ex_index)
 
         def test_increments_correctly(self, setup, t_func, horse01_10):
             ans = t_func(*horse01_10.input)
             assert ans == horse01_10.output[1], BAD_RETURN
             ex_index = horse01_10.output[2]
             index = t_func._DiskCache__index
-            assert len(index) == MAX_SIZE, BAD_NUMBER
-            for name in index:
-                if name in ex_index:
-                    assert index[name][1] == 2, BAD_USES
+            check_index(index, MAX_SIZE, lambda x: x[1], 1, 2, ex_index)
 
-                else:
-                    assert index[name][1] == 1, BAD_USES
+        def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
+            TestLfuDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
 
+    class TestSingleModifiedInstance:
+        # Scope of the below is set to class to ensure the built index is never deconstructed.
+        # These tests are supposed to represent usage during a single session.
+        @pytest.fixture(scope='class')
+        def t_func(self):
+            @disk_cache(TARGET_DIR, MAX_SIZE, in_bytes=False, write_converter=horse_write_method,
+                        read_converter=horse_read_method)
+            def make_horse(name: str, age: int) -> Horse:
+                return Horse(name, age)
 
-                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+            return make_horse
+
+        def test_up_to_max_no_problem(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            check_index(index, len(ex_index), lambda x: x[1], 1, should_contain=ex_index)
+
+        def test_increments_correctly(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            check_index(index, MAX_SIZE, lambda x: x[1], 1, 2, ex_index)
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
             TestLfuDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
@@ -418,27 +452,43 @@ class TestLfuDiskCache:
             assert ans == horse01_10.output[1], BAD_RETURN
             ex_index = horse01_10.output[2]
             index = t_func._DiskCache__index
-            assert len(index) == len(ex_index), BAD_NUMBER
-            for name in ex_index:
-                assert name in index, SHOULD_BE_PRESENT
-                assert index[name][1] == 1, BAD_USES
-                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+            check_index(index, len(ex_index), lambda x: x[1], 1, should_contain=ex_index)
 
         def test_increments_correctly(self, setup, t_func, horse01_10):
             ans = t_func(*horse01_10.input)
             assert ans == horse01_10.output[1], BAD_RETURN
             ex_index = horse01_10.output[2]
             index = t_func._DiskCache__index
-            assert len(index) == MAX_SIZE, BAD_NUMBER
-            for name in index:
-                if name in ex_index:
-                    assert index[name][1] == 2, BAD_USES
+            check_index(index, MAX_SIZE, lambda x: x[1], 1, 2, ex_index)
 
-                else:
-                    assert index[name][1] == 1, BAD_USES
+        def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
+            TestLfuDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
 
+    class TestMultipleModifiedInstances:
+        # Scope of the below is not set The goal of this is to ensure a new object is instantiated
+        # for every test. This ensures that files are actually saved correctly.
+        @pytest.fixture
+        def t_func(self):
+            @disk_cache(TARGET_DIR, MAX_SIZE, in_bytes=False, write_converter=horse_write_method,
+                        read_converter=horse_read_method)
+            def make_horse(name: str, age: int) -> Horse:
+                return Horse(name, age)
 
-                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+            return make_horse
+
+        def test_up_to_max_no_problem(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            check_index(index, len(ex_index), lambda x: x[1], 1, should_contain=ex_index)
+
+        def test_increments_correctly(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            check_index(index, MAX_SIZE, lambda x: x[1], 1, 2, ex_index)
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
             TestLfuDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
