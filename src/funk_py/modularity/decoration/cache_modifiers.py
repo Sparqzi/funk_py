@@ -27,6 +27,7 @@ class DiskCacheMethod(IntEnum):
     LFU = 1
     LRU = 2
     CUSTOM = 3
+    AGE = 4
 
 
 class _ResultFile:
@@ -176,7 +177,7 @@ class _DiskCacheResults:
                 if filename != _filename:
                     v[2] += 1
 
-    @_bget.alternative(DiskCacheMethod.LFU, DiskCacheMethod.LRU)
+    @_bget.alternative(DiskCacheMethod.LFU, DiskCacheMethod.LRU, DiskCacheMethod.AGE)
     def _bget2(self, filename: str): ...
 
     @_bget.alternative(DiskCacheMethod.CUSTOM)
@@ -205,8 +206,14 @@ class _DiskCacheResults:
             copier = index.pop(filename)
             index[filename] = copier
 
-    @_aget.alternative(DiskCacheMethod.CUSTOM)
+    @_aget.alternative(DiskCacheMethod.AGE)
     def _aget4(self, filename: str, true_filename: str):
+        index = self._index
+        if filename not in index:
+            index[filename] = [true_filename, datetime.now().strftime('%Y-%m-%d--%H:%M:%S.%f')]
+
+    @_aget.alternative(DiskCacheMethod.CUSTOM)
+    def _aget5(self, filename: str, true_filename: str):
         self._cache_arg[2](self._maxsize, self._index, filename, true_filename)
 
     def _get(self, filename: str, args: tuple, kwargs: dict) -> Optional[str]:
@@ -242,7 +249,7 @@ class _DiskCacheResults:
 
     def _find_and_drop_worst(
             self,
-            calc_funk: Callable[[List[Union[str, int]]], Union[int, float]]
+            calc_funk: Callable[[List[Union[str, int]]], Union[int, float, datetime]]
     ) -> str:
         index = self._index
         _min = min([calc_funk(v) for v in index.values()])
@@ -279,8 +286,12 @@ class _DiskCacheResults:
         del self.__results[filename]
         return _next
 
-    @_drop_worst_candidate.alternative(DiskCacheMethod.CUSTOM)
+    @_drop_worst_candidate.alternative(DiskCacheMethod.AGE)
     def _drop_worst_candidate4(self) -> str:
+        return self._find_and_drop_worst(lambda v: datetime.strptime(v[1], '%Y-%m-%d--%H:%M:%S.%f'))
+
+    @_drop_worst_candidate.alternative(DiskCacheMethod.CUSTOM)
+    def _drop_worst_candidate5(self) -> str:
         _next, filename = self._cache_arg[1](self._maxsize, self._index)
         if filename in self.__results:
             self.__results[filename].delete()
@@ -349,7 +360,7 @@ class _DiskCacheNameConverters:
 
         main_logger.debug('Value does not inherit from one of the base types. Creating and adding '
                           'a tag...')
-        ans = f';{type(value)};' + ans
+        ans = f';{type(value).__name__};' + ans
         main_logger.debug(f'Result is {ans}')
         return ans
 

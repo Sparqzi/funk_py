@@ -1,13 +1,15 @@
+import json
 import os
 from collections import namedtuple
 from datetime import datetime, time, date, timedelta, timezone
+from typing import TextIO
 
 import pytest
 
 from t_support import cov, cov_counter
-# Importing an internal class here in order to test it.
+# _DiskCacheNameConverters is included to facilitate testing of syntax.
 from funk_py.modularity.decoration.cache_modifiers import (_DiskCacheNameConverters, disk_cache,
-                                                           DISK_CACHE_INDEX_NAME, DiskCacheMethod)
+                                                           DiskCacheMethod)
 
 # The following manages whether the generated coverage instance from t_support should report. This
 # method of coverage is used so that coverage can be turned off to not interfere in timed tests.
@@ -137,7 +139,7 @@ def dict_vals(request, simple_vals, more_simple_vals, even_more_simple_vals,
 
 @pytest.fixture
 def unknown_val():
-    return TDef(Horse('Bob', 19), ';<class \'test_cache_modifiers.Horse\'>;Horse(name=Bob, age=19)')
+    return TDef(Horse('Bob', 19), ';Horse;Horse(name=Bob, age=19)')
 
 
 def test_simple_vals_name(simple_vals):
@@ -467,12 +469,10 @@ class TestLruDiskCache:
                     + [make_horse_str(*h) for h in HORSE01_10[2:]])
         for name in index:
             assert name in ex_names, WRONG_OVER
-            print(index[name])
             assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
 
         ans = t_func(*horse02.input)
         assert ans == horse02.output[1]
-        index = t_func._DiskCache__index
         assert len(index) == MAX_SIZE, BAD_NUMBER
         ex_names[2] = horse02.output[0]
         for name in index:
@@ -585,7 +585,6 @@ class TestWuncDiskCache:
 
         ans = t_func(*horse02.input)
         assert ans == horse02.output[1]
-        index = t_func._DiskCache__index
         assert len(index) == MAX_SIZE, BAD_NUMBER
         for name in index:
             if name == horse01.output[0]:
@@ -681,3 +680,162 @@ class TestWuncDiskCache:
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
             TestWuncDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
+
+
+class TestAgeDiskCache:
+    BAD_TIME = ('The datetime either was not stored properly, or the format in which it is stored '
+                'has changed. Value was {}. Expected format was \'%Y-%m-%d--%H:%M:%S.%f\'.')
+    MISS_VAL = 'An expected value was missing.'
+    @pytest.fixture(scope='class')
+    def setup(self):
+        os.mkdir(TARGET_DIR)
+
+        yield
+
+        for root, _, files in os.walk(TARGET_DIR):
+            for file in files:
+                os.remove(os.path.join(root, file))
+
+        os.rmdir(TARGET_DIR)
+
+    @staticmethod
+    def overwrite_tst(t_func, horse01, horse02, horse11):
+        ans = t_func(*horse01.input)
+        assert ans == horse01.output[1]
+        ans = t_func(*horse11.input)
+        assert ans == horse11.output[1]
+        index = t_func._DiskCache__index
+        assert len(index) == MAX_SIZE, BAD_NUMBER
+        for name in index:
+            try:
+                datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+            except ValueError:
+                assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+            assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        assert horse11.output[0] in index, TestAgeDiskCache.MISS_VAL
+        for horse in HORSE01_10[1:]:
+            assert make_horse_str(*horse) in index, WRONG_OVER
+
+        ans = t_func(*horse02.input)
+        assert ans == horse02.output[1]
+        assert len(index) == MAX_SIZE, BAD_NUMBER
+        for name in index:
+            try:
+                datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+            except ValueError:
+                assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+            assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        assert horse11.output[0] in index, TestAgeDiskCache.MISS_VAL
+        for horse in HORSE01_10[1:]:
+            assert make_horse_str(*horse) in index, WRONG_OVER
+
+        ans = t_func(*horse01.input)
+        assert ans == horse01.output[1]
+        for name in index:
+            try:
+                datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+            except ValueError:
+                assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+            assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        assert horse11.output[0] in index, TestAgeDiskCache.MISS_VAL
+        assert horse01.output[0] in index, TestAgeDiskCache.MISS_VAL
+        for horse in HORSE01_10[2:]:
+            assert make_horse_str(*horse) in index, WRONG_OVER
+
+    class TestSingleInstance:
+        # Scope of the below is set to class to ensure the built index is never deconstructed.
+        # These tests are supposed to represent usage during a single session.
+        @pytest.fixture(scope='class')
+        def t_func(self):
+            @disk_cache(TARGET_DIR, MAX_SIZE, cache_method=DiskCacheMethod.AGE)
+            def make_horse(name: str, age: int) -> Horse:
+                return Horse(name, age)
+
+            return make_horse
+
+        def test_up_to_max_no_problem(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            assert len(index) == len(ex_index), BAD_NUMBER
+            for name in ex_index:
+                assert name in index, SHOULD_BE_PRESENT
+                try:
+                    datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+                except ValueError:
+                    assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        def test_increments_correctly(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            index = t_func._DiskCache__index
+            assert len(index) == MAX_SIZE, BAD_NUMBER
+            for name in index:
+                try:
+                    datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+                except ValueError:
+                    assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
+            TestAgeDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
+
+    class TestMultipleInstances:
+        # Scope of the below is not set The goal of this is to ensure a new object is instantiated
+        # for every test. This ensures that files are actually saved correctly.
+        @pytest.fixture
+        def t_func(self):
+            @disk_cache(TARGET_DIR, MAX_SIZE, cache_method=DiskCacheMethod.AGE)
+            def make_horse(name: str, age: int) -> Horse:
+                return Horse(name, age)
+
+            return make_horse
+
+        def test_up_to_max_no_problem(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            assert len(index) == len(ex_index), BAD_NUMBER
+            for name in ex_index:
+                assert name in index, SHOULD_BE_PRESENT
+                try:
+                    datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+                except ValueError:
+                    assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        def test_increments_correctly(self, setup, t_func, horse01_10):
+            ans = t_func(*horse01_10.input)
+            assert ans == horse01_10.output[1], BAD_RETURN
+            ex_index = horse01_10.output[2]
+            index = t_func._DiskCache__index
+            assert len(index) == MAX_SIZE, BAD_NUMBER
+            for name in index:
+                try:
+                    datetime.strptime(index[name][1], '%Y-%m-%d--%H:%M:%S.%f')
+
+                except ValueError:
+                    assert False, TestAgeDiskCache.BAD_TIME.format(index[name][1])
+
+                assert os.path.exists(os.path.join(TARGET_DIR, index[name][0])), EXPECTED_PATH
+
+        def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
+            TestAgeDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
