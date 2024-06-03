@@ -31,8 +31,6 @@ def has_alternatives(name: Hashable, *more_names: str):
             @staticmethod
             def set_alternative(name: Hashable):
                 nonlocal cur_funk
-                print(name)
-                print(options.get(name))
                 cur_funk = options[name]
 
             def alternative(self, name: Hashable, *more_names: str):
