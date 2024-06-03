@@ -370,7 +370,7 @@ class _DiskCacheNameConverters:
     @staticmethod
     def _time_str(value: time) -> str:
         main_logger.debug('Making a date into a string...')
-        ans = ';time;' + value.strftime('%H-%M-%S')
+        ans = ';time;' + value.strftime('%H-%M-%S--%Z')
         main_logger.debug(f'Result is {ans}')
         return ans
 

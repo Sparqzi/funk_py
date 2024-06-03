@@ -1,8 +1,6 @@
 import os
-import pickle
 from collections import namedtuple
-from typing import Tuple, Any, Union, List
-from pathlib import Path
+from datetime import datetime, time, date, timedelta, timezone
 
 import pytest
 
@@ -43,7 +41,10 @@ def abc_provider():
     TDef('lorem', ';str;lorem'),
     TDef(543, ';int;543'),
     TDef(97.5, ';float;97.5'),
-), ids=('str', 'int', 'float'))
+    TDef(datetime(2024, 9, 18, 14, 22, 33), ';datetime;2024-09-18--14-22-33--'),
+    TDef(date(2024, 9, 18), ';date;2024-09-18'),
+    TDef(time(14, 22, 33), ';time;14-22-33--'),
+), ids=('str', 'int', 'float', 'datetime', 'date', 'time'))
 def simple_vals(request):
     return request.param
 
@@ -52,7 +53,11 @@ def simple_vals(request):
     TDef('ipsum', ';str;ipsum'),
     TDef(987, ';int;987'),
     TDef(16.666, ';float;16.666'),
-), ids=('str', 'int', 'float'))
+    TDef(datetime(2025, 4, 13, 19, 12, 0, tzinfo=timezone(-timedelta(hours=6))),
+         ';datetime;2025-04-13--19-12-00--UTC-06:00'),
+    TDef(date(2025, 4, 13), ';date;2025-04-13'),
+    TDef(time(19, 12, 0, tzinfo=timezone(-timedelta(hours=6))), ';time;19-12-00--UTC-06:00'),
+), ids=('str', 'int', 'float', 'datetime', 'date', 'time'))
 def more_simple_vals(request):
     return request.param
 
@@ -60,7 +65,10 @@ def more_simple_vals(request):
     TDef('dolor', ';str;dolor'),
     TDef(5, ';int;5'),
     TDef(9.0, ';float;9.0'),
-), ids=('str', 'int', 'float'))
+    TDef(datetime(2023, 1, 1, 1, 0, 0, 19), ';datetime;2023-01-01--01-00-00--'),
+    TDef(date(2023, 1, 1), ';date;2023-01-01'),
+    TDef(time(1, 0, 0, 19), ';time;01-00-00--'),
+), ids=('str', 'int', 'float', 'datetime', 'date', 'time'))
 def even_more_simple_vals(request):
     return request.param
 
