@@ -129,8 +129,7 @@ def dict_vals(request, simple_vals, more_simple_vals, even_more_simple_vals,
 
 @pytest.fixture
 def unknown_val():
-    return TDef(Horse('Bob', 19),
-                ';<class \'test_special_modifiers.Horse\'>;Horse(name=Bob, age=19)')
+    return TDef(Horse('Bob', 19), ';<class \'test_cache_modifiers.Horse\'>;Horse(name=Bob, age=19)')
 
 
 def test_simple_vals_name(simple_vals):
