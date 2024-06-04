@@ -593,6 +593,9 @@ def disk_cache(target_dir: Union[str, bytes, os.PathLike],
 
            This function should be used to perform changes to the index after all other steps are
            completed. It does not need to return anything.
+        5. ``DiskCacheMethod.AGE`` - Uses the time when each value is first cached to determine
+           which is removed first. Oldest will always be removed first (unless two are entered in
+           the same microsecond, in which case behavior is uncertain.
     :type cache_method: The method to use for caching.
     :param cache_arg: An extra argument consumed by some cache methods.
     :type cache_arg: Any
