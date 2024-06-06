@@ -640,16 +640,14 @@ class Obj(dict):
                 for k, v in dict.items(self)
             }
 
-        match recur:
-            case builtins.list | builtins.tuple | builtins.dict:
-                ans = recursive_conversion(recur, recur)
+        if recur in (list, tuple, dict):
+            ans = recursive_conversion(recur, recur)
 
-            case [t, *rest] if t in (list, tuple, dict):
-                ans = thing(recursive_conversion(recur[0],
-                                                 rest if len(rest) else ...))
+        elif type(recur) is tuple and recur[0] in (list, tuple, dict):
+            ans = thing(recursive_conversion(recur[0], recur[1:] if len(recur[1:]) else ...))
 
-            case _:
-                ans = dict.copy(self)
+        else:
+            ans = dict.copy(self)
 
         if thing is dict:
             return ans
