@@ -297,6 +297,7 @@ def horse_read_method(io: TextIO):
 
 
 TARGET_DIR = 'target_dir'
+TARGET_DIR2 = 'target_dir2'
 MAX_SIZE = 10
 BAD_RETURN = 'The function did not return the expected value.'
 BAD_NUMBER = 'The expected number of results was not present.'
@@ -889,3 +890,74 @@ class TestAgeDiskCache:
 
         def test_not_replace_higher(self, setup, t_func, horse01, horse02, horse11):
             TestAgeDiskCache.overwrite_tst(t_func, horse01, horse02, horse11)
+
+
+class TestMultipleTypes:
+    @pytest.fixture(scope='class')
+    def setup(self):
+        os.mkdir(TARGET_DIR)
+        os.mkdir(TARGET_DIR2)
+
+        yield
+
+        for root, _, files in os.walk(TARGET_DIR):
+            for file in files:
+                os.remove(os.path.join(root, file))
+
+        for root, _, files in os.walk(TARGET_DIR2):
+            for file in files:
+                os.remove(os.path.join(root, file))
+
+        os.rmdir(TARGET_DIR)
+        os.rmdir(TARGET_DIR2)
+
+    @pytest.fixture(scope='class')
+    def t_funcs(self):
+        @disk_cache(TARGET_DIR, MAX_SIZE, cache_method=DiskCacheMethod.LFU)
+        def make_horse1(name: str, age: int) -> Horse:
+            return Horse(name, age)
+
+        @disk_cache(TARGET_DIR2, MAX_SIZE, cache_method=DiskCacheMethod.LRU)
+        def make_horse2(name: str, age: int) -> Horse:
+            return Horse(name, age)
+
+        return make_horse1, make_horse2
+
+    def test_up_to_max_no_problem(self, setup, t_funcs, horse01_10):
+        t_func1, t_func2 = t_funcs
+        # Test for LFU behavior
+        ans = t_func1(*horse01_10.input)
+        assert ans == horse01_10.output[1], BAD_RETURN
+        ex_index = horse01_10.output[2]
+        index = t_func1._DiskCache__index
+        check_index(index, len(ex_index), lambda x: x[1], 1, should_contain=ex_index)
+        # Test for LRU behavior
+        ans = t_func2(*horse01_10.input)
+        assert ans == horse01_10.output[1], BAD_RETURN
+        ex_index = horse01_10.output[2]
+        index = t_func2._DiskCache__index
+        assert len(index) == len(ex_index), BAD_NUMBER
+        for name in ex_index:
+            assert name in index, SHOULD_BE_PRESENT
+            assert os.path.exists(os.path.join(TARGET_DIR, index[name])), EXPECTED_PATH
+
+    def test_increments_correctly(self, setup, t_funcs, horse01_10):
+        t_func1, t_func2 = t_funcs
+        # Test for LFU behavior
+        ans = t_func1(*horse01_10.input)
+        assert ans == horse01_10.output[1], BAD_RETURN
+        ex_index = horse01_10.output[2]
+        index = t_func1._DiskCache__index
+        check_index(index, MAX_SIZE, lambda x: x[1], 1, 2, ex_index)
+        # Test for LRU behavior
+        ans = t_func2(*horse01_10.input)
+        assert ans == horse01_10.output[1], BAD_RETURN
+        index = t_func2._DiskCache__index
+        assert len(index) == MAX_SIZE, BAD_NUMBER
+        for name in index:
+            assert os.path.exists(os.path.join(TARGET_DIR, index[name])), EXPECTED_PATH
+
+    def test_not_replace_higher(self, setup, t_funcs, horse01, horse02, horse11):
+        t_func1, t_func2 = t_funcs
+        TestLfuDiskCache.overwrite_tst(t_func1, horse01, horse02, horse11)
+        TestLruDiskCache.overwrite_tst(t_func2, horse01, horse02, horse11)
