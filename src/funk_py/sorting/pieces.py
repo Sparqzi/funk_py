@@ -236,13 +236,13 @@ def _find_and_follow_first_path_in_pick(
     while True:
         try:
             path, instruction = next(output_map_iter)
+            if not isinstance(worker, dict):
+                main_logger.warning(f'An unexpected value was encountered in pick attempt. a path '
+                                    f'has now been skipped. value = {worker}')
+                return None, None, True
+
             if path in worker:
                 if isinstance(instruction, str):
-                    if not isinstance(worker, dict):
-                        main_logger.warning(f'An unexpected value was encountered in pick attempt. '
-                                            f'a path has now been skipped. value = {worker}')
-                        return None, None, False
-
                     static_builder[instruction] = worker[path]
                     builder.append({})
                     # The caller doesn't need to call anything, we did everything needed for the

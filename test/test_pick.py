@@ -1175,6 +1175,24 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
     }, speed, (name, dissimilar_lists.name, more_dissimilar_lists.name))
 
 
+@pytest.fixture(params=(
+    {KEYS[0]: {KEYS[1]: {KEYS[3]: VALS2}}},
+    {KEYS[0]: {KEYS[1]: {}}},
+    {KEYS[0]: {KEYS[1]: None}},
+    {KEYS[0]: {KEYS[2]: VALS2}},
+    {KEYS[0]: {}},
+    {KEYS[0]: None}
+), ids=(
+    'Last key different',
+    'last no keys',
+    'last None',
+    'second value',
+    'second no keys',
+    'second None'
+))
+def danger_dict(request): return {KEYS[0]: {KEYS[1]: {KEYS[2]: OUT_KEYS[2]}}}, request.param
+
+
 class TestMultiplicative:
     name = COM
     pick_type = PickType.COMBINATORIAL
@@ -1279,6 +1297,11 @@ class TestMultiplicative:
 
         t_func = self.deco_too_slow_func(t)
         self.too_slow(t.speed, t.dict, t_func())
+
+    def test_danger_dict(self, danger_dict):
+        output_map, dict = danger_dict
+        ans = pick(output_map, dict, self.pick_type)
+        assert len(ans) == 0
 
 
 class TestTandem:
@@ -1386,6 +1409,11 @@ class TestTandem:
         t_func = self.deco_too_slow_func(t)
         self.too_slow(t.speed, t.dict, t_func())
 
+    def test_danger_dict(self, danger_dict):
+        output_map, dict = danger_dict
+        ans = pick(output_map, dict, self.pick_type)
+        assert len(ans) == 0
+
 
 class TestReduce:
     name = RED
@@ -1492,6 +1520,11 @@ class TestReduce:
         t_func = self.deco_too_slow_func(t)
         self.too_slow(t.speed, t.dict, t_func())
 
+    def test_danger_dict(self, danger_dict):
+        output_map, dict = danger_dict
+        ans = pick(output_map, dict, self.pick_type)
+        assert len(ans) == 0
+
 
 class TestAccumulate:
     name = ACC
@@ -1597,3 +1630,8 @@ class TestAccumulate:
 
         t_func = self.deco_too_slow_func(t)
         self.too_slow(t.speed, t.dict, t_func())
+
+    def test_danger_dict(self, danger_dict):
+        output_map, dict = danger_dict
+        ans = pick(output_map, dict, self.pick_type)
+        assert len(ans) == 1
