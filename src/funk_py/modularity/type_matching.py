@@ -1,11 +1,15 @@
 import inspect
-from types import FunctionType
-from typing import Union, Any, AnyStr, Callable, Mapping, MutableMapping, \
-    get_args, get_origin, Sequence, Literal, Tuple, List, Dict
+from types import FunctionType, UnionType
+from typing import (Union, Any, AnyStr, get_args, get_origin, Literal, Tuple, List, Dict, TypeVar,
+                    Generic)
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Callable
 
 from funk_py.modularity.basic_structures import simple_trinomial
+from funk_py.modularity.logging import make_logger
+
+
+T = TypeVar('T')
 
 
 _WEIRDOS = (None, ..., True, False)
@@ -19,38 +23,72 @@ _double_func_check = simple_trinomial(lambda x: isinstance(x, FunctionType))  # 
 
 def check_iterable_not_string(value: Any) -> bool:
     """Check if a value is iterable, but not a string."""
-    return isinstance(value, Iterable) and type(value) is not str
+    return isinstance(value, Iterable) and not (isinstance(value, str) or isinstance(value, bytes))
 
 
-class TypeMatcher:
-    def __new__(cls, type_: Union[type, tuple, None]):
-        if not hasattr(TypeMatcher, '_existing_matches'):
-            TypeMatcher._existing_matches = {}
+tm_logger = make_logger('TypeMatcher', 'TYPEMATCHER_LOG_LEVEL', default_level='error', TRACE=5)
 
-        if type_ in TypeMatcher._existing_matches:
-            return TypeMatcher._existing_matches[type_]
 
-        TypeMatcher._existing_matches[type_] = t = super().__new__(cls)
+class TypeMatcher(Generic[T]):
+    G_CHECK = 'Generating check...'
+    R_G_CHECK = 'Returning generated check.'
+
+    def _base_eval(self, type_: type) -> callable:
+        msg = f'Checking if {{}} is {self._spec_msg}{type_}. Returning result.'
+
+        def t(value: Any) -> bool:
+            tm_logger.trace(msg.format(value))
+            return isinstance(value, type_)
+
+        return t
+
+    @staticmethod
+    def __any_check(value: Any) -> bool: return True
+
+    def __new__(cls, type_: Union[type, tuple, UnionType, None]):
+        tm_logger.info(f'Getting a new TypeMatcher for {type_}...')
+        if not hasattr(TypeMatcher, '_TypeMatcher__existing_matches'):
+            tm_logger.debug('TypeMatcher does not already have an __existing_matches collection. '
+                            'Adding one...')
+            TypeMatcher.__existing_matches = {}
+
+        if type_ in TypeMatcher.__existing_matches:
+            tm_logger.debug(f'TypeMatcher already exists for {type_}.')
+            tm_logger.info('Returning existing instance.')
+            return TypeMatcher.__existing_matches[type_]
+
+        tm_logger.debug(f'TypeMatcher does not already exist for {type_}. Generating a new '
+                        f'instance and adding it to existing matches...')
+        TypeMatcher.__existing_matches[type_] = t = super().__new__(cls)
+        tm_logger.debug('Initializing instance...')
         t.__true_init(type_)
+        tm_logger.info('Returning new instance.')
         return t
 
     # *DISREGARD python:S1144*
     # This might trigger a warning for python:S1144, that is because some linters do not check the
     # __new__ method properly. This does not violate python:S1144.
-    def __true_init(self, type_: Union[type, tuple, None]):  # noqa
+    def __true_init(self, type_: Union[type, tuple, UnionType, None]):  # noqa
         """
         This serves as a hidden init so that instances are never re-initialized. This is important
         to prevent eating up too much memory when a user wants MANY instances of ``TypeMatcher``. It
         can also decrease other resource usage.
         """
         self._type = type_
-        self._function = self.__get_new_function(type_)
+        self._spec_msg = 'an instance of '
+        self._p_spec_msg = 'instances of '
+        self._function = self._get_new_function(type_)
 
-    def __init__(self, type_: Union[type, tuple, None]):
+    def __init__(self, type_: Union[type, tuple, UnionType, None]):
         """
-        A ``TypeMatcher`` used to check whether a variable is a specific type. This class is
-        callable, and can be called with a value to return a boolean representing whether the value
-        is the type of the ``TypeMatcher``.
+        A ``TypeMatcher`` used to check whether a variable is a specific type. Instances of this
+        class are callable, and can be called with a value to return a boolean representing whether
+        the value is the type of the ``TypeMatcher``. The class itself can be used as a parametrized
+        type hint for plugging into instances of itself.
+
+        .. warning::
+          This class makes a distinction between booleans and integers, which is not standard, but
+          in several cases is more logical behavior.
         """
         # This exists to ensure correct documentation appears in IDEs.
         pass
@@ -59,249 +97,552 @@ class TypeMatcher:
         """Evaluate whether type of value is a match for this TypeMatcher."""
         return self._function(value)
 
-    @staticmethod
-    def __get_new_function(type_: Union[type, tuple, None]) -> Callable:
+    def _get_new_function(self, type_: Union[type, tuple, None]) -> Callable:
         """A class to represent a runtime type-check."""
+        tm_logger.info('Generating a unique function for a new TypeMatcher...')
+        tm_logger.debug(f'Type is {type_}.')
+
+        # The origin of a type is essentially used for figuring out if it's one of the parametrized
+        # types.
+        tm_logger.debug('Getting the origin of the type...')
         origin = get_origin(type_)
+        tm_logger.debug(f'Got origin of type. {origin}.')
         if type_ is ... or isinstance(type_, type(...)):
+            # Ellipsis is a singleton.
+            tm_logger.debug('Type is ellipsis. Returning ellipsis type check.')
             return lambda x: x is ...
 
+        elif origin in (TypeMatcher, StrictTypeMatcher):
+            tm_logger.debug('Type is TypeMatcher or StrictTypeMatcher. Returning TypeMatcher type '
+                            'check.')
+            return self.__type_matcher_check(type_)
+
         elif origin is Union:
-            return TypeMatcher.__glorified_union_check(get_args(type_))
+            tm_logger.debug('Type is a union. Generating and returning a union type check.')
+            return self.__glorified_union_check(get_args(type_))
 
         elif origin is Literal:
-            return TypeMatcher.__literal(get_args(type_))
+            tm_logger.debug('Type is a literal. Generating and returning a literal type check.')
+            return self.__literal(get_args(type_))
 
         elif type_ is Any:
-            return lambda x: True
+            # The simplest case, technically.
+            tm_logger.debug('Type is Any. Returning any type check.')
+            return self.__any_check
 
         # Cannot import NoneType, but when used in Union, None becomes NoneType. Therefore, must
-        # evaluate type_ against type(None)
+        # evaluate type_ against type(None).
+        # Since TypeMatcher will recursively generate instances to handle things like Union, this is
+        # necessary.
         elif type_ is None or isinstance(type_, type(None)):
+            tm_logger.debug('Type is None/NoneType. Returning none type check.')
             return lambda x: x is None
 
         elif type_ is IterableNonString:
+            tm_logger.debug('Type is IterableNonString. Returning iterable non-string type check.')
             return check_iterable_not_string
 
         elif type_ is AnyStr:
-            return lambda x: isinstance(x, str)
+            tm_logger.debug('Type is AnyStr. Returning AnyStr type check.')
+            return lambda x: isinstance(x, str) or isinstance(x, bytes)
 
-        elif type_ in (str, int, float, bool, complex, object, bytes, Callable):
-            return TypeMatcher.__generic_type(type_)
+        elif type_ is callable or origin in (callable, Callable):
+            tm_logger.debug('Type is callable. Generating and returning a callable type check.')
+            return self.__callable_check(type_)
 
         elif type(type_) is tuple:
-            return TypeMatcher.__glorified_union_check(type_)
+            tm_logger.debug('Type is an actual tuple. Generating and returning a type check based '
+                            'on its contents.')
+            return self.__glorified_union_check(type_)
 
-        elif origin in (list, set, Iterable, Sequence):
-            return TypeMatcher.__generic_list(type_)
+        # Don't just test for origin. Also check for subclasses to allow any non-built-in classes
+        # to be treated as their base classes would be. The inner-workings of __mapping_check should
+        # handle making sure the non-built-in class must be the parent.
+        elif (origin in (dict, Mapping, MutableMapping) or (inspect.isclass(origin)
+              and issubclass(origin, (dict, Mapping, MutableMapping)))):
+            tm_logger.debug('Type is dictionary or mapping. Generating and returning a mapping '
+                            'type check.')
+            return self.__mapping_check(type_)
 
-        elif origin in (dict, Mapping, MutableMapping):
-            return TypeMatcher.__mapping_check(type_)
+        # Don't just test for origin. Also check for subclasses to allow any non-built-in classes
+        # to be treated as their base classes would be. The inner-workings of __tuple_check should
+        # handle making sure the non-built-in class must be the parent.
+        elif origin is tuple or (inspect.isclass(origin) and issubclass(origin, tuple)):
+            tm_logger.debug('Type is tuple. Generating and returning a tuple type check.')
+            return self.__tuple_check(type_)
 
-        elif origin is tuple:
-            return TypeMatcher.__tuple_check(type_)
+        # Don't just test for origin. Also check for subclasses to allow any non-built-in classes
+        # to be treated as their base classes would be. The inner-workings of __generic_list should
+        # handle making sure the non-built-in class must be the parent.
+        elif (origin in (list, set, Iterable, Sequence) or (inspect.isclass(origin)
+              and issubclass(origin, (list, set, Iterable, Sequence)))):
+            tm_logger.debug('Type is an iterable or sequence. Generating and returning appropriate '
+                            'type check.')
+            return self.__generic_list(type_)
 
-        else:
-            return TypeMatcher.__generic_type(type_)
+        # If no matches are found before this, it's fairly certain the value is a simple type.
+        tm_logger.debug('Type does not appear to be a special type. Generating and returning a '
+                        'generic type check.')
+        return self.__generic_type(type_)
 
-    @staticmethod
-    def __generic_type(type_: type) -> Callable:
+    def __generic_type(self, type_: type) -> callable:
         """Check if a value matches a generic type."""
-        def type_check(value: Any) -> bool:
-            return type(value) is type_
+        tm_logger.debug('Generating base type check...')
+        base_eval = self._base_eval(type_)
+        tm_logger.debug('Base type check generated.')
 
-        return type_check
+        # Booleans can be mistaken for integers, by default, TypeMatchers should not make this
+        # mistake, so a special function with an extra check is used when the target type is
+        # integer.
+        if type_ is int:
+            tm_logger.debug('Type is int. Generating a special check to avoid confusing '
+                            'booleans...')
+            def type_check(value: Any) -> bool:
+                tm_logger.trace(f'Checking if {value} is an instance of int and verifying that it '
+                                f'is not a bool. Returning result.')
+                return isinstance(value, int) and type(value) is not bool
+
+            tm_logger.debug(TypeMatcher.R_G_CHECK)
+            return type_check
+
+        # Not a boolean so nothing fancy needs to happen.
+        return base_eval
 
     @staticmethod
-    def __literal(options: tuple) -> Callable:
+    def __literal(options: tuple) -> callable:
         """Get the function for checking a Literal."""
-        check_list = list(options)
-
+        tm_logger.debug(TypeMatcher.G_CHECK)
+        valid_opts = f'valid options: {options}'
         def type_check(value: Any) -> bool:
+            tm_logger.trace('Checking a literal type...')
+            tm_logger.trace(valid_opts)
             # need to check for True/False and 1/0
             if value in [0, 1]:
+                tm_logger.trace(f'value == {value}, which could mean it is a boolean or an int (or '
+                                f'a float). Evaluating more carefully...')
                 # if not found in list, then definite False
-                if value not in check_list:
+                if value not in options:
+                    tm_logger.trace(f'{value} is not in the literal checker, returning False.')
                     return False
 
                 # otherwise, check to ensure the value is ACTUALLY equal
-                for val in check_list:
+                tm_logger.trace(f'{value} is in the literal checker. Verifying value actually is a '
+                                f'match.')
+                for val in options:
                     if val is value:
+                        tm_logger.trace('Match found. Returning True.')
                         return True
 
+                tm_logger.trace('Match not found. Returning False.')
                 return False
 
-            return value in check_list
+            tm_logger.trace(f'{value} cannot be a boolean. Checking if it is in literal and '
+                            f'returning result.')
+            return value in options
 
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
         return type_check
 
-    @staticmethod
-    def __generic_list(type_: type) -> Callable:
+    def __generic_list(self, type_: type) -> callable:
         """Check if a value matches a generic sequence."""
-        try:
-            type_types = get_args(type_)
-            type__ = get_origin(type_)
-
-        except AttributeError:
-            type_types = ()
+        tm_logger.debug(f'Getting the origin of {type_}...')
+        type__ = get_origin(type_)
+        tm_logger.debug(f'Origin retrieved. {type__}.')
+        tm_logger.debug('Generating base type check...')
+        base_eval = self._base_eval(type__)
+        tm_logger.debug('Base type check generated.')
+        tm_logger.debug('Checking if type has args...')
+        type_types = get_args(type_)
 
         if len(type_types):
-            checker = TypeMatcher(type_types)
+            tm_logger.debug(f'It does. args = {type_types}')
+            tt = type_types[0]
+            tm_logger.debug(f'Retrieving a TypeMatcher for {tt}...')
+            # When there is an internal type, generate a TypeMatcher for it and a function to use
+            # it.
+            checker = self.__class__(tt)
+            tm_logger.debug('Retrieved TypeMatcher.')
+
+            tm_logger.debug(TypeMatcher.G_CHECK)
+            cl_msg = f'Checking if {{}} is {self._spec_msg}{type_}...'
+            gb_msg = (f'{{}} is {self._spec_msg}{type__}. Proceeding to check if all elements '
+                      f'are instances of {tt}...')
+            bb_msg = f'{{}} is not even {self._spec_msg}{type__}. Returning False.'
+            b_el_msg = f'{{}} is not {self._spec_msg}{tt}. Returning False.'
+            g_msg = f'All elements are {self._p_spec_msg}{tt}. Returning True.'
 
             def type_check(value: Any) -> bool:
-                if type(value) is type__:
+                tm_logger.trace(cl_msg.format(value))
+                if base_eval(value):
+                    tm_logger.trace(gb_msg.format(value))
                     for v in value:
                         if not checker(v):
+                            tm_logger.trace(b_el_msg.format(v))
                             return False
 
+                    tm_logger.trace(g_msg)
                     return True
 
+                tm_logger.trace(bb_msg.format(value))
                 return False
 
-        else:
-            def type_check(value: Any) -> bool:
-                return type(value) is type_
+            tm_logger.debug(TypeMatcher.R_G_CHECK)
+            return type_check
 
-        return type_check
-
-    @staticmethod
-    def __glorified_union_check(type_: tuple) -> Callable:
-        """Check if a value is in a union."""
-        if type_[0] == 'instance':
-            inst_check = True
-            type_ = type_[1:]
-
-        else:
-            inst_check = False
-
-        basic_check_list = [str, int, float, bool, complex, object, Callable]
-        hard_check_list = [list, set, dict, Iterable, type(None), tuple, Union, Literal]
-
-        easy_checks = []
-        hard_checks = []
-        for t in type_:
-            if t in basic_check_list:
-                easy_checks.append(t)
-
-            elif type(t) is tuple \
-                    or t in hard_check_list \
-                    or get_origin(t) in hard_check_list:
-                hard_checks.append(TypeMatcher(t)._function)
-
-            else:
-                easy_checks.append(t)
-
-        return TypeMatcher.__get_glorified_union_check_function(easy_checks,
-                                                                hard_checks,
-                                                                inst_check)
+        # When isn't an internal type, it's a very simple check for correct instance.
+        tm_logger.debug('It does not.')
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
+        return base_eval
 
     @staticmethod
-    def __get_glorified_union_check_function(easy_checks: list, hard_checks: list,
-                                             inst_check: bool) -> Callable:
-        """Actually construct the function for the __glorified_union_check"""
-        if inst_check:
-            def type_check(value: Any) -> bool:
-                if any(isinstance(value, t) for t in easy_checks) or \
-                        any(t(value) for t in hard_checks):
-                    return True
-
-                return False
-
-        else:
-            def type_check(value: Any) -> bool:
-                if type(value) in easy_checks or \
-                        any(t(value) for t in hard_checks):
-                    return True
-
-                return False
-
-        return type_check
+    def __is_callable(value: Any) -> bool:
+        tm_logger.trace(f'Checking if {value} is callable and returning result.')
+        return callable(value)
 
     @staticmethod
-    def __tuple_check(type_: type) -> Callable:
-        """Checks a tuple for matching types if needed."""
+    def __callable_check(type_: type) -> callable:
+        tm_logger.debug('Checking if type has args...')
+
         if len(type_types := get_args(type_)):
-            type__ = get_origin(type_)
+            tm_logger.debug(f'It does. args = {type_types}')
+            tm_logger.debug('Retrieving the expected output type...')
+            t = type_types[1]
+            tm_logger.debug(f'Expected output type is {t}.')
+
+            tm_logger.debug('Generating a checker for the output type...')
+            def checker_out(value: Any) -> bool:
+                if value is None or isinstance(value, type(None)):
+                    tm_logger.trace('Output type of function is None. Checking if expected that as '
+                                    'a result...')
+                    ans = t is type(None)
+
+                    tm_logger.trace(f"It does{'' if ans else ' not'}.")
+                    return ans
+
+                tm_logger.trace('Output type is neither empty nor None. Checking if it is the '
+                                'expected type.')
+                return t is value or (inspect.isclass(value) and issubclass(value, t))
+
+            tm_logger.debug('Generated output checker.')
+
+            if type_types[0] is ...:
+                # If signature is unneeded, that's great. It makes checking easier.
+                tm_logger.debug('Any parameters are valid for input...')
+                if t is Any:
+                    # Even better if return type isn't specified.
+                    tm_logger.debug('Any callable type is valid for output...')
+                    tm_logger.debug('Returning generic callable check.')
+                    return TypeMatcher.__is_callable
+
+                tm_logger.debug(TypeMatcher.G_CHECK)
+
+                def type_check(value: Any) -> bool:
+                    tm_logger.trace(f'Checking if {value} is callable and has correct return type '
+                                    f'then returning result.')
+                    return (callable(value)
+                            and checker_out(inspect.signature(value).return_annotation))
+
+                tm_logger.debug(TypeMatcher.R_G_CHECK)
+                return type_check
+
+            tm_logger.debug('Specific parameter types are valid for input. Determining parameter '
+                            'types...')
+            # Aggregate the checkers for parameter types.
+            checker_in = []
+            for type_arg in type_types[0]:
+                checker_in.append(TypeMatcher.__genuine_type_check(type_arg))
+
+            tm_logger.debug('Parameter type checkers have been generated.')
+            tm_logger.debug(f'Value: {checker_in}')
+
+            tm_logger.debug(TypeMatcher.G_CHECK)
+            t_str = str(type_)
+            check_msg1 = f'Checking if {{}} parameters match callable of form {t_str}.'
+
+            def _type_check(value: Any) -> bool:
+                tm_logger.trace(check_msg1.format(value))
+                if (not callable(value)
+                        or len((sig := inspect.signature(value)).parameters) != len(checker_in)):
+                    tm_logger.trace(f'{value} is either not callable or does not have the right'
+                                    f'number of parameters. Returning False.')
+                    return False
+
+                tm_logger.trace(f'{value} is both callable and has the correct number of '
+                                f'parameters. Verifying that parameters match.')
+                params = [p for _, p in sig.parameters.items()]
+                for check, name, p in zip(checker_in, type_types[0], params):
+                    if p.kind in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD,
+                                  inspect.Parameter.VAR_POSITIONAL):
+                        # Keyword-only arguments and var-args/kwargs cannot be represented in
+                        # callable type annotations.
+                        tm_logger.trace(f'There is a keyword-only, vararg, or varkwarg parameter '
+                                        f'in the callable. The callable does not match the '
+                                        f'signature {t_str}. Returning False.')
+                        return False
+
+                    elif not check(p.annotation):
+                        tm_logger.trace(f"A parameter's type did not match the expected type. "
+                                        f"Returning False.\n"
+                                        f"Parameter Type: {p.annotation}\n"
+                                        f"Expected Type: {name}")
+                        return False
+
+                tm_logger.trace('Successfully matched. Returning True.')
+                return True
+
+            tm_logger.debug('Check generated.')
+
+            tm_logger.debug('Checking if a return type is specified...')
+            if type_types[1] is Any:
+                # No return type is specified, don't need to check that part.
+                tm_logger.debug('Return type is not specified. Returning generated check.')
+                return _type_check
+
+            tm_logger.debug('Return type is specified. Generating check...')
+            check_msg2 = f'Checking if {{}} matches callable of form {t_str}.'
+
+            def type_check(value: Any) -> bool:
+                tm_logger.trace(check_msg2.format(value))
+                if not _type_check(value):
+                    tm_logger.trace('Input parameters for do not match the correct signature. '
+                                    'Returning False.')
+                    return False
+
+                tm_logger.trace('Input parameters for value match the correct signature. '
+                                'Determining if return type matches and returning result.')
+                ans = checker_out(inspect.signature(value).return_annotation)
+                tm_logger.trace(f'Returning {ans}.')
+                return ans
+
+            tm_logger.debug(TypeMatcher.R_G_CHECK)
+            return type_check
+
+        tm_logger.debug('It does not.')
+        tm_logger.debug('Returning generic callable check.')
+        return TypeMatcher.__is_callable
+
+    @staticmethod
+    def __genuine_type_check(type_: type) -> callable:
+        if type_ is inspect.Parameter.empty or type_ is Any:
+            tm_logger.debug('Type is empty or Any. Using Any check.')
+            return TypeMatcher.__any_check
+
+        tm_logger.debug('Type is not empty or Any.')
+        tm_logger.debug(TypeMatcher.G_CHECK)
+
+        def type_check(value: Any) -> bool:
+            return value is type_ or (inspect.isclass(value) and issubclass(value, type_))
+
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
+        return type_check
+
+    def __glorified_union_check(self, type_: tuple) -> callable:
+        """Check if a value is in a union."""
+        tm_logger.debug('Checking if Any happens to be in type_...')
+        if Any in type_:
+            tm_logger.debug('Any is one of the specified types. Expression is equivalent to Any. '
+                            'Returning any type check.')
+            return TypeMatcher.__any_check
+
+        tm_logger.debug(f'Any is not in type_. Creating a check for each type in {type_}...')
+        checks = [self.__class__(t) for t in type_]
+        tm_logger.debug(TypeMatcher.G_CHECK)
+
+        def type_check(value: Any) -> bool:
+            tm_logger.trace(f'Checking if {value} is one of multiple types and returning result.')
+            return any(check(value) for check in checks)
+
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
+        return type_check
+
+    def __tuple_check(self, type_: type) -> callable:
+        """Checks a tuple for matching types if needed."""
+        tm_logger.debug('There are args within the given tuple. Retrieving origin...')
+        type__ = get_origin(type_)
+        tm_logger.debug(f'Origin is {type__}.')
+        tm_logger.debug('Generating base type check...')
+        base_eval = self._base_eval(type__)
+        tm_logger.debug('Base type check generated.')
+        if len(type_types := get_args(type_)):
             if repeat := (type_types[-1] is ...):
                 type_types = type_types[:-1]
 
-            checks = [TypeMatcher(t) for t in type_types]
+            tm_logger.debug('Getting checkers for all types in args...')
+            # Use class of self to ensure TypeMatchers generated match what the user expects.
+            checks = [self.__class__(t) for t in type_types]
+            tm_logger.debug(f'Checks generated: {checks}')
 
             if repeat:
-                return TypeMatcher.__get_tuple_check_repeat_function(checks, type__)
+                tm_logger.debug('The last value is ellipsis. Types may repeat.')
+                tm_logger.debug('Generating and returning a check function for repeating tuple '
+                                'type.')
+                return self.__get_tuple_check_repeat_function(checks, type__, base_eval)
 
-            return TypeMatcher.__get_tuple_check_args_function(checks, type__)
+            tm_logger.debug('The last value is not ellipsis. Types cannot repeat.')
+            tm_logger.debug('Generating and returning a check function for non-repeating tuple '
+                            'type.')
+            return self.__get_tuple_check_args_function(checks, type__, base_eval)
 
-        def type_check(value: Any) -> bool:
-            return type(value) is type_
+        tm_logger.debug('There are no args within the given tuple.')
+        # Cover the special case for a zero-length tuple. It is important to note that such a case
+        # can only be determined via an equality check.
+        if type_ == tuple[()]:
+            tm_logger.debug('The given tuple compares equal to tuple[()].')
+            tm_logger.debug(TypeMatcher.G_CHECK)
 
-        return type_check
+            def type_check(value: Any) -> bool:
+                tm_logger.trace(f'Checking if {value} is a zero-length tuple and returning result.')
+                return isinstance(value, type__) and len(value) == 0
+
+            tm_logger.debug(TypeMatcher.R_G_CHECK)
+            return type_check
+
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
+        return base_eval
 
     @staticmethod
-    def __get_tuple_check_repeat_function(checks, type__) -> Callable:
+    def __get_tuple_check_repeat_function(checks, type__, base_eval) -> callable:
         """Actually construct the function for a tuple with repeating types."""
         unit = len(checks)
+        tm_logger.debug(f'Determined number of values in tuple should be evenly divisible by '
+                        f'{unit}.')
+        tm_logger.debug(TypeMatcher.G_CHECK)
+        main_msg = f'Checking if {{}} is of type {type__[checks]}...'
+        t_match_msg = f'Type of value is aligned with {type__}.'
+        t_n_match_msg = f'Type of value is not aligned with {type__}. Returning False.'
+        b_len_msg = f'The length of the value is not evenly divisible by {unit}. Returning False.'
+        p_checks_msg = (f'The length of the value is evenly divisible by {unit}. Checking each '
+                        f'segment to make sure it matches the pattern '
+                        f'{[t.type for t in checks]}...')
+        n_match_msg = (f'Portion of tuple does not match pattern. {{}} does not match '
+                       f'{[t.type for t in checks]}. Returning False.')
 
         def type_check(value: Any) -> bool:
-            if type(value) is type__:
+            tm_logger.trace(main_msg.format(value))
+            if base_eval(value):
+                tm_logger.trace(t_match_msg)
                 if len(value) % unit:
+                    tm_logger.trace(b_len_msg)
                     return False
 
+                tm_logger.trace(p_checks_msg)
                 j = 0
+                k = 1
                 while j < len(value):
                     if not all(checks[i](value[i + j]) for i in range(unit)):
+                        tm_logger.trace(n_match_msg.format(value[j:j + unit]))
                         return False
 
+                    tm_logger.trace(f'Segment {k} matches.')
                     j += unit
+                    k += 1
 
+                tm_logger.trace('All segments match. Returning True.')
                 return True
 
+            tm_logger.trace(t_n_match_msg)
             return False
 
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
         return type_check
 
     @staticmethod
-    def __get_tuple_check_args_function(checks, type__) -> Callable:
+    def __get_tuple_check_args_function(checks, type__, base_eval) -> callable:
         """Actually construct the function for a tuple with non-repeating types."""
+        tm_logger.debug(TypeMatcher.G_CHECK)
+        main_msg = f'Checking if {{}} is of type {type__[checks]}...'
+
         def type_check(value: Any) -> bool:
-            if type(value) is type__ and len(checks) == len(value):
+            tm_logger.trace(main_msg.format(value))
+            if base_eval(value) and len(checks) == len(value):
+                tm_logger.trace('Value is correct general type and has correct length. Checking if '
+                                'all values within match expected types and returning result.')
                 return all(checks[i](value[i]) for i in range(len(value)))
 
+            tm_logger.trace('Value is either not the correct general type or is not the correct '
+                            'length. Returning False.')
             return False
 
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
         return type_check
 
-    @staticmethod
-    def __mapping_check(type_: type) -> Callable:
+    def __mapping_check(self, type_: type) -> callable:
         """Check a mapping for matching types if needed."""
+        tm_logger.debug(f'Getting the origin of {type_}...')
+        type__ = get_origin(type_)
+        tm_logger.debug(f'Origin retrieved. {type__}.')
+        tm_logger.debug('Generating base type check...')
+        base_eval = self._base_eval(type__)
+        tm_logger.debug('Base type check generated.')
+
         if len(type_types := get_args(type_)):
-            type__ = get_origin(type_)
-            check_key = TypeMatcher(type_types[0])
-            check_val = TypeMatcher(type_types[1])
-            return TypeMatcher.__get_mapping_check_args_function(check_key, check_val, type__)
+            tm_logger.debug(f'Type has args: {type_types}')
+            # Use class of self to ensure TypeMatchers generated match what the user expects.
+            check_key = self.__class__(type_types[0])
+            tm_logger.debug(f'Key checker generated: {check_key}')
+            # Use class of self to ensure TypeMatchers generated match what the user expects.
+            check_val = self.__class__(type_types[1])
+            tm_logger.debug(f'Value checker generated: {check_val}')
+            tm_logger.debug(TypeMatcher.G_CHECK)
+            main_msg = f'Checking if {{value}} is an instance of {type__[type_types]}.'
+            i_type_msg = (f'Value is an instance of {type__}. Checking if all key-val pairs match '
+                          f'the expected typing {check_key}: {check_val}.')
+            n_type_msg = f'Value is not {self._spec_msg}{type__}. Returning False.'
+            b_pair_msg = (f'Pair {{key}}: {{value}} does not match type {check_key}: {check_val}. '
+                          f'Returning False.')
+
+            def type_check(value: Any) -> bool:
+                tm_logger.trace(main_msg.format(value=value))
+                if base_eval(value):
+                    tm_logger.trace(i_type_msg)
+                    for key, val in value.items():
+                        if not check_key(key) or not check_val(val):
+                            tm_logger.trace(b_pair_msg.format(key=key, value=val))
+                            return False
+
+                    tm_logger.trace('All pairs match expected type. Returning True.')
+                    return True
+
+                tm_logger.trace(n_type_msg)
+                return False
+
+            tm_logger.debug(TypeMatcher.R_G_CHECK)
+            return type_check
+
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
+        return base_eval
+
+    def __type_matcher_check(self, type_: type) -> callable:
+        """Check a ``TypeMatcher`` for correct type if needed."""
+        tm_logger.debug(f'Getting the origin of {type_}...')
+        type__ = get_origin(type_)
+        tm_logger.debug(f'Origin retrieved. {type__}.')
+        tm_logger.debug('Generating base type check...')
+        base_eval = self._base_eval(type__)
+        tm_logger.debug('Base type check generated.')
+
+        if len(type_types := get_args(type_)):
+            tm_logger.debug(f'Type has args: {type_types}')
+            if type__ is StrictTypeMatcher:
+                tm_logger.debug('Generating a StrictTypeMatcher for args and returning its '
+                                'function.')
+                return StrictTypeMatcher(type_types[0])._function # noqa
+
+            tm_logger.debug('Generating a TypeMatcher for args and returning its function.')
+            return TypeMatcher(type_types[0])._function
+
+        tm_logger.debug('Type does not have args.')
+        tm_logger.debug(TypeMatcher.G_CHECK)
 
         def type_check(value: Any) -> bool:
-            return type(value) is type_
+            tm_logger.trace(f'Checking if {value} is {self._spec_msg}{type__} and returning '
+                            f'result.')
+            return base_eval(value)
 
+        tm_logger.debug(TypeMatcher.R_G_CHECK)
         return type_check
 
-    @staticmethod
-    def __get_mapping_check_args_function(check_key, check_val, type__) \
-            -> Callable:
-        """Actually construct the function for a mapping with args."""
-        def type_check(value: Any) -> bool:
-            if type(value) is type__:
-                for key, val in value.items():
-                    if not check_key(key) or not check_val(val):
-                        return False
-
-                return True
-
-            return False
-
-        return type_check
-
-    def __repr__(self) -> str: return f'<TypeMatcher: {repr(self._type)}>'
+    def __repr__(self) -> str: return f'<{self.__class__.__name__}: {repr(self._type)}>'
 
     # Because of how Typematcher only creates one instance of a matcher for each type, we MUST treat
     # its type as immutable or suffer the consequences.
@@ -309,6 +650,67 @@ class TypeMatcher:
     def type(self):
         """What type is the TypeMatcher checking for?"""
         return self._type
+
+
+class StrictTypeMatcher(TypeMatcher, Generic[T]):
+    G_CHECK = 'Generating check...'
+    R_G_CHECK = 'Returning generated check.'
+
+    def _base_eval(self, type_: type) -> callable:
+        msg = f'Checking if {{}} is {self._spec_msg}{type_}. Returning result.'
+
+        def t(value: Any) -> bool:
+            tm_logger.trace(msg.format(value))
+            return type(value) is type_
+
+        return t
+
+    def __new__(cls, type_: Union[type, tuple, UnionType, None]):
+        tm_logger.info(f'Getting a new StrictTypeMatcher for {type_}...')
+        if not hasattr(StrictTypeMatcher, '_StrictTypeMatcher__existing_matches'):
+            tm_logger.debug('StrictTypeMatcher does not already have an _existing_matches '
+                            'collection. Adding one...')
+            StrictTypeMatcher.__existing_matches = {}
+
+        if type_ in StrictTypeMatcher.__existing_matches:
+            tm_logger.debug(f'StrictTypeMatcher already exists for {type_}.')
+            tm_logger.info('Returning existing instance.')
+            return StrictTypeMatcher.__existing_matches[type_]
+
+        tm_logger.debug(f'StrictTypeMatcher does not already exist for {type_}. Generating a new '
+                        f'instance and adding it to existing matches...')
+        # Do not use super below. It messes up instance differentiation between StrictTypeMatcher
+        # and TypeMatcher.
+        StrictTypeMatcher.__existing_matches[type_] = t = object.__new__(cls)
+        tm_logger.debug('Initializing instance...')
+        t.__true_init(type_)
+        tm_logger.info('Returning new instance.')
+        return t
+
+    # *DISREGARD python:S1144*
+    # This might trigger a warning for python:S1144, that is because some linters do not check the
+    # __new__ method properly. This does not violate python:S1144.
+    def __true_init(self, type_: Union[type, tuple, UnionType, None]):  # noqa
+        """
+        This serves as a hidden init so that instances are never re-initialized. This is important
+        to prevent eating up too much memory when a user wants MANY instances of ``TypeMatcher``. It
+        can also decrease other resource usage.
+        """
+        self._type = type_
+        self._spec_msg = 'a/an '
+        self._p_spec_msg = ''
+        self._function = self._get_new_function(type_)
+
+    def __init__(self, type_: Union[type, tuple, UnionType, None]):
+        """
+        A ``StrictTypeMatcher`` used to check whether a variable is exactly a specific type.
+        Instances of this class are callable, and can be called with a value to return a boolean
+        representing whether the value is the type of the ``StrictTypeMatcher``. The class itself
+        can be used as a parametrized type hint for plugging into instances of itself and
+        ``TypeMatcher``.
+        """
+        # This exists to ensure correct documentation appears in IDEs.
+        pass
 
 
 class TransformerFilter:
