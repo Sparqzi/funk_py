@@ -539,14 +539,6 @@ class DictBuilder:
     """
 
     class _Instruction:
-        # This class and _Cur implement the following patterns.
-        # Chain of Responsibility
-        # Command Pattern
-        # Builder Pattern
-        # Fluent Interface
-        # Interpreter Pattern (loosely)
-        # Proxy Pattern
-        # Decorator Pattern
         def __init__(inner_self, method: str, *args, **kwargs):
             # Construct the base of a chain.
             inner_self._chain = [{_METHOD: method, _ARGS: args, _KWARGS: kwargs}]
