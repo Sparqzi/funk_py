@@ -1,5 +1,4 @@
-import builtins
-import inspect
+from inspect import getsource
 import operator
 from typing import Any, Callable, Optional, ParamSpec, overload, Mapping, Iterable, Union, Tuple
 
@@ -165,8 +164,6 @@ def simple_trinomial(check_func: Callable[[Any, Args], bool],
     - If both return ``True``, the function will return ``True``.
     - If both return False, the function will return ``...`` (ellipsis).
 
-
-
     :param check_func: This is the first function used to check inputs. If ``check_func2`` is also
         specified, this will only be used to check the first input to the generated function. If
         ``check_func2`` is not specified, this will be used to check both inputs to the generated
@@ -325,7 +322,7 @@ class Obj(dict):
         def setting_msg(orig: str, new: str):
             return 'Setting self.__dict__[\'' + orig + '\'] to self.' + new + '...'
 
-        def new_func_msg(func): return 'Should become:\n' + inspect.getsource(func)
+        def new_func_msg(func): return 'Should become:\n' + getsource(func)
 
         def override_func_safely(old_func_name: str, new_func: callable):
             obj_logger.trace(setting_msg(old_func_name, new_func.__name__))
