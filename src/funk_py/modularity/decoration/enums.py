@@ -123,16 +123,16 @@ class CarrierEnumMeta(type):
 
         if isinstance(func, staticmethod):
             def bind(self, *_args, **_kwargs):
-                return sig.bind(*_args, **_kwargs), *func(*_args, **_kwargs)
+                return sig.bind(*_args, **_kwargs), func(*_args, **_kwargs)
 
         elif isinstance(func, classmethod):
             def bind(self, *_args, **_kwargs):
                 return (sig.bind(self.__class__, *_args, **_kwargs),
-                        *func(self.__class__, *_args, **_kwargs))
+                        func(self.__class__, *_args, **_kwargs))
 
         else:
             def bind(self, *_args, **_kwargs):
-                return sig.bind(self, *_args, **_kwargs), *func(self, *_args, **_kwargs)
+                return sig.bind(self, *_args, **_kwargs), func(self, *_args, **_kwargs)
 
         @wraps(func)
         def __call__(self, *_args, **_kwargs):
@@ -236,8 +236,8 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             @ignore
             @staticmethod
             def gen_random():
-                return 4 // chosen by fair dice roll.
-                         // guaranteed to be random.
+                return 4 # chosen by fair dice roll.
+                         # guaranteed to be random.
 
     Static Member Access Examples:
 
@@ -260,15 +260,15 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         print(point1.y)  # prints 0
         print(point1[1]) # prints 0
 
-        # Filling the signature matters.
+        # Filling the signature makes a difference.
         point2 = MyEnum.POINT2D(42, 55)
-        print(point1.x)  # prints 42
-        print(point1[0]) # prints 42
-        print(point1.y)  # prints 55
-        print(point1[1]) # prints 55
+        print(point2.x)  # prints 42
+        print(point2[0]) # prints 42
+        print(point2.y)  # prints 55
+        print(point2[1]) # prints 55
 
         # positional, positional-or-keyword, and keyword arguments are treated differently.
-        point3 = MyEnum.POINT3D(53, 19, 93)
+        point3 = MyEnum.POINT3D(53, 19, z=93)
         print(point3.x)   # raises an AttributeError
         print(point3[0])  # prints 53
         print(point3.y)   # prints 19
@@ -280,7 +280,7 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         # Values returned by executing the wrapped method will be added to kwargs.
         # Class methods are also made to function normally when wrapped.
         point4 = MyEnum.PI_POINT3D(1, 2)
-        print(point4.x)  # prints 1
+        print(point4.x)  # raises an AttributeError
         print(point4[0]) # prints 1
         print(point4.y)  # prints 2
         print(point4[1]) # prints 2
