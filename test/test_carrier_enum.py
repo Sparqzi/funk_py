@@ -3,7 +3,7 @@ from enum import Enum
 import pytest
 
 
-from funk_py.modularity.decoration.enum_modifiers import CarrierEnum
+from funk_py.modularity.decoration.enums import CarrierEnum
 
 
 def test_can_create_empty():
