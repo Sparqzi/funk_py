@@ -7,7 +7,7 @@ from urllib.parse import parse_qs
 
 import yaml
 
-from funk_py.modularity.decoration.enum_modifiers import converts_enums
+from funk_py.modularity.decoration.enums import converts_enums
 from funk_py.modularity.logging import make_logger
 from funk_py.sorting.converters import csv_to_json, xml_to_json, wonky_json_to_json, jsonl_to_json
 from funk_py.sorting.dict_manip import convert_tuplish_dict, get_subset_values, get_subset

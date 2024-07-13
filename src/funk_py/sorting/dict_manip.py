@@ -539,6 +539,14 @@ class DictBuilder:
     """
 
     class _Instruction:
+        # This class and _Cur implement the following patterns.
+        # Chain of Responsibility
+        # Command Pattern
+        # Builder Pattern
+        # Fluent Interface
+        # Interpreter Pattern (loosely)
+        # Proxy Pattern
+        # Decorator Pattern
         def __init__(inner_self, method: str, *args, **kwargs):
             # Construct the base of a chain.
             inner_self._chain = [{_METHOD: method, _ARGS: args, _KWARGS: kwargs}]
@@ -593,6 +601,14 @@ class DictBuilder:
             return attr
 
     class _Cur:
+        # This class and _Instruction implement the following patterns.
+        # Chain of Responsibility
+        # Command Pattern
+        # Builder Pattern
+        # Fluent Interface
+        # Interpreter Pattern (loosely)
+        # Proxy Pattern
+        # Decorator Pattern
         def __getitem__(self, key):
             return DictBuilder._Instruction('__getitem__', key)
 

@@ -3,7 +3,7 @@ from enum import Enum, IntEnum
 import pytest
 
 from t_support import cov, cov_counter
-from funk_py.modularity.decoration.enum_modifiers import converts_enums
+from funk_py.modularity.decoration.enums import converts_enums
 
 
 # The following manages whether the generated coverage instance from t_support should report. This
