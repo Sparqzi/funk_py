@@ -1,8 +1,8 @@
 enum_modifiers
 ====================================================================================================
-The :mod:`enum_modifiers module<enum_modifiers>` holds decorators related to enums.
+The :mod:`enums module<enums>` holds decorators related to enums.
 
 Functions
 ----------------------------------------------------------------------------------------------------
-.. automodule:: funk_py.modularity.decoration.enum_modifiers
+.. automodule:: funk_py.modularity.decoration.enums
    :members:
