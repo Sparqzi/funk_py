@@ -76,6 +76,12 @@ class CarrierEnumMeta(type):
                         setattr(enum_class, key, t := metacls._create_func_(enum_class, value, key))
                         members[key] = t
 
+                elif isinstance(value, classmethod):
+                    if not hasattr(value, '_ignore_me'):
+                        setattr(enum_class, key,
+                                t := metacls._create_func_(enum_class, value, key))
+                        members[key] = t
+
                 else:
                     setattr(enum_class, key, t := metacls._create_value_(enum_class, value))
                     members[key] = t
@@ -101,8 +107,23 @@ class CarrierEnumMeta(type):
 
         # Deconstruct the signature of the function and populate evals, args, vargs, kwargs, and
         # vkwargs appropriately.
-        sig = sgntr(func)
+        sm = isinstance(func, staticmethod)
+        lm = '<lambda>' in func.__qualname__
+        if cm := (type(func) is classmethod):
+            setattr(cls, func.__name__ + '\\,,', func)
+            func = getattr(cls, func.__name__ + '\\,,')
+            sig = sgntr(func)
+
+        else:
+            sig = sgntr(func)
+
+        first = True
         for name, parameter in sig.parameters.items():
+            if first:
+                first = False
+                if not (sm | cm | lm):
+                    continue
+
             evals[name] = CarrierEnumMeta.__get_tm(parameter)
             match parameter.kind:
                 case parameter.POSITIONAL_ONLY:
@@ -121,14 +142,9 @@ class CarrierEnumMeta(type):
                 case parameter.VAR_KEYWORD:
                     vkwargs = name
 
-        if isinstance(func, staticmethod):
+        if sm | cm | lm:
             def bind(self, *_args, **_kwargs):
                 return sig.bind(*_args, **_kwargs), func(*_args, **_kwargs)
-
-        elif isinstance(func, classmethod):
-            def bind(self, *_args, **_kwargs):
-                return (sig.bind(self.__class__, *_args, **_kwargs),
-                        func(self.__class__, *_args, **_kwargs))
 
         else:
             def bind(self, *_args, **_kwargs):
@@ -337,13 +353,13 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
                 setattr(self, _name, value)
 
     def __call__(self, *args, **kwargs) -> 'CarrierEnum':
-        if self._call_ is None:
+        if not hasattr(self, '_call_') or self._call_ is None:
             raise TypeError(f'{repr(self.__class__.__name__)} object is not callable')
 
         return self._call_(self, *args, **kwargs)
 
     def __getitem__(self, index: int):
-        if self._args is None:
+        if not hasattr(self, '_args') or self._args is None:
             raise TypeError(f'{repr(self.__class__.__name__)} object is not subscriptable')
 
         return self._args[index]
