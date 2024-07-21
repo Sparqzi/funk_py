@@ -230,10 +230,13 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
     .. code-block:: python
 
         class MyEnum(CarrierEnum):
-            def __init__(self):
+            def __init__(self, value):
+                super().__init__(value)
                 self.uses = 0
 
             PI = 3.14159
+
+            POINT4D = lambda w, x, y, z: ...
 
             @staticmethod
             def POINT2D(x: int, y: int = 0): ...
@@ -242,18 +245,17 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             def POINT3D(x: int, /, y: int, *, z: int): ...
 
             @classmethod
-            def PI_POINT3D(cls, x: int, y: int):
-                return {'z': cls.PI.value}
+            def PI_POINT3D(cls, x: int, y: int): return {'z': cls.PI.value}
 
-            def CALC_POINT2D(self, x: int):
-                self.uses += 1
-                return {'y': self.uses * self.gen_random() * x}
+            def CALC_POINT2D(i_self, x: int):
+                i_self.uses += 1
+                return {'y': i_self.uses * i_self.gen_random() * x}
 
             @ignore
             @staticmethod
             def gen_random():
-                return 4 # chosen by fair dice roll.
-                         # guaranteed to be random.
+                return 4  # chosen by fair dice roll.
+                          # guaranteed to be random.
 
     Static Member Access Examples:
 
@@ -316,6 +318,20 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         print(point6[0]) # prints 14
         print(point6.y)  # prints 112
         print(point6[1]) # raises an IndexError
+
+        # Lambdas are treated like static methods.
+        point7 = MyEnum.POINT4D(5, 6, 7, 8)
+        print(point7.w)  # prints 5
+        print(point7[0]) # prints 5
+        print(point7.x)  # prints 6
+        print(point7[1]) # prints 6
+        print(point7.y)  # prints 7
+        print(point7[2]) # prints 7
+        print(point7.z)  # prints 8
+        print(point7[3]) # prints 8
+
+        # ignore decorator should keep a function from being interpreted as an attribute.
+        print(MyEnum.gen_random()) # prints 4
     """
     def __new__(cls, value):
         cls_ = super().__new__(cls)
