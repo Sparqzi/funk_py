@@ -3,7 +3,6 @@ import pytest
 from test.t_support import build_nest
 from funk_py.modularity.type_matching import check_dict_equality, strict_check_dict_equality
 
-
 G_STR1 = 'a'
 G_STR2 = 'Gerd'
 G_STR3 = 'Jerb'
@@ -70,99 +69,14 @@ def normal_dicts(request, normal_pair_keys):
     return dict(zip(normal_pair_keys, request.param)), dict(zip(normal_pair_keys, request.param))
 
 
-@pytest.fixture(params=((S_SET1, S_SET2), (I_SET1, I_SET2), (F_SET1, F_SET2)),
-                ids=('str', 'int', 'flt'))
-def same_but_diff_pair_keys(request): return request.param
-
-
-@pytest.fixture(params=((S_SET1, S_SET2), (I_SET1, I_SET2), (F_SET1, F_SET2)),
-                ids=('str', 'int', 'flt'))
-def same_but_diff_dicts(request, same_but_diff_pair_keys):
-    k1, k2 = same_but_diff_pair_keys
-    v1, v2 = request.param
-    return dict(zip(k1, v1)), dict(zip(k2, v2))
-
-
-def test_normal_equal_dicts(normal_dicts):
-    assert check_dict_equality(*normal_dicts)
-
-    assert strict_check_dict_equality(*normal_dicts)
-
-
-def test_normal_diff_order_equal_dicts(same_but_diff_dicts):
-    assert check_dict_equality(*same_but_diff_dicts)
-    assert strict_check_dict_equality(*same_but_diff_dicts)
-
-    keys1, keys2 = (tuple(d.keys()) for d in same_but_diff_dicts)
-
-    # The following is meant to ensure that the dicts actually have different orders of keys. If
-    # keys are in the same order, then the test is pointless.
-    d_pos = False
-
-    for i in range(len(keys1)):
-        if keys1[i] != keys2[i]:
-            d_pos = True
-            break
-
-    assert d_pos, ('The dicts compared in this test had all keys in the same order. This test '\
-                   'cannot be trusted until the issue is rectified.')
+@pytest.mark.benchmark
+def test_normal_equal_dicts_benchmark(normal_dicts, benchmark):
+    benchmark(check_dict_equality, *normal_dicts)
+    benchmark(strict_check_dict_equality, *normal_dicts)
 
 
 SFT = {False: 'a', True: 'a'}
 VSFT = {'a': False, 'b': True}
-
-
-@pytest.fixture(params=((SFT, ((0, 'a'), (True, 'a')), False),
-                        (SFT, ((False, 'a'), (1, 'a')), False),
-                        (VSFT, (('a', 0), ('b', True)), True),
-                        (VSFT, (('a', False), ('b', 1)), True)),
-                ids=('key|0==False',
-                     'key|1==True',
-                     'val|0==False',
-                     'val|1==True'))
-def weird_aligned_dicts(request): return request.param[0], dict(request.param[1]), request.param[2]
-
-
-USELESS_TRUE_FALSE_TEST = 'Useless test detected, both keys are the same items in both dicts.'
-
-
-def test_dict_equality_still_hates_true_and_false(weird_aligned_dicts):
-    assert weird_aligned_dicts[0] == weird_aligned_dicts[1]
-    if weird_aligned_dicts[2]:
-        v1 = list(weird_aligned_dicts[0].values())
-        v2 = list(weird_aligned_dicts[1].values())
-        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
-
-    else:
-        k1 = list(weird_aligned_dicts[0].keys())
-        k2 = list(weird_aligned_dicts[1].keys())
-        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
-
-
-def test_dict_equality_true_false_behavior_for_check_dict_equality(weird_aligned_dicts):
-    assert check_dict_equality(*weird_aligned_dicts[:2])
-    if weird_aligned_dicts[2]:
-        v1 = list(weird_aligned_dicts[0].values())
-        v2 = list(weird_aligned_dicts[1].values())
-        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
-
-    else:
-        k1 = list(weird_aligned_dicts[0].keys())
-        k2 = list(weird_aligned_dicts[1].keys())
-        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
-
-
-def test_dict_inequality_true_false_behavior_for_strict_check_dict_equality(weird_aligned_dicts):
-    assert not strict_check_dict_equality(*weird_aligned_dicts[:2])
-    if weird_aligned_dicts[2]:
-        v1 = list(weird_aligned_dicts[0].values())
-        v2 = list(weird_aligned_dicts[1].values())
-        assert v1[0] is not v2[0] or v1[1] is not v2[1], USELESS_TRUE_FALSE_TEST
-
-    else:
-        k1 = list(weird_aligned_dicts[0].keys())
-        k2 = list(weird_aligned_dicts[1].keys())
-        assert k1[0] is not k2[0] or k1[1] is not k2[1], USELESS_TRUE_FALSE_TEST
 
 
 SET1 = tuple(zip(S_SET1, I_SET1))
@@ -171,7 +85,6 @@ SET2 = tuple(zip(S_SET2, I_SET2))
 B_SET2 = tuple(zip(B_S_SET2, B_I_SET2))
 SET3 = tuple(zip(F_SET1, S_SET1))
 B_SET3 = tuple(zip(B_F_SET1, B_S_SET1))
-
 
 TOP_NESTED_DICTS = (
     (dict(base=SET1,
@@ -373,7 +286,6 @@ BAD_DOUBLE_NESTED_DICTS = (
      'D1_1->(*,D2->(*,D3))!=D1_2->(*,D2->(*,D3))')
 )
 
-
 NON_RECURSIVE_NESTED_DICTS = TOP_NESTED_DICTS + DOUBLE_NESTED_DICTS
 BAD_NON_RECURSIVE_NESTED_DICTS = BAD_TOP_NESTED_DICTS + BAD_DOUBLE_NESTED_DICTS
 
@@ -394,14 +306,19 @@ def nested_non_recursive_unequal_dicts(request):
     return build_nest(dict, **d1), build_nest(dict, **d2)
 
 
-def test_nested_non_recursive_dict_equality(nested_non_recursive_equal_dicts):
-    assert check_dict_equality(*nested_non_recursive_equal_dicts[:2])
-    assert strict_check_dict_equality(*nested_non_recursive_equal_dicts[:2])
+@pytest.mark.benchmark
+def test_nested_non_recursive_dict_equality_benchmark(nested_non_recursive_equal_dicts, benchmark):
+    benchmark(check_dict_equality, *nested_non_recursive_equal_dicts[:2])
+    benchmark(strict_check_dict_equality, *nested_non_recursive_equal_dicts[:2])
 
 
-def test_nested_non_recursive_dict_inequality(nested_non_recursive_unequal_dicts):
-    assert not check_dict_equality(*nested_non_recursive_unequal_dicts)
-    assert not strict_check_dict_equality(*nested_non_recursive_unequal_dicts)
+@pytest.mark.benchmark
+def test_nested_non_recursive_dict_inequality_benchmark(
+        nested_non_recursive_unequal_dicts,
+        benchmark
+):
+    benchmark(check_dict_equality, *nested_non_recursive_unequal_dicts)
+    benchmark(strict_check_dict_equality, *nested_non_recursive_unequal_dicts)
 
 
 SIMPLE_RECURSIVE_DICT = (
@@ -521,50 +438,13 @@ def recursive_unequal_dicts(request):
     return l1, l2
 
 
-@pytest.fixture(params=(((True, 'a'), (1, 'a'), True),
-                        ((False, 'a'), (0, 'a'), True),
-                        (('a', True), ('a', 1), False),
-                        (('a', False), ('a', 0), False)),
-                ids=('True==1 (keys)',
-                     'False==0 (keys)',
-                     'True==1 (values)',
-                     'False==0 (values)'))
-def screwy_tests(request):
-    v1, v2, strict_result = request.param
-    d1 = {v1[0]: v1[1], 'b': {v1[0]: v1[1]}}
-    d1['b']['b'] = d1['b']
-    d2 = {v2[0]: v2[1], 'b': {v2[0]: v2[1]}}
-    d2['b']['b'] = d2['b']
-    return d1, d2, strict_result
+@pytest.mark.benchmark
+def test_recursive_equality_benchmark(recursive_equal_dicts, benchmark):
+    benchmark(check_dict_equality, *recursive_equal_dicts[:2])
+    benchmark(strict_check_dict_equality, *recursive_equal_dicts[:2])
 
 
-# If for some reason Python makes it so that comparing recursive lists does not raise exceptions,
-# then the function being tested here is useless.
-def test_still_has_purpose(recursive_equal_dicts):
-    d1, d2, timeout = recursive_equal_dicts
-    with pytest.raises(RecursionError):
-        # Your linter may dislike this line because "it has no side effects" It absolutely has
-        # effects. It should always raise an exception.
-        d1 == d2  # noqa
-
-
-def test_recursive_equality(recursive_equal_dicts):
-    assert check_dict_equality(*recursive_equal_dicts[:2])
-    assert strict_check_dict_equality(*recursive_equal_dicts[:2])
-
-
-def test_follows_rules_for_true_and_false(screwy_tests):
-    assert check_dict_equality(*screwy_tests[:2])
-
-
-def test_strict_not_follows_rules_for_true_and_false(screwy_tests):
-    if screwy_tests[2]:
-        assert strict_check_dict_equality(*screwy_tests[:2])
-
-    else:
-        assert not strict_check_dict_equality(*screwy_tests[:2])
-
-
-def test_recursive_inequality(recursive_unequal_dicts):
-    assert not check_dict_equality(*recursive_unequal_dicts)
-    assert not strict_check_dict_equality(*recursive_unequal_dicts)
+@pytest.mark.benchmark
+def test_recursive_inequality_benchmark(recursive_unequal_dicts, benchmark):
+    benchmark(check_dict_equality, *recursive_unequal_dicts)
+    benchmark(strict_check_dict_equality, *recursive_unequal_dicts)

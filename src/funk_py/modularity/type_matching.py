@@ -1,7 +1,14 @@
 import inspect
-from types import FunctionType, UnionType
+import sys
+from types import FunctionType
 from typing import (Union, Any, AnyStr, get_args, get_origin, Literal, Tuple, List, Dict, TypeVar,
                     Generic)
+
+if sys.version_info >= (3, 10):
+    from types import UnionType
+
+else:
+    UnionType = object
 
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Callable
 
@@ -89,6 +96,10 @@ class TypeMatcher(Generic[T]):
         .. warning::
           This class makes a distinction between booleans and integers, which is not standard, but
           in several cases is more logical behavior.
+
+        .. note::
+          In Python 3.9 and lower, ``TypeMatcher`` cannot handle ellipsis as the parameter when used
+          as a parametrized type hint.
         """
         # This exists to ensure correct documentation appears in IDEs.
         pass
@@ -158,8 +169,8 @@ class TypeMatcher(Generic[T]):
         # Don't just test for origin. Also check for subclasses to allow any non-built-in classes
         # to be treated as their base classes would be. The inner-workings of __mapping_check should
         # handle making sure the non-built-in class must be the parent.
-        elif (origin in (dict, Mapping, MutableMapping) or (inspect.isclass(origin)
-              and issubclass(origin, (dict, Mapping, MutableMapping)))):
+        elif (origin in (Dict, dict, Mapping, MutableMapping) or (inspect.isclass(origin)
+              and issubclass(origin, (Dict, dict, Mapping, MutableMapping)))):
             tm_logger.debug('Type is dictionary or mapping. Generating and returning a mapping '
                             'type check.')
             return self.__mapping_check(type_)
@@ -484,18 +495,20 @@ class TypeMatcher(Generic[T]):
             return self.__get_tuple_check_args_function(checks, type__, base_eval)
 
         tm_logger.debug('There are no args within the given tuple.')
-        # Cover the special case for a zero-length tuple. It is important to note that such a case
-        # can only be determined via an equality check.
-        if type_ == tuple[()]:
-            tm_logger.debug('The given tuple compares equal to tuple[()].')
-            tm_logger.debug(TypeMatcher.G_CHECK)
+        if sys.version_info >= (3, 9):
+            # Cover the special case for a zero-length tuple. It is important to note that such a
+            # case can only be determined via an equality check. Not valid for Python 3.8.
+            if type_ == tuple[()]:
+                tm_logger.debug('The given tuple compares equal to tuple[()].')
+                tm_logger.debug(TypeMatcher.G_CHECK)
 
-            def type_check(value: Any) -> bool:
-                tm_logger.trace(f'Checking if {value} is a zero-length tuple and returning result.')
-                return isinstance(value, type__) and len(value) == 0
+                def type_check(value: Any) -> bool:
+                    tm_logger.trace(f'Checking if {value} is a zero-length tuple and returning'
+                                    f' result.')
+                    return isinstance(value, type__) and len(value) == 0
 
-            tm_logger.debug(TypeMatcher.R_G_CHECK)
-            return type_check
+                tm_logger.debug(TypeMatcher.R_G_CHECK)
+                return type_check
 
         tm_logger.debug(TypeMatcher.R_G_CHECK)
         return base_eval
@@ -507,7 +520,11 @@ class TypeMatcher(Generic[T]):
         tm_logger.debug(f'Determined number of values in tuple should be evenly divisible by '
                         f'{unit}.')
         tm_logger.debug(TypeMatcher.G_CHECK)
-        main_msg = f'Checking if {{}} is of type {type__[checks]}...'
+        # Generate the error messages outside the method being returned to avoid having them as
+        # overhead each time the method is called.
+        # Do not put the raw parameterized type in the log event below. Python 3.8 does not like
+        # it when it encounters type.
+        main_msg = f'Checking if {{}} is of type {type__}[{checks}]...'
         t_match_msg = f'Type of value is aligned with {type__}.'
         t_n_match_msg = f'Type of value is not aligned with {type__}. Returning False.'
         b_len_msg = f'The length of the value is not evenly divisible by {unit}. Returning False.'
@@ -550,7 +567,7 @@ class TypeMatcher(Generic[T]):
     def __get_tuple_check_args_function(checks, type__, base_eval) -> callable:
         """Actually construct the function for a tuple with non-repeating types."""
         tm_logger.debug(TypeMatcher.G_CHECK)
-        main_msg = f'Checking if {{}} is of type {type__[checks]}...'
+        main_msg = f'Checking if {{}} is of type {type__}[{checks}]...'
 
         def type_check(value: Any) -> bool:
             tm_logger.trace(main_msg.format(value))
@@ -584,7 +601,9 @@ class TypeMatcher(Generic[T]):
             check_val = self.__class__(type_types[1])
             tm_logger.debug(f'Value checker generated: {check_val}')
             tm_logger.debug(TypeMatcher.G_CHECK)
-            main_msg = f'Checking if {{value}} is an instance of {type__[type_types]}.'
+            # Do not put the raw parameterized type in the log event below. Python 3.8 does not like
+            # it when it encounters ABCMeta classes.
+            main_msg = f'Checking if {{value}} is an instance of {type__}[{type_types}].'
             i_type_msg = (f'Value is an instance of {type__}. Checking if all key-val pairs match '
                           f'the expected typing {check_key}: {check_val}.')
             n_type_msg = f'Value is not {self._spec_msg}{type__}. Returning False.'
@@ -708,6 +727,10 @@ class StrictTypeMatcher(TypeMatcher, Generic[T]):
         representing whether the value is the type of the ``StrictTypeMatcher``. The class itself
         can be used as a parametrized type hint for plugging into instances of itself and
         ``TypeMatcher``.
+
+        .. note::
+          In Python 3.9 and lower, ``StrictTypeMatcher`` cannot handle ellipsis as the parameter
+          when used as a parametrized type hint.
         """
         # This exists to ensure correct documentation appears in IDEs.
         pass

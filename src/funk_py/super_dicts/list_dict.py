@@ -16,7 +16,7 @@ class ListDict(list):
             for item in values:
                 list.append(self, self.__process_item(item))
 
-    def __process_item(self, item) -> tuple[Any, str]:
+    def __process_item(self, item) -> Tuple[Any, str]:
         """
         An internal helper function used to apply the key_function to incoming values.
 

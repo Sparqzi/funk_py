@@ -102,30 +102,6 @@ def test_user_listened_to_comments():
     assert len(CONFUSED_SET1) > INSERT_POINT3_2 >= -1, READ_IT
 
 
-def test_list_still_hates_true_and_false():
-    assert [True] == [1]
-    assert [False] == [0]
-
-    assert (True,) == (1,)
-    assert (False,) == (0,)
-
-
-def test_non_strict_also_hates_true_and_false():
-    assert check_list_equality([True], [1])
-    assert check_list_equality([False], [0])
-
-    assert check_list_equality((True,), (1,))
-    assert check_list_equality((False,), (0,))
-
-
-def test_strict_does_not_hate_true_and_false():
-    assert not strict_check_list_equality([True], [1])
-    assert not strict_check_list_equality([False], [0])
-
-    assert not strict_check_list_equality((True,), (1,))
-    assert not strict_check_list_equality((False,), (0,))
-
-
 @pytest.fixture(params=[(v[0], *v[2:]) for v in GOOD_LISTS], ids=[v[1] for v in GOOD_LISTS])
 def regular_equal_lists(request):
     s = request.param
@@ -140,14 +116,16 @@ def regular_equal_lists(request):
 def regular_unequal_lists(request): return request.param
 
 
-def test_un_nested_list_equality(regular_equal_lists):
-    assert check_list_equality(*regular_equal_lists[:2])
-    assert strict_check_list_equality(*regular_equal_lists[:2])
+@pytest.mark.benchmark
+def test_un_nested_list_equality_benchmark(regular_equal_lists, benchmark):
+    benchmark(check_list_equality, *regular_equal_lists[:2])
+    benchmark(strict_check_list_equality, *regular_equal_lists[:2])
 
 
-def test_un_nested_list_inequality(regular_unequal_lists):
-    assert not check_list_equality(*regular_unequal_lists)
-    assert not strict_check_list_equality(*regular_unequal_lists)
+@pytest.mark.benchmark
+def test_un_nested_list_inequality_benchmark(regular_unequal_lists, benchmark):
+    benchmark(check_list_equality, *regular_unequal_lists)
+    benchmark(strict_check_list_equality, *regular_unequal_lists)
 
 
 TOP_NESTED_LISTS = (
@@ -374,65 +352,19 @@ def nested_non_recursive_unequal_lists(request, types):
     return build_nest(types, **d1), build_nest(types, **d2)
 
 
-def test_nested_non_recursive_list_equality(nested_non_recursive_equal_lists):
-    assert check_list_equality(*nested_non_recursive_equal_lists[:2])
-    assert strict_check_list_equality(*nested_non_recursive_equal_lists[:2])
+@pytest.mark.benchmark
+def test_nested_non_recursive_list_equality_benchmark(nested_non_recursive_equal_lists, benchmark):
+    benchmark(check_list_equality, *nested_non_recursive_equal_lists[:2])
+    benchmark(strict_check_list_equality, *nested_non_recursive_equal_lists[:2])
 
 
-def test_nested_non_recursive_list_inequality(nested_non_recursive_unequal_lists):
-    assert not check_list_equality(*nested_non_recursive_unequal_lists)
-    assert not strict_check_list_equality(*nested_non_recursive_unequal_lists)
-
-
-SHARING_LISTS = (
-    (INSERT_POINT2_1, 'L1->(*,S1,*)'),
-    (INSERT_POINT2_2, 'L1->(*,S1)')
-)
-
-
-@pytest.fixture(params=[v[0] for v in SHARING_LISTS], ids=[v[1] for v in SHARING_LISTS])
-def nested_with_shared_equal_lists(request, types):
-    point = request.param
-    shared = types(INT_SET)
-    if point == -1:
-        l1 = list(INT_SET) + [shared]
-        l2 = list(INT_SET) + [shared]
-
-    else:
-        l1 = list(INT_SET[:point]) + [shared] + list(INT_SET[point:])
-        l2 = list(INT_SET[:point]) + [shared] + list(INT_SET[point:])
-
-    return types(l1), types(l2)
-
-
-@pytest.fixture(params=(
-        (INSERT_POINT2_1, INSERT_POINT2_2),
-        (INSERT_POINT2_2, INSERT_POINT2_1)
-), ids=(
-    'L1->(*,S1,*)!=L1->(*,S1)',
-    'L1->(*,S1)!=L1->(*,S1,*)'
-))
-def nested_with_shared_unequal_lists(request, types):
-    point1, point2 = request.param
-    shared = types(INT_SET)
-    l1 = list(INT_SET) + [shared] \
-        if point1 == -1 \
-        else list(INT_SET[:point1]) + [shared] + list(INT_SET[point1:])
-    l2 = list(INT_SET) + [shared] \
-        if point2 == -1 \
-        else list(INT_SET[:point2]) + [shared] + list(INT_SET[point2:])
-
-    return types(l1), types(l2)
-
-
-def test_sharing_works(nested_with_shared_equal_lists):
-    assert check_list_equality(*nested_with_shared_equal_lists)
-    assert strict_check_list_equality(*nested_with_shared_equal_lists)
-
-
-def test_no_false_pass_sharing(nested_with_shared_unequal_lists):
-    assert not strict_check_list_equality(*nested_with_shared_unequal_lists)
-    assert not check_list_equality(*nested_with_shared_unequal_lists)
+@pytest.mark.benchmark
+def test_nested_non_recursive_list_inequality_benchmark(
+        nested_non_recursive_unequal_lists,
+        benchmark
+):
+    benchmark(check_list_equality, *nested_non_recursive_unequal_lists)
+    benchmark(strict_check_list_equality, *nested_non_recursive_unequal_lists)
 
 
 NASTY_RECURSIVE_LIST = (
@@ -577,124 +509,13 @@ def recursive_unequal_lists(request, types):
     return l1, l2
 
 
-@pytest.fixture(params=((True, 1), (False, 0)), ids=('True==1', 'False==0'))
-def screwy_tests(request, types):
-    v1, v2 = request.param
-    l1 = [v1, [v1]]
-    l1[1].append(l1[1])
-    l2 = [v1, [v2]]
-    l2[1].append(l2[1])
-    return types(l1), types(l2)
+@pytest.mark.benchmark
+def test_recursive_equality_benchmark(recursive_equal_lists, benchmark):
+    benchmark(check_list_equality, *recursive_equal_lists[:2])
+    benchmark(strict_check_list_equality, *recursive_equal_lists[:2])
 
 
-# If for some reason Python makes it so that comparing recursive lists does not raise exceptions,
-# then the function being tested here is useless.
-def test_still_has_purpose(recursive_equal_lists):
-    l1, l2, timeout = recursive_equal_lists
-    with pytest.raises(RecursionError):
-        # Your linter may dislike this line because "it has no side effects" It absolutely has
-        # effects. It should always raise an exception.
-        l1 == l2  # noqa
-
-
-def test_recursive_equality(recursive_equal_lists):
-    assert check_list_equality(*recursive_equal_lists[:2])
-    assert strict_check_list_equality(*recursive_equal_lists[:2])
-
-
-def test_follows_rules_for_true_and_false(screwy_tests):
-    assert check_list_equality(*screwy_tests)
-
-
-def test_strict_not_follows_rules_for_true_and_false(screwy_tests):
-    assert not strict_check_list_equality(*screwy_tests)
-
-
-def test_recursive_inequality(recursive_unequal_lists):
-    assert not check_list_equality(*recursive_unequal_lists)
-    assert not strict_check_list_equality(*recursive_unequal_lists)
-
-
-@pytest.fixture(params=(1, 2), ids=('base as outer', 'base as inner'))
-def confused_recursive_list_positions(request):
-    return request.param
-
-
-@pytest.fixture(params=FALSY_VALS)
-def confused_unequal_falsy_recursive_lists(request, types, confused_recursive_list_positions):
-    s1 = (True, False, request.param)
-    s2 = (True, False, False)
-    ip = 1
-
-    l1 = build_nest(types,
-                    base=s1,
-                    point1=ip,
-                    instruction1=dict(base=s1,
-                                      callback=1,
-                                      point1=ip,
-                                      instruction1=dict(base=1)))
-    if confused_recursive_list_positions == 1:
-        l2 = build_nest(types,
-                        base=s1,
-                        point1=ip,
-                        instruction1=dict(base=s2,
-                                          callback=1,
-                                          point1=ip,
-                                          instruction1=dict(base=1)))
-
-    else:
-        l2 = build_nest(types,
-                        base=s2,
-                        point1=ip,
-                        instruction1=dict(base=s1,
-                                          callback=1,
-                                          point1=ip,
-                                          instruction1=dict(base=1)))
-
-    return l1, l2
-
-
-@pytest.fixture(params=TRUTHY_VALS)
-def confused_unequal_truthy_recursive_lists(request, types, confused_recursive_list_positions):
-    s1 = (True, False, request.param)
-    s2 = (True, False, True)
-    ip = 1
-
-    l1 = build_nest(types,
-                    base=s1,
-                    point1=ip,
-                    instruction1=dict(base=s1,
-                                      callback=1,
-                                      point1=ip,
-                                      instruction1=dict(base=1)))
-    if confused_recursive_list_positions == 1:
-        l2 = build_nest(types,
-                        base=s1,
-                        point1=ip,
-                        instruction1=dict(base=s2,
-                                          callback=1,
-                                          point1=ip,
-                                          instruction1=dict(base=1)))
-
-    else:
-        l2 = build_nest(types,
-                        base=s2,
-                        point1=ip,
-                        instruction1=dict(base=s1,
-                                          callback=1,
-                                          point1=ip,
-                                          instruction1=dict(base=1)))
-
-    return l1, l2
-
-
-@pytest.mark.timeout(2)
-def test_confused_falsy_recursive_inequality(confused_unequal_falsy_recursive_lists):
-    assert not check_list_equality(*confused_unequal_falsy_recursive_lists)
-    assert not strict_check_list_equality(*confused_unequal_falsy_recursive_lists)
-
-
-@pytest.mark.timeout(2)
-def test_confused_truthy_recursive_inequality(confused_unequal_truthy_recursive_lists):
-    assert not check_list_equality(*confused_unequal_truthy_recursive_lists)
-    assert not strict_check_list_equality(*confused_unequal_truthy_recursive_lists)
+@pytest.mark.benchmark
+def test_recursive_inequality_benchmark(recursive_unequal_lists, benchmark):
+    benchmark(check_list_equality, *recursive_unequal_lists)
+    benchmark(strict_check_list_equality, *recursive_unequal_lists)

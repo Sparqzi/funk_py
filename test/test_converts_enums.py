@@ -2,25 +2,7 @@ from enum import Enum, IntEnum
 
 import pytest
 
-from t_support import cov, cov_counter
 from funk_py.modularity.decoration.enums import converts_enums
-
-
-# The following manages whether the generated coverage instance from t_support should report. This
-# method of coverage is used so that coverage can be turned off to not interfere in timed tests.
-@pytest.fixture(scope='session', autouse=True)
-def c():
-    cov_counter.value += 1
-
-    yield cov
-
-    cov_counter.value -= 1
-
-    # We don't want to report till all test modules are completed...
-    if not cov_counter.value:
-        cov.stop()
-        cov.save()
-        cov.html_report()
 
 
 LOREM = 'lorem'

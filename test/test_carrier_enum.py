@@ -1,5 +1,6 @@
-import pytest
+from typing import Union, List
 
+import pytest
 
 from funk_py.modularity.decoration.enums import CarrierEnum, ignore
 
@@ -50,7 +51,7 @@ def test_simple_values_cant_be_called():
 def test_can_create_with_complex_values():
     class Bologna(CarrierEnum):
         @staticmethod
-        def HORSE(name_: str, owner: str | list[str] = None, age: int = 1): ...
+        def HORSE(name_: str, owner: Union[str, List[str]] = None, age: int = 1): ...
 
         @staticmethod
         def HOUSE(address: str, *, owner: str = None, age: int = 0): ...
@@ -104,7 +105,7 @@ def test_can_create_with_complex_values():
 def test_complex_values_which_cant_be_called():
     class Bologna(CarrierEnum):
         @staticmethod
-        def HORSE(name_: str, owner: str | list[str] = None, age: int = 1): ...
+        def HORSE(name_: str, owner: Union[str, List[str]] = None, age: int = 1): ...
 
         @staticmethod
         def HOUSE(address: str, *, owner: str = None, age: int = 0): ...

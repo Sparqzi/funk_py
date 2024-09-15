@@ -11,7 +11,7 @@ import pytest
 from funk_py.modularity.basic_structures import pass_, Speed
 from funk_py.sorting.dict_manip import align_to_list, nest_under_keys
 from funk_py.sorting.pieces import pick, PickType
-from funk_py.sorting.converters import json_to_xml, json_to_csv, json_to_jsonl
+from funk_py.sorting.converters import json_to_xml, json_to_csv, json_to_jsonl, xml_to_json
 
 
 COM = 'combinatorial'
@@ -1179,267 +1179,267 @@ class TestMultiplicative:
     name = COM
     pick_type = PickType.COMBINATORIAL
 
-    def test_simple_lists(self, similar_lists):
+    @pytest.mark.benchmark
+    def test_simple_lists_benchmark(self, similar_lists, benchmark):
         t = similar_lists
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+    @pytest.mark.benchmark
+    def test_single_dict_nested_lists_benchmark(self, dicts_with_one_nested_list, benchmark):
         t = dicts_with_one_nested_list
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        t = dict_with_two_nested_similar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
-
-    def test_dict_nested_dissimilar_lists_in_list(
+    @pytest.mark.benchmark
+    def test_dict_nested_lists_in_list_benchmark(
             self,
-            dict_with_two_nested_dissimilar_lists_in_list
+            dict_with_two_nested_similar_lists_in_list,
+            benchmark,
+    ):
+        t = dict_with_two_nested_similar_lists_in_list
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_in_list_benchmark(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list,
+            benchmark,
     ):
         t = dict_with_two_nested_dissimilar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        t = two_nested_lists_under_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        t = dict_with_list_of_dicts
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_nested_dissimilar_lists_under_double_keys(
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_keys_benchmark(
             self,
-            two_nested_lists_under_double_keys
+            two_nested_lists_under_keys,
+            benchmark,
+    ):
+        t = two_nested_lists_under_keys
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_with_list_of_dicts_benchmark(self, dict_with_list_of_dicts, benchmark):
+        t = dict_with_list_of_dicts
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_double_keys_benchmark(
+            self,
+            two_nested_lists_under_double_keys,
+            benchmark,
     ):
         t = two_nested_lists_under_double_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_complicated_dict1(self, complicated_dict1):
+    @pytest.mark.benchmark
+    def test_complicated_dict1_benchmark(self, complicated_dict1, benchmark):
         t = complicated_dict1
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_danger_dict(self, danger_dict):
-        output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
-        assert len(ans) == 0
+    @pytest.mark.benchmark
+    def test_danger_dict_benchmark(self, danger_dict, benchmark):
+        benchmark(pick, *danger_dict, self.pick_type)
 
 
 class TestTandem:
     name = TAN
     pick_type = PickType.TANDEM
 
-    def test_simple_lists(self, similar_lists):
+    @pytest.mark.benchmark
+    def test_simple_lists_benchmark(self, similar_lists, benchmark):
         t = similar_lists
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+    @pytest.mark.benchmark
+    def test_single_dict_nested_lists_benchmark(self, dicts_with_one_nested_list, benchmark):
         t = dicts_with_one_nested_list
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        t = dict_with_two_nested_similar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
-
-    def test_dict_nested_dissimilar_lists_in_list(
+    @pytest.mark.benchmark
+    def test_dict_nested_lists_in_list_benchmark(
             self,
-            dict_with_two_nested_dissimilar_lists_in_list
+            dict_with_two_nested_similar_lists_in_list,
+            benchmark,
+    ):
+        t = dict_with_two_nested_similar_lists_in_list
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_in_list_benchmark(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list,
+            benchmark,
     ):
         t = dict_with_two_nested_dissimilar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        t = two_nested_lists_under_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        t = dict_with_list_of_dicts
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_nested_dissimilar_lists_under_double_keys(
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_keys_benchmark(
             self,
-            two_nested_lists_under_double_keys
+            two_nested_lists_under_keys,
+            benchmark,
+    ):
+        t = two_nested_lists_under_keys
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_with_list_of_dicts_benchmark(self, dict_with_list_of_dicts, benchmark):
+        t = dict_with_list_of_dicts
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_double_keys_benchmark(
+            self,
+            two_nested_lists_under_double_keys,
+            benchmark,
     ):
         t = two_nested_lists_under_double_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_complicated_dict1(self, complicated_dict1):
+    @pytest.mark.benchmark
+    def test_complicated_dict1_benchmark(self, complicated_dict1, benchmark):
         t = complicated_dict1
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_danger_dict(self, danger_dict):
+    @pytest.mark.benchmark
+    def test_danger_dict_benchmark(self, danger_dict, benchmark):
         output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
-        assert len(ans) == 0
+        benchmark(pick, output_map, dict, self.pick_type)
 
 
 class TestReduce:
     name = RED
     pick_type = PickType.REDUCE
 
-    def test_simple_lists(self, similar_lists):
+    @pytest.mark.benchmark
+    def test_simple_lists_benchmark(self, similar_lists, benchmark):
         t = similar_lists
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+    @pytest.mark.benchmark
+    def test_single_dict_nested_lists_benchmark(self, dicts_with_one_nested_list, benchmark):
         t = dicts_with_one_nested_list
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        t = dict_with_two_nested_similar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
-
-    def test_dict_nested_dissimilar_lists_in_list(
+    @pytest.mark.benchmark
+    def test_dict_nested_lists_in_list_benchmark(
             self,
-            dict_with_two_nested_dissimilar_lists_in_list
+            dict_with_two_nested_similar_lists_in_list,
+            benchmark,
+    ):
+        t = dict_with_two_nested_similar_lists_in_list
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_in_list_benchmark(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list,
+            benchmark,
     ):
         t = dict_with_two_nested_dissimilar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        t = two_nested_lists_under_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        t = dict_with_list_of_dicts
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_nested_dissimilar_lists_under_double_keys(
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_keys_benchmark(
             self,
-            two_nested_lists_under_double_keys
+            two_nested_lists_under_keys,
+            benchmark,
+    ):
+        t = two_nested_lists_under_keys
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_with_list_of_dicts_benchmark(self, dict_with_list_of_dicts, benchmark):
+        t = dict_with_list_of_dicts
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_double_keys_benchmark(
+            self,
+            two_nested_lists_under_double_keys,
+            benchmark,
     ):
         t = two_nested_lists_under_double_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_complicated_dict1(self, complicated_dict1):
+    def test_complicated_dict1_benchmark(self, complicated_dict1, benchmark):
         t = complicated_dict1
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_danger_dict(self, danger_dict):
+    @pytest.mark.benchmark
+    def test_danger_dict_benchmark(self, danger_dict, benchmark):
         output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
-        assert len(ans) == 0
+        benchmark(pick, output_map, dict, self.pick_type)
 
 
 class TestAccumulate:
     name = ACC
     pick_type = PickType.ACCUMULATE
 
-    def deco_too_slow_func(
-            self,
-            t: Union[ListSet, DictSet]
-    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
-        def gives_func(which=None):
-            def func(x):
-                if which is None:
-                    pick(t.output_map, x, self.pick_type)
-
-                elif which == 1:
-                    pick(t.output_map1, x, self.pick_type)
-
-                elif which == 2:
-                    pick(t.output_map2, x, self.pick_type)
-
-                else:
-                    assert False, 'The given value for which was not reasonable.'
-
-            return func
-
-        return gives_func
-
-    def test_simple_lists(self, similar_lists):
+    @pytest.mark.benchmark
+    def test_simple_lists_benchmark(self, similar_lists, benchmark):
         t = similar_lists
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_single_dict_nested_lists(self, dicts_with_one_nested_list):
+    @pytest.mark.benchmark
+    def test_single_dict_nested_lists_benchmark(self, dicts_with_one_nested_list, benchmark):
         t = dicts_with_one_nested_list
-        ans = pick(t.output_map1, t.list1, self.pick_type)
-        assert ans == t.result_set[self.name][0]
+        benchmark(pick, t.output_map1, t.list1, self.pick_type)
+        benchmark(pick, t.output_map2, t.list2, self.pick_type)
 
-        ans = pick(t.output_map2, t.list2, self.pick_type)
-        assert ans == t.result_set[self.name][1]
-
-    def test_dict_nested_lists_in_list(self, dict_with_two_nested_similar_lists_in_list):
-        t = dict_with_two_nested_similar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
-
-    def test_dict_nested_dissimilar_lists_in_list(
+    @pytest.mark.benchmark
+    def test_dict_nested_lists_in_list_benchmark(
             self,
-            dict_with_two_nested_dissimilar_lists_in_list
+            dict_with_two_nested_similar_lists_in_list,
+            benchmark,
+    ):
+        t = dict_with_two_nested_similar_lists_in_list
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_in_list_benchmark(
+            self,
+            dict_with_two_nested_dissimilar_lists_in_list,
+            benchmark,
     ):
         t = dict_with_two_nested_dissimilar_lists_in_list
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        assert ans == t.result_set[self.name]
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_dict_nested_dissimilar_lists_under_keys(self, two_nested_lists_under_keys):
-        t = two_nested_lists_under_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_with_list_of_dicts(self, dict_with_list_of_dicts):
-        t = dict_with_list_of_dicts
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
-
-    def test_dict_nested_dissimilar_lists_under_double_keys(
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_keys_benchmark(
             self,
-            two_nested_lists_under_double_keys
+            two_nested_lists_under_keys,
+            benchmark,
+    ):
+        t = two_nested_lists_under_keys
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_with_list_of_dicts_benchmark(self, dict_with_list_of_dicts, benchmark):
+        t = dict_with_list_of_dicts
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
+
+    @pytest.mark.benchmark
+    def test_dict_nested_dissimilar_lists_under_double_keys_benchmark(
+            self,
+            two_nested_lists_under_double_keys,
+            benchmark,
     ):
         t = two_nested_lists_under_double_keys
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_complicated_dict1(self, complicated_dict1):
+    @pytest.mark.benchmark
+    def test_complicated_dict1_benchmark(self, complicated_dict1, benchmark):
         t = complicated_dict1
-        ans = pick(t.output_map, t.dict, self.pick_type)
-        compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
+        benchmark(pick, t.output_map, t.dict, self.pick_type)
 
-    def test_danger_dict(self, danger_dict):
+    @pytest.mark.benchmark
+    def test_danger_dict_benchmark(self, danger_dict, benchmark):
         output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
-        assert len(ans) == 1
+        benchmark(pick, output_map, dict, self.pick_type)

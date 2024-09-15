@@ -1,4 +1,5 @@
 import math
+import sys
 from typing import (Any, List, Tuple, Set, Mapping, Dict, Iterable, Union, Literal, Sequence,
                     MutableMapping, AnyStr, Callable, Optional)
 
@@ -45,7 +46,8 @@ def test_generates_matcher_of_type_matcher(): TM(TM)
 def test_generates_matcher_of_strict_type_matcher(): TM(STM)
 
 
-def test_handles_parameterized_type():
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
+def test_handles_parametrized_type():
     TM[int]
     TM[str]
     TM[bool]
@@ -53,12 +55,26 @@ def test_handles_parameterized_type():
     TM[float]
     TM[str | float | int]
 
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason='Test is not needed for Python 3.10 or higher. Reserved for 3.9 and below.'
+)
+def test_handles_parametrized_type():
+    TM[int]
+    TM[str]
+    TM[bool]
+    TM[complex]
+    TM[float]
+
+
 def test_generates_strict_matcher_of_type_matcher(): STM(TM)
 
 
 def test_generates_strict_matcher_of_strict_type_matcher(): STM(STM)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
 def test_handles_strict_parameterized_type():
     STM[int]
     STM[str]
@@ -66,6 +82,18 @@ def test_handles_strict_parameterized_type():
     STM[complex]
     STM[float]
     STM[str | float | int]
+
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason='Test is not needed for Python 3.10 or higher. Reserved for 3.9 and below.'
+)
+def test_handles_strict_parameterized_type():
+    STM[int]
+    STM[str]
+    STM[bool]
+    STM[complex]
+    STM[float]
 
 
 @pytest.fixture(params=(TM, STM), ids=('regular type matcher', 'strict type matcher'))
@@ -108,7 +136,20 @@ def generate_basic_matcher_from_spec(blueprint: tuple) -> TM:
     return m1(m2[t_])
 
 
+# generate_base_name_from_spec
 def gbnfs(m1: type, m2: Optional[type], *n) -> str:
+    """
+    Generates the name for a matcher of a matcher.
+    
+    :param m1: The outer matcher type.
+    :param m2: The inner matcher type. If omitted, that name will just be "``outer_matcher_type`` of
+        ``inner_type``".
+    :param n: The inner type of the matcher. If a single type is provided, the name will be
+        "``outer_matcher_type`` of [``inner_matcher_type`` of ]``inner_type``". If two types -
+        specifically a parameterizable type and another type - are provided, the name will be
+        "``outer_matcher_type`` of [``inner_matcher_type`` of ]``inner_param_type`` of
+        ``inner_type``".
+    """
     builder = (TM_NAME if m1 is TM else STM_NAME) + ' of '
     if m2 is not None:
         builder += (TM_NAME if m2 is TM else STM_NAME) + ' of '
@@ -199,22 +240,36 @@ def test_basic_types(basic_vals, basic_type_matchers):
 # List and Set Tests
 # --------------------------------------------------------------------------------------------------
 LIST_TYPES = (list, List, set, Set)
+LIST_TYPES_NOT_FOR_3_8 = (list, set)
 LIST_BUILDERS = (list, list, set, set)
 LIST_NAMES = ('list', 'major-list', 'set', 'major-set')
+LIST_NAMES_3_8 = ('major-list', 'major-set')
 S_LIST_BUILDERS = (list, set)
 S_LIST_NAMES = ('list', 'set')
 
 
 @pytest.fixture(params=tuple(zip(LIST_TYPES, LIST_BUILDERS)), ids=LIST_NAMES)
-def basic_list_types(request): return request.param
+def basic_list_types_all(request): return request.param
 
 
-def test_generates_simple_list_types(basic_list_types, matchers): matchers(basic_list_types[0])
+@pytest.fixture(params=tuple(zip(LIST_TYPES, LIST_BUILDERS)), ids=LIST_NAMES)
+def basic_list_types(request):
+    if sys.version_info < (3, 9) and request.param[0] in LIST_TYPES_NOT_FOR_3_8:
+        pytest.skip('This list type cannot be parameterized in the current Python version.')
+
+    return request.param
 
 
-def test_generates_matchers_of_simpl_list_type_matchers(basic_list_types, matchers_of_matchers):
+def test_generates_simple_list_types(basic_list_types_all, matchers):
+    matchers(basic_list_types_all[0])
+
+
+def test_generates_matchers_of_simple_list_type_matchers(
+        basic_list_types_all,
+        matchers_of_matchers
+):
     m2, m1 = matchers_of_matchers
-    m1(m2[basic_list_types[0]])
+    m1(m2[basic_list_types_all[0]])
 
 
 @pytest.fixture(params=tuple(zip(BASE_TYPES, LIST_SETS)), ids=BASE_NAMES)
@@ -284,40 +339,52 @@ def test_generates_matchers_of_spec_list_type_matchers(spec_list_types, matchers
 
 
 def spec_list_checkers():
+    # This function generates a list of special list checkers following appropriate rules.
     builder1 = {}
     builder2 = set()
-    b1 = False
-    for t1 in BASE_TYPES:
-        for t2, n2 in zip(BASE_TYPES, BASE_NAMES):
-            for l1 in S_LIST_BUILDERS:
-                for l2, lt, ln in zip(LIST_BUILDERS, LIST_TYPES, LIST_NAMES):
-                    if not b1:
+    type1_done = False
+    for type1 in BASE_TYPES:
+        for type2, num2 in zip(BASE_TYPES, BASE_NAMES):
+            for list_builder1 in S_LIST_BUILDERS:
+                for list_builder2, list_type, list_name \
+                        in zip(LIST_BUILDERS, LIST_TYPES, LIST_NAMES):
+                    if not type1_done:
+                        # Only run this section for the first BASE_TYPE.
+                        # The purpose of this section is to generate the actual TypeMatcher
+                        # definitions.
                         builder2.update({
-                            (TM, None, lt, t2, gbnfs(TM, None, ln, n2)),
-                            (STM, None, lt, t2, gbnfs(STM, None, ln, n2))
+                            (TM, None, list_type, type2, gbnfs(TM, None, list_name, num2)),
+                            (STM, None, list_type, type2, gbnfs(STM, None, list_name, num2))
                         })
 
-                    if l1 is l2:
-                        if t1 is t2:
+                    # The rest is here to ensure that the right test definitions are added.
+                    if list_builder1 is list_builder2:
+                        if type1 is type2:
+                            # When the builders match, the result of a comparison is generally going
+                            # to be True.
                             builder1.update({
-                                (TM, None, lt, t2, t1, l2): True,
-                                (STM, None, lt, t2, t1, l2): True
+                                (TM, None, list_type, type2, type1, list_builder2): True,
+                                (STM, None, list_type, type2, type1, list_builder2): True
                             })
                             continue
 
-                        elif issubclass(t1, t2) and not (t1 is bool and t2 is int):
+                        elif issubclass(type1, type2) and not (type1 is bool and type2 is int):
+                            # StrictTypeMatcher sees bool as a non-integer, so it will compare as
+                            # false, though TypeMatcher will compare as True.
                             builder1.update({
-                                (TM, None, lt, t2, t1, l2): True,
-                                (STM, None, lt, t2, t1, l2): False
+                                (TM, None, list_type, type2, type1, list_builder2): True,
+                                (STM, None, list_type, type2, type1, list_builder2): False
                             })
                             continue
 
+                    # When the builders don't match, both TypeMatcher and StrictTypeMatcher will
+                    # compare False.
                     builder1.update({
-                        (TM, None, lt, t2, t1, l1): False,
-                        (STM, None, lt, t2, t1, l1): False
+                        (TM, None, list_type, type2, type1, list_builder1): False,
+                        (STM, None, list_type, type2, type1, list_builder1): False
                     })
 
-        b1 = True
+        type1_done = True
 
     return builder1, builder2
 
@@ -327,9 +394,13 @@ SPEC_LIST_CHECKER_MAP, SPEC_LIST_CHECKER_DEFS = spec_list_checkers()
 
 @pytest.fixture(
     params=tuple(t[:-1] for t in SPEC_LIST_CHECKER_DEFS),
-    ids=tuple(t[-1] for t in SPEC_LIST_CHECKER_DEFS)
+    ids=tuple(t[-1] for t in SPEC_LIST_CHECKER_DEFS),
 )
 def spec_list_type_matchers(request):
+    _, _, list_type, *_ = request.param
+    if sys.version_info < (3, 9) and list_type in LIST_TYPES_NOT_FOR_3_8:
+        pytest.skip('This list type cannot be parameterized in the current Python version.')
+
     return generate_basic_matcher_from_spec(request.param), *request.param
 
 
@@ -339,12 +410,16 @@ def test_spec_list_types(spec_list_types, spec_list_type_matchers):
     def_ = (*def_, lt, lb)
     assert matcher(val) == SPEC_LIST_CHECKER_MAP[def_]
 
+
 # --------------------------------------------------------------------------------------------------
 # Dictionary Tests
 # --------------------------------------------------------------------------------------------------
 DICT_TYPES = (dict, Dict, Mapping, MutableMapping)
+DICT_TYPES_NOT_FOR_3_8 = (dict,)
+DICT_TYPES_3_8 = (Dict, Mapping, MutableMapping)
 DICT_BUILDER = dict
 DICT_NAMES = ('dictionary', 'major-dictionary', 'major-mapping', 'major-mutableMapping')
+DICT_NAMES_3_8 = ('major-dictionary', 'major-mapping', 'major-mutableMapping')
 
 
 @pytest.fixture(params=DICT_TYPES, ids=DICT_NAMES)
@@ -438,7 +513,32 @@ def gdnfs(m: type, dn: str, m1: Optional[str], k: str, m2: Optional[str], v: str
 
 
 def cd(dt, kt1, kt2, vt1, vt2):
+    """
+    Create a function which generates a small dictionary of test definitions based off of provided
+    values.
+
+    :param dt: The type of the dictionary.
+    :param kt1: Key type that matcher should be testing.
+    :param kt2: Key type that matcher should be for.
+    :param vt1: Value type that matcher should be testing.
+    :param vt2: Value type that matcher should be for.
+    """
     def key(ptm, pstm, tmkstm, tmvstm, stmktm, stmvtm):
+        """
+        Generates a small dictionary of test definitions for dictionaries of specific typing
+        with the given results.
+
+        :param ptm: The expected result of using a plain ``TypeMatcher`` of a dictionary.
+        :param pstm: The expected result of using a plain ``StrictTypeMatcher`` of a dictionary.
+        :param tmkstm: The expected result of using a ``TypeMatcher`` of a dictionary having a key
+            type of ``StrictTypeMatcher``.
+        :param tmvstm: The expected result of using a ``TypeMatcher`` of a dictionary having a value
+            type of ``StrictTypeMatcher``.
+        :param stmktm: The expected result of using a ``StrictTypeMatcher`` of a dictionary having a
+            key type of ``TypeMatcher``.
+        :param stmvtm: he expected result of using a ``StrictTypeMatcher`` of a dictionary having a
+            value type of ``TypeMatcher``.
+        """
         return {
             (TM, dt, None, kt2, None, vt2, kt1, vt1): ptm,
             (STM, dt, None, kt2, None, vt2, kt1, vt1): pstm,
@@ -451,76 +551,124 @@ def cd(dt, kt1, kt2, vt1, vt2):
     return key
 
 
-def spec_dict_checkers():
+def spec_dict_checkers(dict_types: tuple, dict_names: tuple):
+    # This function generates a list of special dictionary checkers following appropriate rules.
     builder1 = {}
     builder2 = set()
-    b1 = False
-    for kt1 in BASE_TYPES:
-        for kt2, kn2 in zip(BASE_TYPES, BASE_NAMES):
-            for vt1 in BASE_TYPES:
-                for vt2, vn2 in zip(BASE_TYPES, BASE_NAMES):
-                    for dt, dn in zip(DICT_TYPES, DICT_NAMES):
-                        if not b1:
+    key_type1_done = False
+    for key_type1 in BASE_TYPES:
+        for key_type2, key_name2 in zip(BASE_TYPES, BASE_NAMES):
+            for value_type1 in BASE_TYPES:
+                for value_type2, value_name2 in zip(BASE_TYPES, BASE_NAMES):
+                    for dict_type, dict_name in zip(dict_types, dict_names):
+                        if not key_type1_done:
+                            # Only run this section for the first BASE_TYPE.
+                            # The purpose of this section is to generate the actual TypeMatcher
+                            # definitions.
                             builder2.update({
-                                (TM, dt, None, kt2, None, vt2, gdnfs(TM, dn, None, kn2, None, vn2)),
-                                (STM, dt, None, kt2, None, vt2,
-                                 gdnfs(STM, dn, None, kn2, None, vn2)),
-                                (TM, dt, STM, kt2, None, vt2,
-                                 gdnfs(TM, dn, STM_NAME, kn2, None, vn2)),
-                                (TM, dt, None, kt2, STM, vt2,
-                                 gdnfs(TM, dn, None, kn2, STM_NAME, vn2)),
-                                (STM, dt, TM, kt2, None, vt2,
-                                 gdnfs(TM, dn, TM_NAME, kn2, None, vn2)),
-                                (STM, dt, None, kt2, TM, vt2,
-                                 gdnfs(TM, dn, None, kn2, TM_NAME, vn2))
+                                (TM, dict_type, None, key_type2, None, value_type2,
+                                 gdnfs(TM, dict_name, None, key_name2, None, value_name2)),
+                                (STM, dict_type, None, key_type2, None, value_type2,
+                                 gdnfs(STM, dict_name, None, key_name2, None, value_name2)),
+                                (TM, dict_type, STM, key_type2, None, value_type2,
+                                 gdnfs(TM, dict_name, STM_NAME, key_name2, None, value_name2)),
+                                (TM, dict_type, None, key_type2, STM, value_type2,
+                                 gdnfs(TM, dict_name, None, key_name2, STM_NAME, value_name2)),
+                                (STM, dict_type, TM, key_type2, None, value_type2,
+                                 gdnfs(TM, dict_name, TM_NAME, key_name2, None, value_name2)),
+                                (STM, dict_type, None, key_type2, TM, value_type2,
+                                 gdnfs(TM, dict_name, None, key_name2, TM_NAME, value_name2))
                             })
 
-                        _cd = cd(dt, kt1, kt2, vt1, vt2)
-                        if dt in (dict, Dict):
-                            if kt1 is kt2:
-                                if vt1 is vt2:
+                        # The rest is here to ensure that the right test definitions are added.
+                        # _cd will be used to generate subsections of the dictionary test
+                        # definitions.
+                        _cd = cd(dict_type, key_type1, key_type2, value_type1, value_type2)
+                        if dict_type in (dict, Dict):
+                            # If type of the matcher is actually one of the dictionary types, tests
+                            # are simpler to design.
+                            if key_type1 is key_type2:
+                                if value_type1 is value_type2:
+                                    # When key types match and value types match, all cases should
+                                    # generally pass.
                                     builder1.update(_cd(True, True, True, True, True, True))
                                     continue
 
-                                elif issubclass(vt1, vt2) and not (vt1 is bool and vt2 is int):
+                                elif (issubclass(value_type1, value_type2)
+                                      and not (value_type1 is bool and value_type2 is int)):
+                                    # When key types match, but the value type to test is boolean
+                                    # and the value type of the matcher is integer, only tests not
+                                    # involving a StrictTypeMatcher around the value type should
+                                    # pass.
                                     builder1.update(_cd(True, False, True, False, False, True))
                                     continue
 
-                            elif issubclass(kt1, kt2) and not (kt1 is bool and kt2 is int):
-                                if vt1 is vt2:
+                            elif (issubclass(key_type1, key_type2)
+                                  and not (key_type1 is bool and key_type2 is int)):
+                                if value_type1 is value_type2:
+                                    # When the key type to test is boolean and the key type of the
+                                    # matcher is integer, and the value types match, only tests not
+                                    # involving a StrictTypeMatcher around the key type should
+                                    # pass.
                                     builder1.update(_cd(True, False, False, True, True, False))
                                     continue
 
-                                elif issubclass(vt1, vt2) and not (vt1 is bool and vt2 is int):
+                                elif (issubclass(value_type1, value_type2)
+                                      and not (value_type1 is bool and value_type2 is int)):
+                                    # When the key type to test is boolean and the key type of the
+                                    # matcher is integer, and the value type to test is boolean and
+                                    # the value type of the matcher is integer, only tests not
+                                    # involving a StrictTypeMatcher at all should pass.
                                     builder1.update(_cd(True, False, False, False, False, False))
                                     continue
 
-                        elif kt1 is kt2:
-                            if vt1 is vt2:
+                        # The rest below this is to generate tests for Mapping as the TypeMatcher
+                        # type.
+                        elif key_type1 is key_type2:
+                            if value_type1 is value_type2:
+                                # When key types match and value types match, everything where
+                                # StrictTypeMatcher is not the outermost should pass.
                                 builder1.update(_cd(True, False, True, True, False, False))
                                 continue
 
-                            elif issubclass(vt1, vt2) and not (vt1 is bool and vt2 is int):
+                            elif (issubclass(value_type1, value_type2)
+                                  and not (value_type1 is bool and value_type2 is int)):
+                                # When key types match, but the value type to test is boolean and
+                                # the value type of the matcher is integer, everything involving a
+                                # StrictTypeMatcher containing the value should pass.
                                 builder1.update(_cd(True, False, True, False, False, False))
                                 continue
 
-                        elif issubclass(kt1, kt2) and not (kt1 is bool and kt2 is int):
-                            if vt1 is vt2:
+                        elif (issubclass(key_type1, key_type2)
+                              and not (key_type1 is bool and key_type2 is int)):
+                            # When the key type to test is boolean and the key type of the
+                            # matcher is integer, and the value types match, only tests not
+                            # involving a StrictTypeMatcher around the key type should
+                            # pass.
+                            if value_type1 is value_type2:
                                 builder1.update(_cd(True, False, False, True, False, False))
                                 continue
 
-                            elif issubclass(vt1, vt2) and not (vt1 is bool and vt2 is int):
+                            elif (issubclass(value_type1, value_type2)
+                                  and not (value_type1 is bool and value_type2 is int)):
+                                # When the key type to test is boolean and the key type of the
+                                # matcher is integer, and the value type to test is boolean and
+                                # the value type of the matcher is integer, only tests not
+                                # involving a StrictTypeMatcher at all should pass.
                                 builder1.update(_cd(True, False, False, False, False, False))
                                 continue
 
+                        # When no previous conditions were met, every test should fail.
                         builder1.update(_cd(False, False, False, False, False, False))
 
-        b1 = True
+        key_type1_done = True
 
     return builder1, builder2
 
 
-SPEC_DICT_CHECKER_MAP, SPEC_DICT_CHECKER_DEFS = spec_dict_checkers()
+SPEC_DICT_CHECKER_MAP, SPEC_DICT_CHECKER_DEFS = spec_dict_checkers(DICT_TYPES, DICT_NAMES)
+SPEC_DICT_CHECKER_MAP_3_8, SPEC_DICT_CHECKER_DEFS_3_8 = \
+    spec_dict_checkers(DICT_TYPES_3_8, DICT_NAMES_3_8)
 
 
 @pytest.fixture(
@@ -528,6 +676,10 @@ SPEC_DICT_CHECKER_MAP, SPEC_DICT_CHECKER_DEFS = spec_dict_checkers()
     ids=tuple(t[-1] for t in SPEC_DICT_CHECKER_DEFS)
 )
 def spec_dict_type_matchers(request):
+    _, dict_type, *_ = request.param
+    if sys.version_info < (3, 9) and dict_type in DICT_TYPES_NOT_FOR_3_8:
+        pytest.skip('This dict type cannot be parameterized in the current Python version.')
+
     return generate_dict_matcher(request.param), *request.param
 
 
@@ -542,19 +694,33 @@ def test_spec_dict_types(dicts, spec_dict_type_matchers):
 # Tuple Tests
 # --------------------------------------------------------------------------------------------------
 TUPLE_TYPES = (tuple, Tuple)
+TUPLE_TYPES_NOT_FOR_3_8 = (tuple,)  # These types are ones that break when parameterized in
+                                    # Python 3.8.
+TUPLE_TYPES_3_8 = (Tuple,)  # make a tuple both for interchangeability and for potential noticed
+                            # missed edge cases.
 TUPLE_NAMES = ('tuple', 'major-tuple')
+TUPLE_NAMES_3_8 = ('major-tuple',)  # make a tuple both for interchangeability and for potential
+                                    # noticed missed edge cases.
 TUPLE_BUILDER = tuple
 
 
 @pytest.fixture(params=TUPLE_TYPES, ids=TUPLE_NAMES)
-def basic_tuple_types(request): return request.param
+def basic_tuple_types_all(request): return request.param
 
 
-def test_generate_simple_tuple_types(basic_tuple_types): TM(basic_tuple_types)
+@pytest.fixture(params=TUPLE_TYPES, ids=TUPLE_NAMES)
+def basic_tuple_types(request):
+    if sys.version_info < (3, 9) and request.param in TUPLE_TYPES_NOT_FOR_3_8:
+        pytest.skip('This tuple type cannot be parameterized in the current Python version.')
+
+    return request.param
 
 
-def test_generate_matchers_of_simple_tuple_type_matchers(basic_tuple_types):
-    TM(TM[basic_tuple_types])
+def test_generate_simple_tuple_types(basic_tuple_types_all): TM(basic_tuple_types_all)
+
+
+def test_generate_matchers_of_simple_tuple_type_matchers(basic_tuple_types_all):
+    TM(TM[basic_tuple_types_all])
 
 
 @pytest.fixture(params=tuple(zip(BASE_TYPES, LIST_SETS)), ids=BASE_NAMES)
@@ -599,19 +765,20 @@ def spec_tuple_checkers():
         builder[t1] = _builder = {GOOD: [], BAD:[]}
         for t2 in BASE_TYPES:
             for tt in TUPLE_TYPES:
-                if t1 is t2 or (issubclass(t1, t2) and not (t1 is bool and t2 is int)):
-                    _builder[GOOD].extend([TM(tt[t2, ...]),
-                                           TM(tt[t2, t2, t2, t2, t2, t2, t2]),
-                                           TM(TM[tt[t2, ...]]),
-                                           TM(TM[tt[t2, t2, t2, t2, t2, t2, t2]])])
+                if not (sys.version_info < (3, 9) and tt in TUPLE_TYPES_NOT_FOR_3_8):
+                    if t1 is t2 or (issubclass(t1, t2) and not (t1 is bool and t2 is int)):
+                        _builder[GOOD].extend([TM(tt[t2, ...]),
+                                               TM(tt[t2, t2, t2, t2, t2, t2, t2]),
+                                               TM(TM[tt[t2, ...]]),
+                                               TM(TM[tt[t2, t2, t2, t2, t2, t2, t2]])])
 
-                else:
-                    _builder[BAD].extend([TM(tt[t2, ...]),
-                                          TM(tt[t2, t2, t2, t2, t2, t2, t2]),
-                                          TM(TM[tt[t2, ...]]),
-                                          TM(TM[tt[t2, t2, t2, t2, t2, t2, t2]])])
+                    else:
+                        _builder[BAD].extend([TM(tt[t2, ...]),
+                                              TM(tt[t2, t2, t2, t2, t2, t2, t2]),
+                                              TM(TM[tt[t2, ...]]),
+                                              TM(TM[tt[t2, t2, t2, t2, t2, t2, t2]])])
 
-                _builder[BAD].extend([TM(tt[t2]), TM(TM[tt[t2]])])
+                    _builder[BAD].extend([TM(tt[t2]), TM(TM[tt[t2]])])
 
     return builder
 
@@ -641,6 +808,7 @@ def newer_spec_tuple_checkers():
     return builder
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='Test requires Python 3.9 or higher.')
 def test_newer_spec_tuple_types(spec_tuple_types, newer_spec_tuple_checkers):
     tt, t, val = spec_tuple_types
     for checker in newer_spec_tuple_checkers[t]:
@@ -655,7 +823,7 @@ def match_types(request): return request.param
 
 @pytest.fixture
 def single_string_tuple(match_types):
-    return TM(TM[tuple[str]]) if match_types else TM(tuple[str]), {
+    return TM(TM[Tuple[str]]) if match_types else TM(Tuple[str]), {
         GOOD: [
             (STRINGS[0],),
             (STRINGS[1],)
@@ -693,7 +861,7 @@ def one_type_any_length_tuple(match_types):
         (INTS[0],)
     ]
 
-    return TM(TM[tuple[str, ...]]) if match_types else TM(tuple[str, ...]), builder
+    return TM(TM[Tuple[str, ...]]) if match_types else TM(Tuple[str, ...]), builder
 
 
 @pytest.fixture
@@ -715,7 +883,7 @@ def even_count_string_only_tuple(match_types):
 
 @pytest.fixture
 def one_int_and_one_string_tuple(match_types):
-    return TM(TM[tuple[int, str]]) if match_types else TM(tuple[int, str]), {
+    return TM(TM[Tuple[int, str]]) if match_types else TM(Tuple[int, str]), {
         GOOD: [
             (INTS[0], STRINGS[0]),
             (INTS[1], STRINGS[1])
@@ -762,6 +930,7 @@ def t_vals(matcher, vals):
 def test_single_string_tuple_cases(single_string_tuple): t_vals(*single_string_tuple)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='Test requires Python 3.9 or higher.')
 def test_zero_element_tuple_cases(zero_element_tuple): t_vals(*zero_element_tuple)
 
 
@@ -769,6 +938,7 @@ def test_one_type_any_length_tuple_cases(one_type_any_length_tuple):
     t_vals(*one_type_any_length_tuple)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='Test requires Python 3.9 or higher.')
 def test_even_count_string_only_tuple_cases(even_count_string_only_tuple):
     t_vals(*even_count_string_only_tuple)
 
@@ -777,6 +947,7 @@ def test_one_int_and_one_string_tuple_cases(one_int_and_one_string_tuple):
     t_vals(*one_int_and_one_string_tuple)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason='Test requires Python 3.9 or higher.')
 def test_int_string_pair_tuple_cases(int_string_pair_tuple): t_vals(*int_string_pair_tuple)
 
 
@@ -962,17 +1133,51 @@ def test_spec_bytes_sequence_types(i_bytes, base_types, match_types):
     (bool, (True, False), (None, (), 1, 0, 19.5)),
     (int, (0, 1), (None, (), True, False, 19.5))
 ), ids=('None', 'Ellipsis (...)', 'Ellipsis', 'bool', 'int'))
-def special_types(request): return request.param
+def special_types3_10(request): return request.param
 
 
-def test_generate_special_types(special_types): TM(special_types[0])
+@pytest.fixture(params=(
+    (None, (None,), (..., (), True, False, 1, 0, 19.5)),
+    (bool, (True, False), (None, (), 1, 0, 19.5)),
+    (int, (0, 1), (None, (), True, False, 19.5))
+), ids=('None', 'bool', 'int'))
+def special_types3_9(request): return request.param
 
 
-def test_generate_matchers_of_special_type_matchers(special_types): TM(TM[special_types[0]])
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
+def test_generate_matchers_of_special_type_matchers_3_10(special_types3_10):
+    TM(TM[special_types3_10[0]])
 
 
-def test_special_types(special_types, match_types):
-    t, good, bad = special_types
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason='Test is not needed for Python 3.10 or higher. Reserved for 3.9 or lower.'
+)
+def test_generate_matchers_of_special_type_matchers_3_8(special_types3_9):
+    TM(TM[special_types3_9[0]])
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
+def test_special_types3_10(special_types3_10, match_types):
+    t, good, bad = special_types3_10
+    checker = TM(TM[t]) if match_types else TM(t)
+    for val in good:
+        assert checker(val), (f'{SHOULDA_PASSED}'
+                              f'checker: {checker}\n'
+                              f'value: {repr(val)}')
+
+    for val in bad:
+        assert not checker(val), (f'{SHOULDNA_PASSED}'
+                                  f'checker: {checker}\n'
+                                  f'value: {repr(val)}')
+
+
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason='Test is not needed for Python 3.10 or higher. Reserved for 3.9 and below.'
+)
+def test_special_types3_9(special_types3_9, match_types):
+    t, good, bad = special_types3_9
     checker = TM(TM[t]) if match_types else TM(t)
     for val in good:
         assert checker(val), (f'{SHOULDA_PASSED}'
@@ -1034,9 +1239,11 @@ def test_generate_union_type(): TM(UNION_TYPE)
 def test_generate_matcher_of_union_type_matcher(): TM(TM[UNION_TYPE])
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
 def test_generate_uniony_type(): TM(int | str | None)
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
 def test_generate_matcher_of_uniony_type_matcher(): TM(TM[int | str | None])
 
 
@@ -1048,6 +1255,7 @@ def test_union_type(union_vals, match_types):
                                          f'value: {repr(val)}')
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason='Test requires Python 3.10 or higher.')
 def test_uniony_type(union_vals, match_types):
     checker = TM(TM[int | str | None]) if match_types else TM(int | str | None)
     val, expectation = union_vals
@@ -1097,7 +1305,7 @@ def test_generate_callable_types(callable_types): TM(callable_types)
 def test_generate_matchers_of_callable_type_matchers(callable_types): TM(TM[callable_types])
 
 
-def at(func: callable, args: list[Union[type, str]], ret: type = None, *to: list):
+def at(func: callable, args: List[Union[type, str]], ret: type = None, *to: list):
     """Append To"""
     FUNCS.append(func)
     FUNC_NAMES.append(f'func signature | ({", ".join(str(v) for v in args)}) -> {ret}')

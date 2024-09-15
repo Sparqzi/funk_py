@@ -1,8 +1,16 @@
+import sys
 from inspect import getsource
 import operator
-from typing import Any, Callable, Optional, ParamSpec, overload, Mapping, Iterable, Union, Tuple
+from typing import Any, Callable, Optional, overload, Mapping, Iterable, Union, Tuple
+
+if sys.version_info >= (3, 10):
+    from typing import ParamSpec
+
+else:
+    from typing_extensions import ParamSpec
 
 from funk_py.modularity.logging import make_logger, logs_vars
+
 
 Args = ParamSpec("Args")
 
@@ -206,7 +214,8 @@ obj_logger = make_logger('Obj', 'OBJ_LOGGING', show_function=False, default_leve
 
 class ObjAttributeError(AttributeError):
     """An error associated with setting or getting an attribute from an :class:`~Obj`."""
-    pass
+    # Don't use a kwarg to pass to super. It doesn't like it in Python 3.8/3.9.
+    def __init__(self, message, *, name=None): super().__init__(message, name)
 
 
 class Obj(dict):

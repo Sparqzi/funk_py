@@ -1,8 +1,10 @@
-from functools import wraps, update_wrapper
-from typing import Hashable
+import sys
+from functools import update_wrapper
+
+from typing import Hashable, Optional, List, overload
 
 
-def has_alternatives(name: Hashable, *more_names: str):
+def has_alternatives(name: Hashable, *more_names: str) -> callable:
     """
     Gives a function the ability to have alternative versions which can be switched between at will.
 
@@ -73,6 +75,9 @@ def has_alternatives(name: Hashable, *more_names: str):
                 .. warning::
                     While it is advised to only decorate functions with the same signature in this
                     fashion, it is not enforced. Please take this into consideration.
+
+                .. note::
+                    The decorated methods should have different names.
 
                 :param name: The name to assign the alternative.
                 :param more_names: Any other names desired to alias to this version of the function.

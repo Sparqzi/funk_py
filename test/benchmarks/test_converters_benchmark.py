@@ -45,8 +45,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_empty_xml(self, empty_xml):
-        assert xml_to_json(empty_xml.input, empty_xml.sans_attributes) == empty_xml.output
+    @pytest.mark.benchmark
+    def test_empty_xml_benchmark(self, empty_xml, benchmark):
+        benchmark(xml_to_json, empty_xml.input, empty_xml.sans_attributes)
 
     V1 = VALS[0]
     ROOT_OF_VAL = {ROOT: V1}
@@ -68,20 +69,19 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_xml(self, s_xml):
-        assert xml_to_json(s_xml.input, s_xml.sans_attributes) == s_xml.output
+    @pytest.mark.benchmark
+    def test_simple_xml_benchmark(self, s_xml, benchmark):
+        benchmark(xml_to_json, s_xml.input, s_xml.sans_attributes)
 
     V2 = VALS[1]
     K1 = KEYS[1]
     K2 = KEYS[2]
 
     @pytest.fixture
-    def basic_attributes(self):
-        return {self.K1: self.V1, self.K2: self.V2}
+    def basic_attributes(self): return {self.K1: self.V1, self.K2: self.V2}
 
     @pytest.fixture
-    def sa_xml_builder(self, basic_attributes):
-        return ET.Element(ROOT, basic_attributes)
+    def sa_xml_builder(self, basic_attributes): return ET.Element(ROOT, basic_attributes)
 
     @pytest.fixture(params=((False, PS_40_000), (True, PS_40_000)),
                     ids=('with attributes', 'sans attributes'))
@@ -95,8 +95,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_attribute_only(self, sao_xml):
-        assert xml_to_json(sao_xml.input, sao_xml.sans_attributes) == sao_xml.output
+    @pytest.mark.benchmark
+    def test_simple_attribute_only_benchmark(self, sao_xml, benchmark):
+        benchmark(xml_to_json, sao_xml.input, sao_xml.sans_attributes)
 
     KV1 = {KEYS[i]: VALS[i - 1] for i in range(1, T_MAX)}
 
@@ -121,8 +122,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_no_attribute(self, sna_xml):
-        assert xml_to_json(sna_xml.input, sna_xml.sans_attributes) == sna_xml.output
+    @pytest.mark.benchmark
+    def test_simple_no_attribute_benchmark(self, sna_xml, benchmark):
+        benchmark(xml_to_json, sna_xml.input, sna_xml.sans_attributes)
 
     KV2 = {KEYS[i]: VALS[i - 1] for i in range(3, T_MAX)}
 
@@ -147,8 +149,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_attribute_and_tag(self, sat_xml):
-        assert xml_to_json(sat_xml.input, sat_xml.sans_attributes) == sat_xml.output
+    @pytest.mark.benchmark
+    def test_simple_attribute_and_tag_benchmark(self, sat_xml, benchmark):
+        benchmark(xml_to_json, sat_xml.input, sat_xml.sans_attributes)
 
     L1 = [VALS[i] for i in range(T_MAX)]
 
@@ -168,8 +171,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_no_attribute_list_no_attribute(self, snalna_xml):
-        assert xml_to_json(snalna_xml.input, snalna_xml.sans_attributes) == snalna_xml.output
+    @pytest.mark.benchmark
+    def test_simple_no_attribute_list_no_attribute_benchmark(self, snalna_xml, benchmark):
+        benchmark(xml_to_json, snalna_xml.input, snalna_xml.sans_attributes)
 
     L2 = [{KEYS[i]: VALS[i - 2], KEYS[i + 1]: VALS[i - 1]} for i in range(2, T_MAX - 2, 2)]
 
@@ -188,8 +192,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_no_attribute_list_attribute_only(self, snalao_xml):
-        assert xml_to_json(snalao_xml.input, snalao_xml.sans_attributes) == snalao_xml.output
+    @pytest.mark.benchmark
+    def test_simple_no_attribute_list_attribute_only_benchmark(self, snalao_xml, benchmark):
+        benchmark(xml_to_json, snalao_xml.input, snalao_xml.sans_attributes)
 
     L3 = [{TEXT: VALS[i],
            KEYS[i]: VALS[i - 2],
@@ -216,8 +221,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_no_attribute_list_attribute_and_tag(self, snalat_xml):
-        assert xml_to_json(snalat_xml.input, snalat_xml.sans_attributes) == snalat_xml.output
+    @pytest.mark.benchmark
+    def test_simple_no_attribute_list_attribute_and_tag_benchmark(self, snalat_xml, benchmark):
+        benchmark(xml_to_json, snalat_xml.input, snalat_xml.sans_attributes)
 
     L4 = [VALS[i - 4] for i in range(4, T_MAX)]
     K3 = KEYS[3]
@@ -243,8 +249,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_attribute_list_no_attribute(self, salna_xml):
-        assert xml_to_json(salna_xml.input, salna_xml.sans_attributes) == salna_xml.output
+    @pytest.mark.benchmark
+    def test_simple_attribute_list_no_attribute_benchmark(self, salna_xml, benchmark):
+        benchmark(xml_to_json, salna_xml.input, salna_xml.sans_attributes)
 
     L5 = [{KEYS[i]: VALS[i - 4], KEYS[i + 1]: VALS[i - 3]} for i in range(4, T_MAX - 2, 2)]
 
@@ -268,8 +275,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_attribute_list_attribute_only(self, salao_xml):
-        assert xml_to_json(salao_xml.input, salao_xml.sans_attributes) == salao_xml.output
+    @pytest.mark.benchmark
+    def test_simple_attribute_list_attribute_only_benchmark(self, salao_xml, benchmark):
+        benchmark(xml_to_json, salao_xml.input, salao_xml.sans_attributes)
 
     L6 = [{TEXT: VALS[i - 2],
            KEYS[i]: VALS[i - 4],
@@ -297,8 +305,9 @@ class TestXmlToJson:
 
         return XmlTDef(sans_attributes, _input, output, speed)
 
-    def test_simple_attribute_list_attribute_and_tag(self, salat_xml):
-        assert xml_to_json(salat_xml.input, salat_xml.sans_attributes) == salat_xml.output
+    @pytest.mark.benchmark
+    def test_simple_attribute_list_attribute_and_tag_benchmark(self, salat_xml, benchmark):
+        benchmark(xml_to_json, salat_xml.input, salat_xml.sans_attributes)
 
 
 class TestCsvToJson:
@@ -312,8 +321,9 @@ class TestCsvToJson:
 
         return OTDef(_input, output, PS_55_000)
 
-    def test_simple_csv(self, simple_csv):
-        assert csv_to_json(simple_csv.input) == simple_csv.output
+    @pytest.mark.benchmark
+    def test_simple_csv_benchmark(self, simple_csv, benchmark):
+        benchmark(csv_to_json, simple_csv.input)
 
     @pytest.fixture
     def quoted_csv(self):
@@ -325,8 +335,9 @@ class TestCsvToJson:
 
         return OTDef(_input, output, PS_55_000)
 
-    def test_quoted_csv(self, quoted_csv):
-        assert csv_to_json(quoted_csv.input) == quoted_csv.output
+    @pytest.mark.benchmark
+    def test_quoted_csv_benchmark(self, quoted_csv, benchmark):
+        benchmark(csv_to_json, quoted_csv.input)
 
     @pytest.fixture
     def quoted_csv_commas_inside(self):
@@ -339,9 +350,10 @@ class TestCsvToJson:
             output.append({_k: _v for _k, _v in zip(k, v)})
             
         return OTDef(_input, output, PS_35_000)
-    
-    def test_quoted_csv_commas_inside(self, quoted_csv_commas_inside):
-        assert csv_to_json(quoted_csv_commas_inside.input) == quoted_csv_commas_inside.output
+
+    @pytest.mark.benchmark
+    def test_quoted_csv_commas_inside_benchmark(self, quoted_csv_commas_inside, benchmark):
+        benchmark(csv_to_json, quoted_csv_commas_inside.input)
 
     @pytest.fixture
     def quoted_csv_quotes_inside(self):
@@ -354,6 +366,7 @@ class TestCsvToJson:
             output.append({_k.replace('""', '"'): _v.replace('""', '"') for _k, _v in zip(k, v)})
 
         return OTDef(_input, output, PS_45_000)
-    
-    def test_quoted_csv_quotes_inside(self, quoted_csv_quotes_inside):
-        assert csv_to_json(quoted_csv_quotes_inside.input) == quoted_csv_quotes_inside.output
+
+    @pytest.mark.benchmark
+    def test_quoted_csv_quotes_inside_benchmark(self, quoted_csv_quotes_inside, benchmark):
+        benchmark(csv_to_json, quoted_csv_quotes_inside.input)

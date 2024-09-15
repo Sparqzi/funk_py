@@ -72,7 +72,7 @@ def make_logger(name: str, /, env_var: str = 'LOG_LEVEL', *,
         format_str += '%(message)s'
         formatter = logging.Formatter(format_str)
 
-    primary_handler = logging.StreamHandler(sys.stdout)
+    primary_handler = logging.StreamHandler()
     primary_handler.setFormatter(formatter)
     logger.addHandler(primary_handler)
 

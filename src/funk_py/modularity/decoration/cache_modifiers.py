@@ -441,7 +441,7 @@ class _DiskCacheNameConverters:
         # optional in the future, but for now design for the most probable case.
         for t, converter in _DiskCacheNameConverters._converters.items():
             if isinstance(value, t):
-                return converter(value)
+                return converter.__func__(value)
 
         return _DiskCacheNameConverters._file_str(value)
 
@@ -455,7 +455,7 @@ def disk_cache(target_dir: Union[str, bytes, os.PathLike],
                read_converter: Callable[[DiskCacheIO], DiskCacheType] = None,
                cache_method: DiskCacheMethod = DiskCacheMethod.LFU,
                cache_arg: Any = None,
-               **override_name_converters: Callable[[...], str]):
+               **override_name_converters: Callable[..., str]):
     """
     A decorator which caches results of a function in the form of files. It has multiple ways to
     customize behavior.

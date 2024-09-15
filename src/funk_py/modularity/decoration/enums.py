@@ -2,7 +2,7 @@ from collections import namedtuple
 from enum import Enum
 from functools import wraps
 from inspect import signature as sgntr, Parameter
-from typing import Type, Callable, Any, Mapping
+from typing import Type, Callable, Any, Mapping, Union
 
 from funk_py.modularity.type_matching import TypeMatcher as Tm
 
@@ -71,21 +71,16 @@ class CarrierEnumMeta(type):
 
         for key, value in list(enum_members.items()):
             if not key.startswith('__') and key not in ('mro', ''):
-                if callable(value):
-                    if not hasattr(value, '_ignore_me'):
+                if not hasattr(value, '_ignore_me'):
+                    if (callable(value) or isinstance(value, classmethod)
+                            or isinstance(value, staticmethod)):
                         setattr(enum_class, key, t := metacls._create_func_(enum_class, value, key))
                         members[key] = t
 
-                elif isinstance(value, classmethod):
-                    if not hasattr(value, '_ignore_me'):
-                        setattr(enum_class, key,
-                                t := metacls._create_func_(enum_class, value, key))
+                    else:
+                        setattr(enum_class, key, t := metacls._create_value_(enum_class, value))
                         members[key] = t
-
-                else:
-                    setattr(enum_class, key, t := metacls._create_value_(enum_class, value))
-                    members[key] = t
-                    t._name_ = key
+                        t._name_ = key
 
         enum_class._norepeat_ = list(class_dict.keys())
         enum_class._members_ = members
@@ -108,14 +103,19 @@ class CarrierEnumMeta(type):
         # Deconstruct the signature of the function and populate evals, args, vargs, kwargs, and
         # vkwargs appropriately.
         sm = isinstance(func, staticmethod)
-        lm = '<lambda>' in func.__qualname__
-        if cm := (type(func) is classmethod):
-            setattr(cls, func.__name__ + '\\,,', func)
-            func = getattr(cls, func.__name__ + '\\,,')
-            sig = sgntr(func)
+        cm = isinstance(func, classmethod)
+
+        if sm or cm:
+            funk = func.__func__
+            lm = '<lambda>' in funk.__qualname__
+            setattr(cls, funk.__name__ + '\\,,', func)
+            funk = getattr(cls, funk.__name__ + '\\,,')
+            sig = sgntr(funk)
 
         else:
-            sig = sgntr(func)
+            lm = '<lambda>' in func.__qualname__
+            sig = sgntr(funk := func)
+
 
         first = True
         for name, parameter in sig.parameters.items():
@@ -125,32 +125,31 @@ class CarrierEnumMeta(type):
                     continue
 
             evals[name] = CarrierEnumMeta.__get_tm(parameter)
-            match parameter.kind:
-                case parameter.POSITIONAL_ONLY:
-                    args.append(name)
+            if (k := parameter.kind) == parameter.POSITIONAL_ONLY:
+                args.append(name)
 
-                case parameter.POSITIONAL_OR_KEYWORD:
-                    args.append(name)
-                    kwargs.append(name)
+            elif k == parameter.POSITIONAL_OR_KEYWORD:
+                args.append(name)
+                kwargs.append(name)
 
-                case parameter.VAR_POSITIONAL:
-                    vargs = name
+            elif k == parameter.VAR_POSITIONAL:
+                vargs = name
 
-                case parameter.KEYWORD_ONLY:
-                    kwargs.append(name)
+            elif k == parameter.KEYWORD_ONLY:
+                kwargs.append(name)
 
-                case parameter.VAR_KEYWORD:
-                    vkwargs = name
+            elif k == parameter.VAR_KEYWORD:
+                vkwargs = name
 
         if sm | cm | lm:
             def bind(self, *_args, **_kwargs):
-                return sig.bind(*_args, **_kwargs), func(*_args, **_kwargs)
+                return sig.bind(*_args, **_kwargs), funk(*_args, **_kwargs)
 
         else:
             def bind(self, *_args, **_kwargs):
-                return sig.bind(self, *_args, **_kwargs), func(self, *_args, **_kwargs)
+                return sig.bind(self, *_args, **_kwargs), funk(self, *_args, **_kwargs)
 
-        @wraps(func)
+        @wraps(funk)
         def __call__(self, *_args, **_kwargs):
             bound, result = bind(self, *_args, **_kwargs)
             bound.apply_defaults()
@@ -381,7 +380,7 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         return self._args[index]
 
     @classmethod
-    def _valid_member_name_(cls, new_name: str | Callable[[], str]) -> str:
+    def _valid_member_name_(cls, new_name: Union[str, Callable[[], str]]) -> str:
         if callable(new_name):
             while (name := new_name()) in cls._norepeat_: ...
             return name
