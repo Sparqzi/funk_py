@@ -1406,28 +1406,6 @@ class TestAccumulate:
     name = ACC
     pick_type = PickType.ACCUMULATE
 
-    def deco_too_slow_func(
-            self,
-            t: Union[ListSet, DictSet]
-    ) -> Callable[[Optional[int]], Callable[[Union[list, dict]], Any]]:
-        def gives_func(which=None):
-            def func(x):
-                if which is None:
-                    pick(t.output_map, x, self.pick_type)
-
-                elif which == 1:
-                    pick(t.output_map1, x, self.pick_type)
-
-                elif which == 2:
-                    pick(t.output_map2, x, self.pick_type)
-
-                else:
-                    assert False, 'The given value for which was not reasonable.'
-
-            return func
-
-        return gives_func
-
     def test_simple_lists(self, similar_lists):
         t = similar_lists
         ans = pick(t.output_map1, t.list1, self.pick_type)
