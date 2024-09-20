@@ -426,7 +426,7 @@ def fracture(
     Separates a list of dictionaries into sets based on the values of a subset of keys and returns
     each set one at a time.
 
-    :param data: The List to fracture.
+    :param data: The list to fracture.
     :type data: List[dict]
     :param keys: The subset of keys which should be used to differentiate between items in ``data``.
     :type keys: str
@@ -460,23 +460,42 @@ def _iter_fracture(
     # The following two objects will be used to reduce repetitive calculations.
     calc = [None] * len(data)
     done = [False] * len(data)
-    for i, val in enumerate(data):
-        # Quite simply, don't generate a new list for something already included in a list.
+    source = iter(enumerate(data))
+    try:
+        i, val = next(source)
+
+    except StopIteration:
+        return
+
+    builder = []
+    def1 = get_subset_values(val, *keys) if calc[i] is None else calc[i]
+    mark = get_subset(val, *keys)
+    app_func(builder, val)
+    for j, _val in enumerate(data[i + 1:]):
+        j += i + 1
+        calc[j] = def2 = get_subset_values(_val, *keys)
+        if def1 == def2:
+            app_func(builder, _val)
+            done[j] = True
+
+    yield mark, builder
+
+    while True:
+        try:
+            i, val = next(source)
+
+        except StopIteration:
+            return
+
         if not done[i]:
             builder = []
-            def1 = get_subset_values(val, *keys) if calc[i] is None else calc[i]
+            def1 = calc[i]
             mark = get_subset(val, *keys)
             app_func(builder, val)
-            for j, _val in enumerate(data)[i + 1:]:
-                if calc[j] is None:
-                    def2 = get_subset_values(_val, *keys) if calc[j] is None else calc[j]
-                    calc[j] = def2
-
-                else:
-                    def2 = calc[j]
-
-                if def1 == def2:
-                    app_func(builder, val)
+            for j, _val in enumerate(data[i + 1:]):
+                j += i + 1
+                if def1 == calc[j]:
+                    app_func(builder, _val)
                     done[j] = True
 
             yield mark, builder
