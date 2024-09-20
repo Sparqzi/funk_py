@@ -1158,10 +1158,10 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
 
 
 @pytest.fixture(params=(
-    {KEYS[0]: {KEYS[1]: {KEYS[3]: VALS2}}},
+    {KEYS[0]: {KEYS[1]: {KEYS[3]: VALS2[0]}}},
     {KEYS[0]: {KEYS[1]: {}}},
     {KEYS[0]: {KEYS[1]: None}},
-    {KEYS[0]: {KEYS[2]: VALS2}},
+    {KEYS[0]: {KEYS[2]: VALS2[0]}},
     {KEYS[0]: {}},
     {KEYS[0]: None}
 ), ids=(
@@ -1173,6 +1173,32 @@ def complicated_dict1(request, dissimilar_lists, more_dissimilar_lists):
     'second None'
 ))
 def danger_dict(request): return {KEYS[0]: {KEYS[1]: {KEYS[2]: OUT_KEYS[2]}}}, request.param
+
+
+@pytest.fixture(params=(
+    {KEYS[0]: {KEYS[1]: {KEYS[3]: VALS2[0]}}, KEYS[1]: VALS1[0]},
+    {KEYS[0]: {KEYS[1]: {}}, KEYS[1]: VALS1[0]},
+    {KEYS[0]: {KEYS[1]: None}, KEYS[1]: VALS1[0]},
+    {KEYS[0]: {KEYS[2]: VALS2[0]}, KEYS[1]: VALS1[0]},
+    {KEYS[0]: {}, KEYS[1]: VALS1[0]},
+    {KEYS[0]: None, KEYS[1]: VALS1[0]}
+), ids=(
+    'Last key different',
+    'last no keys',
+    'last None',
+    'second value',
+    'second no keys',
+    'second None'
+))
+def less_danger_dict(request):
+    return {
+        KEYS[0]: {
+            KEYS[1]: {
+                KEYS[2]: OUT_KEYS[2],
+            },
+        },
+        KEYS[1]: OUT_KEYS[1],
+    }, request.param
 
 
 class TestMultiplicative:
@@ -1232,9 +1258,14 @@ class TestMultiplicative:
         compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
 
     def test_danger_dict(self, danger_dict):
-        output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
+        output_map, _dict = danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
         assert len(ans) == 0
+
+    def test_less_danger_dict(self, less_danger_dict):
+        output_map, _dict = less_danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
+        assert ans == [{OUT_KEYS[1]: VALS1[0]}]
 
 
 class TestTandem:
@@ -1294,9 +1325,14 @@ class TestTandem:
         compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
 
     def test_danger_dict(self, danger_dict):
-        output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
+        output_map, _dict = danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
         assert len(ans) == 0
+
+    def test_less_danger_dict(self, less_danger_dict):
+        output_map, _dict = less_danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
+        assert ans == [{OUT_KEYS[1]: VALS1[0]}]
 
 
 class TestReduce:
@@ -1356,9 +1392,14 @@ class TestReduce:
         compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
 
     def test_danger_dict(self, danger_dict):
-        output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
+        output_map, _dict = danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
         assert len(ans) == 0
+
+    def test_less_danger_dict(self, less_danger_dict):
+        output_map, _dict = less_danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
+        assert ans == [{OUT_KEYS[1]: VALS1[0]}]
 
 
 class TestAccumulate:
@@ -1440,6 +1481,11 @@ class TestAccumulate:
         compare_lists_of_dicts_unordered(ans, t.result_set[self.name])
 
     def test_danger_dict(self, danger_dict):
-        output_map, dict = danger_dict
-        ans = pick(output_map, dict, self.pick_type)
+        output_map, _dict = danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
         assert len(ans) == 1
+
+    def test_less_danger_dict(self, less_danger_dict):
+        output_map, _dict = less_danger_dict
+        ans = pick(output_map, _dict, self.pick_type)
+        assert ans == [{OUT_KEYS[1]: [VALS1[0]]}]

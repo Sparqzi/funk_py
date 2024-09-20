@@ -67,7 +67,14 @@ def _com_tan_start_and_list_func(ans: list, builder: list, static_builder: dict)
 
 def _acc_start_list_and_iter_func(ans: list, builder: list, static_builder: dict) -> None:
     if not len(builder):
-        builder.extend(ans)
+        builder.append({})
+        for _ans in ans:
+            for k, v in _ans.items():
+                if isinstance(v, list):
+                    builder[0][k] = v
+
+                else:
+                    builder[0][k] = [v]
 
     else:
         for _ans in ans:
@@ -118,6 +125,10 @@ def _tan_iter_func(ans: list, builder: list, static_builder: dict) -> None:
 
 
 def _com_tan_final_func(builder: list, static_builder: dict) -> None:
+    if len(static_builder) and not len(builder):
+        builder.append(static_builder)
+        return
+
     for result in builder:
         result.update(static_builder)
 
@@ -239,7 +250,7 @@ def _find_and_follow_first_path_in_pick(
             if not isinstance(worker, dict):
                 main_logger.warning(f'An unexpected value was encountered in pick attempt. a path '
                                     f'has now been skipped. value = {worker}')
-                return None, None, True
+                return None, None, False
 
             if path in worker:
                 if isinstance(instruction, str):
@@ -258,6 +269,7 @@ def _find_and_follow_first_path_in_pick(
                         return instruction, worker[path], False
 
                     main_logger.warning(f'Path ended early. {repr(worker)} does not have keys.')
+                    return None, None, False
 
         except StopIteration:
             # Welp, the caller will have to return immediately, none of the paths requested were
