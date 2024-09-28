@@ -1147,8 +1147,14 @@ def _strict_has_no_issues(obj1, obj2):
 
 def check_list_equality(list1: Union[list, tuple], list2: Union[list, tuple]):
     """Checks for list equality regardless of whether the lists are recursive or not."""
+    if len(list1) != len(list2):
+        return False
+
     try:
-        return list1 == list2
+        if list1 == list2:
+            return True
+
+        return _recursive_check_list_equality(list1, list2, [list1], [list2])
 
     except RecursionError:
         try:
@@ -1164,23 +1170,18 @@ def strict_check_list_equality(list1: Union[list, tuple], list2: Union[list, tup
     Checks for list equality regardless of whether the lists are recursive or not. Also makes the
     distinction of ``True is not 1`` and ``False is not 0``.
     """
-    try:
-        ans = list1 == list2
-        if not ans:
-            # Fail as fast as possible. If they aren't equal, they aren't equal.
-            return False
+    if len(list1) != len(list2):
+        return False
 
-        # At this point, we know the lists should at least be similar, but since this is a strict
-        # check, we want to make sure that dicts containing False or True as a key or value don't
-        # get compared to dicts with 0 or 1 as a key or value, respectively. As well, we should
-        # confirm that lists which contain False or True do not get compared to lists that contain 0
-        # or 1 respectively.
-        return _strict_has_no_issues(list1, list2)
+    try:
+        if list1 == list2:
+            return _strict_has_no_issues(list1, list2)
+
+        return _recursive_check_list_equality(list1, list2, [list1], [list2], strict=True)
 
     except RecursionError:
         try:
-            return _recursive_check_list_equality(list1, list2, [list1], [list2],
-                                                  strict=True)
+            return _recursive_check_list_equality(list1, list2, [list1], [list2], strict=True)
 
         except RecursionError as e:
             fill = 'list' if type(list1) is list else 'tuple'
@@ -1222,8 +1223,14 @@ def check_dict_equality(dict1: dict, dict2: dict):
     """
     Checks for dictionary equality regardless of whether the dictionaries are recursive or not.
     """
+    if len(dict1) != len(dict2):
+        return False
+
     try:
-        return dict1 == dict2
+        if dict1 == dict2:
+            return True
+
+        return _recursive_check_dict_equality(dict1, dict2, [dict1], [dict2])
 
     except RecursionError:
         try:
@@ -1238,18 +1245,14 @@ def strict_check_dict_equality(dict1: dict, dict2: dict):
     Checks for dictionary equality regardless of whether the dictionaries are recursive or not. Also
     makes the distinction of ``True is not 1`` and ``False is not 0``.
     """
-    try:
-        ans = dict1 == dict2
-        if not ans:
-            # Fail as fast as possible. If they aren't equal, they aren't equal.
-            return False
+    if len(dict1) != len(dict2):
+        return False
 
-        # At this point, we know the dicts should at least be similar, but since this is a strict
-        # check, we want to make sure that dicts containing False or True as a key or value don't
-        # get compared to dicts with 0 or 1 as a key or value, respectively. As well, we should
-        # confirm that lists which contain False or True do not get compared to lists that contain 0
-        # or 1 respectively.
-        return _strict_has_no_issues(dict1, dict2)
+    try:
+        if dict1 == dict2:
+            return _strict_has_no_issues(dict1, dict2)
+
+        return _recursive_check_dict_equality(dict1, dict2, [dict1], [dict2], strict=True)
 
     except RecursionError:
         try:
