@@ -75,7 +75,7 @@ class CarrierEnumMeta(type):
     def __new__(metacls, cls, bases, class_dict, **kwds):
         class_dict['_ignore_'] = ['_value_', 'value', 'name', '_name_', '_ignore_',
                                   '_valid_member_name_', '_mem_map_', '_get_from_mem_map_',
-                                  '_add_to_mem_map_', '_members_', '_members__']
+                                  '_add_to_mem_map_', '_members_', '_members__', '_make_arg_safe_']
         ignore = class_dict['_ignore_']
 
         # create a default docstring if one has not been provided
@@ -412,9 +412,16 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             self._pos_ = 0
 
         elif type(value) in (_ArgEnum, _SimpleArgEnum):
-            self._args = value.args
+            self._args = tuple(self._make_arg_safe_(arg) for arg in value.args)
             for _name, value in value.kwargs.items():
-                setattr(self, _name, value)
+                setattr(self, _name, self._make_arg_safe_(value))
+
+    @staticmethod
+    def _make_arg_safe_(arg):
+        if isinstance(arg, staticmethod):
+            return arg.__func__
+
+        return arg
 
     def __call__(self, *args, **kwargs) -> 'CarrierEnum':
         if not hasattr(self, '_call_') or self._call_ is None:
