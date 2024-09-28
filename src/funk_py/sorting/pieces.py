@@ -31,7 +31,10 @@ PickFinalFunc = Callable[[list, dict], None]
 
 
 class PickType(Enum):
-    """``PickType`` is an enum containing the valid pick types for :func:`pick`."""
+    """
+    ``PickType`` is an enum containing the valid pick types for :func:`pick`. Available types are
+    ``COMBINATORIAL``, ``TANDEM``, ``REDUCE``, and ``ACCUMULATE``.
+    """
     COMBINATORIAL = 'combinatorial'
     TANDEM = 'tandem'
     REDUCE = 'reduce'
@@ -39,6 +42,13 @@ class PickType(Enum):
 
 
 class PickInstruction(Enum):
+    """
+    ``PickInstruction`` is an enum containing the valid pick instructions for :func:`pick`.
+    Available instructions are ``JSON``, ``JSONL``, ``JSON_SINGLE_QUOTE``, ``XML``,
+    ``XMLSA`` (XML sans-attributes), ``ELIST``, ``LIST``, ``CSV``, ``YAML``, ``TUPLE_DICT``,
+    and ``FORM``. Members mimicking :class:`PickType`'s members are also available, and their use
+    indicates that pick type should be changed before diving deeper into the original object.
+    """
     JSON = 'json'
     JSONL = 'jsonl'
     JSON_SINGLE_QUOTE = 'json\''
