@@ -299,10 +299,10 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
 
     .. code-block:: python
 
-        print(MyEnum.PI)    # prints 3.14159
-        print(MyEnum.PI())  # raises a TypeError
-        print(MyEnum.PI[0]) # raises a TypeError
-        print(MyEnum.PI.x)  # raises an AttributeError
+        print(MyEnum.PI)     # prints 3.14159
+        print(MyEnum.PI())   # raises a TypeError
+        print(MyEnum.PI[0])  # raises a TypeError
+        print(MyEnum.PI.x)   # raises an AttributeError
 
     Functional Member Access Examples:
 
@@ -311,17 +311,17 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         # Simple Examples:
         # Default values will be used.
         point1 = MyEnum.POINT2D(42)
-        print(point1.x)  # prints 42
-        print(point1[0]) # prints 42
-        print(point1.y)  # prints 0
-        print(point1[1]) # prints 0
+        print(point1.x)   # prints 42
+        print(point1[0])  # prints 42
+        print(point1.y)   # prints 0
+        print(point1[1])  # prints 0
 
         # Filling the signature makes a difference.
         point2 = MyEnum.POINT2D(42, 55)
-        print(point2.x)  # prints 42
-        print(point2[0]) # prints 42
-        print(point2.y)  # prints 55
-        print(point2[1]) # prints 55
+        print(point2.x)   # prints 42
+        print(point2[0])  # prints 42
+        print(point2.y)   # prints 55
+        print(point2[1])  # prints 55
 
         # positional, positional-or-keyword, and keyword arguments are treated differently.
         point3 = MyEnum.POINT3D(53, 19, z=93)
@@ -336,40 +336,40 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
         # Values returned by executing the wrapped method will be added to kwargs.
         # Class methods are also made to function normally when wrapped.
         point4 = MyEnum.PI_POINT3D(1, 2)
-        print(point4.x)  # raises an AttributeError
-        print(point4[0]) # prints 1
-        print(point4.y)  # prints 2
-        print(point4[1]) # prints 2
-        print(point4.z)  # prints 3.14159
-        print(point4[2]) # raises an IndexError
+        print(point4.x)   # raises an AttributeError
+        print(point4[0])  # prints 1
+        print(point4.y)   # prints 2
+        print(point4[1])  # prints 2
+        print(point4.z)   # prints 3.14159
+        print(point4[2])  # raises an IndexError
 
         # Values returned by executing the wrapped method will be added to kwargs.
         # Instance methods are also made to function normally when wrapped.
         point5 = MyEnum.CALC_POINT2D(14)
-        print(point5.x)  # prints 14
-        print(point5[0]) # prints 14
-        print(point5.y)  # prints 56
-        print(point5[1]) # raises an IndexError
+        print(point5.x)   # prints 14
+        print(point5[0])  # prints 14
+        print(point5.y)   # prints 56
+        print(point5[1])  # raises an IndexError
 
         point6 = MyEnum.CALC_POINT2D(14)
-        print(point6.x)  # prints 14
-        print(point6[0]) # prints 14
-        print(point6.y)  # prints 112
-        print(point6[1]) # raises an IndexError
+        print(point6.x)   # prints 14
+        print(point6[0])  # prints 14
+        print(point6.y)   # prints 112
+        print(point6[1])  # raises an IndexError
 
         # Lambdas are treated like static methods.
         point7 = MyEnum.POINT4D(5, 6, 7, 8)
-        print(point7.w)  # prints 5
-        print(point7[0]) # prints 5
-        print(point7.x)  # prints 6
-        print(point7[1]) # prints 6
-        print(point7.y)  # prints 7
-        print(point7[2]) # prints 7
-        print(point7.z)  # prints 8
-        print(point7[3]) # prints 8
+        print(point7.w)   # prints 5
+        print(point7[0])  # prints 5
+        print(point7.x)   # prints 6
+        print(point7[1])  # prints 6
+        print(point7.y)   # prints 7
+        print(point7[2])  # prints 7
+        print(point7.z)   # prints 8
+        print(point7[3])  # prints 8
 
         # ignore decorator should keep a function from being interpreted as an attribute.
-        print(MyEnum.gen_random()) # prints 4
+        print(MyEnum.gen_random())  # prints 4
     """
     def __new__(cls, value):
         cls_ = super().__new__(cls)
