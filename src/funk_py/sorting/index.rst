@@ -13,6 +13,7 @@ Sorting
    pick_docs
    converters
    dict_manip
+   pieces
 
 
 Indices and tables
