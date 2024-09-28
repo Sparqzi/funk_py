@@ -2,7 +2,7 @@ from typing import Union, List
 
 import pytest
 
-from funk_py.modularity.decoration.enums import CarrierEnum, ignore
+from funk_py.modularity.decoration.enums import CarrierEnum, ignore, special_member
 
 
 def test_can_create_empty():
@@ -34,7 +34,7 @@ def test_can_create_with_simple_values_and_use():
     assert Bologna.HOARSE.name == 'HOARSE'
 
 
-def test_simple_values_cant_be_called():
+def test_simple_values_cant_be_called_or_indexed():
     class Bologna(CarrierEnum):
         HORSE = 1
         HOUSE = 2
@@ -46,6 +46,15 @@ def test_simple_values_cant_be_called():
 
     with pytest.raises(TypeError):
         Bologna.HORSE[0]
+
+
+def test_special_values_cant_be_called():
+    class Bologna(CarrierEnum):
+        HORSE = special_member(4, 5)
+        HOUSE = special_member(a=1, b=2)
+
+    with pytest.raises(TypeError):
+        Bologna.HORSE(4)
 
 
 def test_can_create_with_complex_values():
@@ -136,6 +145,8 @@ class TestEverything:
                 i_self.uses = 0
 
             PI = self.PI
+
+            FIXED_POINT5D = special_member(5, 4, x=3, y=2, z=1)
 
             POINT4D = lambda w, x, y, z: ...
 
@@ -238,3 +249,15 @@ class TestEverything:
         assert point[2] == 7, B_POS
         assert point.z == 8, B_ATTR
         assert point[3] == 8, B_POS
+
+    def test_special_member(self, t_enum):
+        point = t_enum.FIXED_POINT5D
+        assert point.value == 'FIXED_POINT5D'
+        assert point.name == 'FIXED_POINT5D'
+        assert point[0] == 5
+        assert point[1] == 4
+        pytest.raises(IndexError, lambda: point[2])
+        assert point.x == 3
+        assert point.y == 2
+        assert point.z == 1
+        pytest.raises(AttributeError, lambda: point.a)
