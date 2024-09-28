@@ -2,9 +2,9 @@ from collections import namedtuple
 from enum import Enum
 from functools import wraps
 from inspect import signature as sgntr, Parameter
-from typing import Type, Callable, Any, Mapping, Union
+from typing import Type, Callable, Any, Mapping, Union, Optional
 
-from funk_py.modularity.type_matching import TypeMatcher as Tm
+from funk_py.modularity.type_matching import TypeMatcher as Tm, check_list_equality
 
 
 def converts_enums(func: Callable):
@@ -42,6 +42,26 @@ _SENTINEL = '_-`;\\7\'"4J'
 
 _FuncArgSpec = namedtuple('_FuncArgSpec', ('name', 'func',))
 _ArgEnum = namedtuple('_ArgEnum', ('name', 'args', 'kwargs'))
+_SimpleArgEnum = namedtuple('_SimpleArgEnum', ('name', 'args', 'kwargs'))
+
+
+def ignore(func: callable):
+    """
+    A decorator that can be used on functions inside a ``CarrierEnum`` to denote that they should
+    not be used to create instances of the enum.
+    """
+    func._ignore_me = True
+    return func
+
+
+class _SpecialMember:
+    def __init__(self, args, kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+def special_member(*args, **kwargs) -> _SpecialMember:
+    return _SpecialMember(args, kwargs)
 
 
 class CarrierEnumMeta(type):
@@ -54,7 +74,8 @@ class CarrierEnumMeta(type):
 
     def __new__(metacls, cls, bases, class_dict, **kwds):
         class_dict['_ignore_'] = ['_value_', 'value', 'name', '_name_', '_ignore_',
-                                  '_valid_member_name_']
+                                  '_valid_member_name_', '_mem_map_', '_get_from_mem_map_',
+                                  '_add_to_mem_map_', '_members_', '_members__']
         ignore = class_dict['_ignore_']
 
         # create a default docstring if one has not been provided
@@ -68,11 +89,19 @@ class CarrierEnumMeta(type):
 
         enum_class = super().__new__(metacls, cls, bases, class_dict, **kwds)
         members = {}
+        enum_class._mem_map_ = {}
 
         for key, value in list(enum_members.items()):
             if not key.startswith('__') and key not in ('mro', ''):
                 if not hasattr(value, '_ignore_me'):
-                    if (callable(value) or isinstance(value, classmethod)
+                    if type(value) is _SpecialMember:
+                        setattr(enum_class,
+                                key,
+                                t := metacls._create_special_(enum_class, value, key))
+                        members[key] = t
+                        t._name_ = key
+
+                    elif (callable(value) or isinstance(value, classmethod)
                             or isinstance(value, staticmethod)):
                         setattr(enum_class, key, t := metacls._create_func_(enum_class, value, key))
                         members[key] = t
@@ -84,7 +113,11 @@ class CarrierEnumMeta(type):
 
         enum_class._norepeat_ = list(class_dict.keys())
         enum_class._members_ = members
+
         return enum_class
+
+    @staticmethod
+    def _create_special_(cls, value, key): return cls(_SimpleArgEnum(key, value.args, value.kwargs))
 
     @staticmethod
     def _create_func_(cls, func, key): return cls(CarrierEnumMeta.__modify_function(func, cls, key))
@@ -172,18 +205,24 @@ class CarrierEnumMeta(type):
             if isinstance(result, Mapping):
                 _kwargs_.update(result)
 
-            return cls(_ArgEnum(self.name, _args_, _kwargs_))
+            # If a matching instance exists, return that instance instead of duplicating. Helps to
+            # keep the class from ballooning and eating up memory.
+            if (inst := self._get_from_mem_map_(self.value, _args_, _kwargs_)) is not None:
+                return inst
+
+            # If a matching instance does not exist, generate a new one, add it to the _mem_map_,
+            # and return it.
+            inst = cls(_ArgEnum(self.name, _args_, _kwargs_))
+            self._add_to_mem_map_(self.value, _args_, _kwargs_, inst)
+            return inst
 
         return _FuncArgSpec(key, __call__)
 
+    def __contains__(cls, item): return item in cls._members__().values()
 
-def ignore(func: callable):
-    """
-    A decorator that can be used on functions inside a ``CarrierEnum`` to denote that they should
-    not be used to create instances of the enum.
-    """
-    func._ignore_me = True
-    return func
+    def __iter__(cls):
+        print(cls._members_)
+        return iter(cls._members_.values())
 
 
 class CarrierEnum(metaclass=CarrierEnumMeta):
@@ -351,6 +390,16 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             cls_._norepeat_.append(cls_._name_)
             return cls_
 
+        elif type(value) is _SimpleArgEnum:
+            name = cls_._name_ = cls_._value_ = value.name
+            cls_._name_ = value.name
+            if name in cls._norepeat_:
+                raise AttributeError(f'Cannot reassign members. Attempted to reassign {name}.')
+
+            cls_._members_[cls_._name_] = cls_
+            cls_._norepeat_.append(cls_._name_)
+            return cls_
+
         cls_._value_ = value
         return cls_
 
@@ -362,7 +411,7 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             self._call_ = value.func
             self._pos_ = 0
 
-        elif type(value) is _ArgEnum:
+        elif type(value) in (_ArgEnum, _SimpleArgEnum):
             self._args = value.args
             for _name, value in value.kwargs.items():
                 setattr(self, _name, value)
@@ -389,6 +438,24 @@ class CarrierEnum(metaclass=CarrierEnumMeta):
             raise AttributeError(f'Cannot reassign members. Attempted to reassign {new_name}.')
 
         return new_name
+
+    @classmethod
+    def _get_from_mem_map_(cls, value, args, kwargs) -> Optional['CarrierEnum']:
+        if value not in cls._mem_map_:
+            return None
+
+        _data = (args, kwargs)
+        for data, inst in cls._mem_map_[value]:
+            if check_list_equality(_data, data):
+                return inst
+
+    @classmethod
+    def _add_to_mem_map_(cls, value, args, kwargs, inst):
+        if value not in cls._mem_map_:
+            cls._mem_map_[value] = [((args, kwargs), inst)]
+            return
+
+        cls._mem_map_[value].append(((args, kwargs), inst))
 
     @property
     def value(self): return self._value_
